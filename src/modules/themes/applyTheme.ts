@@ -9,8 +9,8 @@ const STYLE_ID = 'pw-theme-tokens';
  * `[data-theme="dark"] { --pw-color-surface: …; color-scheme: dark }`.
  *
  * Switching a theme only changes the `data-theme` attribute; no colours are
- * written inline. Known issue (docs/status.md, F-1): in the macOS CI, WebKit
- * reported inherited text colours one switch behind after a theme change at
+ * written inline. Known issue (docs/status.md, F-1): in the macOS and Windows
+ * CI, inherited text colours were reported stale after a theme change at
  * runtime. The start-up theme is unaffected.
  */
 export function themeStylesheet(): string {
