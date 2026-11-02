@@ -25,3 +25,4 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 #### Bekannte Fehler
 
 - F-1: macOS – nach einem Theme-Wechsel zur Laufzeit meldet WebKit geerbte Textfarben verzögert (siehe `docs/status.md`).
+- F-2: macOS – die Farbe des Fokusrings wird als Textfarbe des Buttons gemeldet (siehe `docs/status.md`).
