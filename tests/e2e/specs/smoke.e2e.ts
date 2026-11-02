@@ -124,44 +124,53 @@ describe('Project Write – Phase 1 smoke test', () => {
           themes[theme][token as keyof (typeof themes)[ThemeName]],
         ]),
       );
-      const pairs = await browser.execute((vars: Record<string, string>) => {
-        const root = document.documentElement;
-        for (const [name, value] of Object.entries(vars)) {
-          root.style.setProperty(name, value);
-        }
-        const background = (element: Element | null): string => {
-          for (let node = element; node; node = node.parentElement) {
-            const color = getComputedStyle(node).backgroundColor;
-            if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
-              return color;
-            }
+      const pairs = await browser.execute(
+        (vars: Record<string, string>, scheme: string) => {
+          // Same steps as applyTheme(): tokens, data-theme and color-scheme.
+          const root = document.documentElement;
+          for (const [name, value] of Object.entries(vars)) {
+            root.style.setProperty(name, value);
           }
-          return getComputedStyle(document.body).backgroundColor;
-        };
-        const selectors = [
-          'h1',
-          'header p',
-          'h2',
-          '[data-testid="check-summary"]',
-          '[data-check] span',
-          'button',
-          'footer span',
-        ];
-        return selectors.flatMap((selector) =>
-          Array.from(document.querySelectorAll(selector)).map((element) => ({
-            selector,
-            text: element.textContent.trim(),
-            color: getComputedStyle(element).color,
-            background: background(element),
-          })),
-        );
-      }, variables);
+          root.dataset['theme'] = scheme;
+          root.style.colorScheme = scheme;
+          const background = (element: Element | null): string => {
+            for (let node = element; node; node = node.parentElement) {
+              const color = getComputedStyle(node).backgroundColor;
+              if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
+                return color;
+              }
+            }
+            return getComputedStyle(document.body).backgroundColor;
+          };
+          const selectors = [
+            'h1',
+            'header p',
+            'h2',
+            '[data-testid="check-summary"]',
+            '[data-check] span',
+            'button',
+            'footer span',
+          ];
+          return selectors.flatMap((selector) =>
+            Array.from(document.querySelectorAll(selector)).map((element) => ({
+              selector,
+              text: element.textContent.trim(),
+              color: getComputedStyle(element).color,
+              background: background(element),
+            })),
+          );
+        },
+        variables,
+        theme,
+      );
 
       expect(pairs.length).toBeGreaterThan(10);
-      for (const pair of pairs.filter((p) => p.text !== '' && p.text !== '·')) {
-        const ratio = contrastRatio(rgbToHex(pair.color), rgbToHex(pair.background));
-        expect({ ...pair, ok: ratio >= MIN_TEXT_CONTRAST }).toMatchObject({ ok: true });
-      }
+      // Report every failing element at once, with its colours and ratio.
+      const failures = pairs
+        .filter((p) => p.text !== '' && p.text !== '·')
+        .map((p) => ({ ...p, ratio: contrastRatio(rgbToHex(p.color), rgbToHex(p.background)) }))
+        .filter((p) => p.ratio < MIN_TEXT_CONTRAST);
+      expect(failures).toEqual([]);
     });
   }
 
@@ -202,9 +211,11 @@ describe('Project Write – Phase 1 smoke test', () => {
       isFirst: true,
       focusVisible: true,
       outlineStyle: 'solid',
-      outlineWidth: '2px',
     });
     if (focused) {
+      // index.css sets 2px; WebKit on macOS reports a wider ring (3px). Section 11
+      // requires a visible focus, so at least 2px is accepted.
+      expect(parseFloat(focused.outlineWidth)).toBeGreaterThanOrEqual(2);
       // Section 6: graphical elements need 3:1 against their surroundings.
       expect(
         contrastRatio(rgbToHex(focused.outlineColor), rgbToHex(focused.background)),
