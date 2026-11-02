@@ -20,7 +20,12 @@ if (!fs.existsSync(application)) {
 // Keep everything the webview writes (caches, local storage) inside the
 // project folder (section 2: tests never write outside it).
 const sandbox = path.join(root, 'tests', 'e2e', '.tmp');
-fs.rmSync(sandbox, { recursive: true, force: true });
+// WebdriverIO evaluates this file again in every worker. Only the launcher may
+// clear the folder: by then the app is running and, on Windows, holds locks on
+// its WebView2 data inside it.
+if (!process.env['WDIO_WORKER_ID']) {
+  fs.rmSync(sandbox, { recursive: true, force: true });
+}
 for (const dir of ['data', 'config', 'cache', 'webview2']) {
   fs.mkdirSync(path.join(sandbox, dir), { recursive: true });
 }
