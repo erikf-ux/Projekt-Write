@@ -48,11 +48,14 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 - PDF.js und WebAssembly-Decoder vs. CSP prüfen (Phase 8, `docs/architecture.md` Abschnitt 10).
 - Isolation Pattern vor Phase 8 und vor Phase 14 neu bewerten (ADR 0005).
 
-### Entscheidungen des Auftraggebers (vor Phase 14)
+### Entscheidungen des Auftraggebers
+
+- Erledigt: Bundle-Kennung `app.projectwrite.desktop` bestätigt; App-Icon festgelegt (Schreibmaschine).
+
+Noch offen (vor Phase 14):
 
 - D4 Lizenz der App, inkl. Bewertung der MPL-2.0-Crates im Tauri-Baum.
 - D11 Signierung, Apple-Developer-Konto.
-- Endgültige Bundle-Kennung (derzeit vorläufig `app.projectwrite.desktop`, ADR 0001).
 
 ## Nächster Schritt
 

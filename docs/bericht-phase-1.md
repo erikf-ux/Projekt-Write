@@ -86,9 +86,10 @@ Keine.
 
 0001 Versionen (TypeScript 6 statt 7, WebdriverIO 9 statt 10, SQLx ohne `load-extension`), 0002 IPC-Vertrag, 0003 E2E ohne `withGlobalTauri`, 0004 In-Memory-Datenbank bis zur Bibliothek, 0005 Isolation Pattern nicht aktiviert.
 
-## Rückfragen an den Auftraggeber
+## Entscheidungen des Auftraggebers
 
-1. Bundle-Kennung `app.projectwrite.desktop` vorläufig bestätigen (endgültig vor Phase 14).
+- Bundle-Kennung `app.projectwrite.desktop` bestätigt (Nachtrag in ADR 0001).
+- App-Icon: Schreibmaschine nach Vorlage des Auftraggebers. Das Windows-Logo der Vorlage wurde entfernt (Markenrecht, Icon erscheint auf allen drei Systemen); Herkunft und Bearbeitung in `docs/dependencies.md`.
 
 ## Nächster Schritt
 

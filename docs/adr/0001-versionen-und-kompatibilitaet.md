@@ -34,3 +34,7 @@ Alle übrigen Versionen stehen in `docs/dependencies.md`. Lockfiles (`package-lo
 
 - Beim Wechsel auf TypeScript 7 oder WebdriverIO 10 ist eine neue ADR nötig.
 - Die Bundle-Kennung `app.projectwrite.desktop` in `tauri.conf.json` ist **vorläufig**. Sie bestimmt Konfigurations- und Datenordner des Systems und ist nach der ersten Weitergabe schwer änderbar (Abschnitt 2, Regel 3). Sie wird vor Phase 14 zusammen mit D4 und D11 festgelegt.
+
+## Nachtrag (2. November 2026)
+
+Der Auftraggeber hat die Bundle-Kennung `app.projectwrite.desktop` bestätigt. Sie gilt damit als festgelegt.

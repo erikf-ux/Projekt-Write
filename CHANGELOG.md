@@ -21,6 +21,8 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 - CI auf Windows, macOS und Linux; Prüfung des Release-Builds auf Testplugins; `cargo audit`, `cargo deny`, `npm audit`.
 - Dokumentation: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, Lizenzliste.
 - Windows: Common-Controls-v6-Manifest wird auch in Test-Executables gelinkt.
+- App-Icon (Schreibmaschine) nach Vorlage des Auftraggebers; Windows-Logo aus der Vorlage entfernt.
+- Bundle-Kennung `app.projectwrite.desktop` bestätigt.
 
 #### Behoben
 

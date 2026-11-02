@@ -72,6 +72,15 @@ Stand: 2. November 2026 (Phase 1). Jede neue Abhängigkeit wird hier mit Zweck, 
 
 `libwebkit2gtk-4.1-dev`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`; für E2E zusätzlich `xvfb`.
 
+## Grafiken
+
+| Datei                                                   | Herkunft                                                               | Bearbeitung                                                                                                                                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/icons/app-icon.png` (Quelle aller App-Icons) | Vom Auftraggeber bereitgestellt, 2. November 2026 (JPEG, 627 × 627 px) | Windows-Logo auf dem Schreibmaschinengehäuse entfernt (Marke von Microsoft, wäre auch im macOS- und Linux-Icon erschienen); Kachel quadratisch zugeschnitten, auf 1024 × 1024 px skaliert, Ecken abgerundet und transparent |
+| `src-tauri/icons/*.png`, `icon.ico`, `icon.icns`        | Erzeugt aus `app-icon.png`                                             | `npx tauri icon src-tauri/icons/app-icon.png -o src-tauri/icons`, danach die Varianten für Android, iOS und den Microsoft Store löschen                                                                                     |
+
+Die Quelle ist von 627 auf 1024 px hochskaliert; in sehr großen Darstellungen (macOS 512 pt @2x) kann sie leicht weich wirken. Eine höher aufgelöste Vorlage würde das beheben.
+
 ## Lizenzen
 
 - Vollständige Liste aller ausgelieferten Komponenten: `THIRD-PARTY-LICENSES`, erzeugt mit `node scripts/third-party-licenses.mjs`. CI prüft, dass die Datei aktuell ist.
