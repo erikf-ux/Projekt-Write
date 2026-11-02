@@ -18,19 +18,18 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const isWindows = process.platform === 'win32';
 
-function run(command, args) {
-  return execFileSync(command, args, {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    shell: isWindows,
-  });
+function run(command, args, { shell = false } = {}) {
+  // Only npm needs a shell on Windows (npm.cmd). cargo runs without one, so
+  // characters such as "|" in its arguments are never interpreted.
+  return execFileSync(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell });
 }
 
 function rustComponents() {
   // `cargo tree` applies the real feature resolver (cargo metadata over-approximates).
   const output = run('cargo', [
     'tree',
+    '--color',
+    'never',
     '--locked',
     '--manifest-path',
     'src-tauri/Cargo.toml',
@@ -44,7 +43,10 @@ function rustComponents() {
     '{p}|{l}',
   ]);
   const components = new Map();
-  for (const line of output.split(/\r?\n/)) {
+  // Strip ANSI escape sequences in case a CARGO_TERM_COLOR setting wins anyway.
+  // eslint-disable-next-line no-control-regex
+  const plain = output.replace(/\u001b\[[0-9;]*m/g, '');
+  for (const line of plain.split(/\r?\n/)) {
     // Repeated subtrees end with " (*)"; local path dependencies carry "(path)".
     const match = /^(\S+) v(\S+)(?: \([^)]*\))?\|(.*?)(?: \(\*\))?$/.exec(line.trim());
     if (!match) {
@@ -60,7 +62,7 @@ function rustComponents() {
 }
 
 function npmComponents() {
-  const packages = JSON.parse(run('npm', ['query', '.prod']));
+  const packages = JSON.parse(run('npm', ['query', '.prod'], { shell: isWindows }));
   return packages
     .filter((pkg) => pkg.location !== '')
     .map((pkg) => ({ name: pkg.name, version: pkg.version, license: pkg.license ?? 'UNKNOWN' }));

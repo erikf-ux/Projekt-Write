@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const binary = process.platform === 'win32' ? 'project-write.exe' : 'project-write';
-const application = path.join(root, 'src-tauri', 'target', 'debug', binary);
+// PW_E2E_APP lets experiments (for example ADR 0005) test another binary.
+const application = process.env['PW_E2E_APP'] ?? path.join(root, 'src-tauri', 'target', 'debug', binary);
 
 if (!fs.existsSync(application)) {
   throw new Error(`App binary not found at ${application}. Run "npm run build:e2e" first.`);
