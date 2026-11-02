@@ -1,0 +1,51 @@
+# cargo-deny configuration (master prompt, sections 7 and 20).
+# Run: cargo deny --manifest-path src-tauri/Cargo.toml check
+
+[graph]
+# Dev-dependencies are never shipped. Optional features (the e2e test plugin)
+# are not enabled, so the graph is exactly the release graph.
+all-features = false
+exclude-dev = true
+
+[advisories]
+yanked = "deny"
+# Unmaintained transitive crates (for example the GTK3 bindings Tauri uses on
+# Linux) cannot be replaced by this project; direct dependencies must be maintained.
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+# Prefer MIT/Apache-2.0 (D4). Everything else is listed in THIRD-PARTY-LICENSES
+# and docs/dependencies.md.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+unused-allowed-license = "allow"
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+deny = [
+    { crate = "rusqlite", reason = "only SQLx may use libsqlite3-sys (section 7)" },
+    { crate = "tauri-plugin-sql", reason = "would give the frontend SQL access (section 7)" },
+    { crate = "tauri-plugin-fs", reason = "no file system access from the frontend (section 20)" },
+    { crate = "tauri-plugin-shell", reason = "no shell access from the frontend (section 20)" },
+    { crate = "tauri-plugin-http", reason = "no network access from the frontend (section 2)" },
+    { crate = "tauri-plugin-wdio", reason = "requires withGlobalTauri (ADR 0003)" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
