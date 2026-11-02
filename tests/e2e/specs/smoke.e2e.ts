@@ -3,7 +3,6 @@
  * start, CSP, rejected file system access, contrast, keyboard focus.
  */
 import { browser, $, $$, expect } from '@wdio/globals';
-import { themeStylesheet } from '../../../src/modules/themes/applyTheme';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
 import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
 
@@ -22,6 +21,84 @@ function rgbToHex(rgb: string): string {
     throw new Error(`Unexpected colour: ${rgb}`);
   }
   return `#${[match[1], match[2], match[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+interface ContrastSample {
+  selector: string;
+  text: string;
+  color: string;
+  background: string;
+  theme: string;
+  surfaceVariable: string;
+  textVariable: string;
+  mainBackground: string;
+}
+
+/** Measures text colour and effective background of every text element. */
+async function measureStartScreen(): Promise<ContrastSample[]> {
+  return browser.execute(async () => {
+    document.body.getBoundingClientRect(); // forces style and layout
+    await new Promise<void>((resolve) => {
+      const fallback = setTimeout(resolve, 250);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          clearTimeout(fallback);
+          resolve();
+        });
+      });
+    });
+    const background = (element: Element | null): string => {
+      for (let node = element; node; node = node.parentElement) {
+        const color = getComputedStyle(node).backgroundColor;
+        if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
+          return color;
+        }
+      }
+      return getComputedStyle(document.body).backgroundColor;
+    };
+    const main = document.querySelector('main');
+    const mainStyle = main ? getComputedStyle(main) : null;
+    const context = {
+      theme: document.documentElement.dataset['theme'] ?? '',
+      surfaceVariable: mainStyle?.getPropertyValue('--pw-color-surface').trim() ?? '',
+      textVariable: mainStyle?.getPropertyValue('--pw-color-text').trim() ?? '',
+      mainBackground: mainStyle?.backgroundColor ?? '',
+    };
+    const selectors = [
+      'h1',
+      'header p',
+      'h2',
+      '[data-testid="check-summary"]',
+      '[data-check] span',
+      'button',
+      'footer span',
+    ];
+    return selectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector)).map((element) => ({
+        selector,
+        text: element.textContent.trim(),
+        color: getComputedStyle(element).color,
+        background: background(element),
+        ...context,
+      })),
+    );
+  });
+}
+
+/** Asserts that `theme` is active and every text reaches 4.5:1 (section 6). */
+function expectContrast(samples: ContrastSample[], theme: ThemeName) {
+  expect(samples.length).toBeGreaterThan(10);
+  expect(samples[0]?.theme).toBe(theme);
+  expect(rgbToHex(samples[0]?.mainBackground ?? '').toUpperCase()).toBe(themes[theme].surface.toUpperCase());
+  // Report every failing element at once, with its colours and ratio.
+  const failures = samples
+    .filter((sample) => sample.text !== '' && sample.text !== '·')
+    .map((sample) => ({
+      ...sample,
+      ratio: contrastRatio(rgbToHex(sample.color), rgbToHex(sample.background)),
+    }))
+    .filter((sample) => sample.ratio < MIN_TEXT_CONTRAST);
+  expect(failures).toEqual([]);
 }
 
 describe('Project Write – Phase 1 smoke test', () => {
@@ -117,93 +194,17 @@ describe('Project Write – Phase 1 smoke test', () => {
     expect(outcome.frozen).toBe(true);
   });
 
-  for (const theme of ['dark', 'light'] as ThemeName[]) {
-    it(`meets the text contrast of section 6 in the ${theme} theme`, async () => {
-      // The same DOM steps as applyTheme(): set data-theme, replace the theme stylesheet.
-      await browser.execute(
-        (scheme: string, css: string) => {
-          document.documentElement.dataset['theme'] = scheme;
-          const style = document.createElement('style');
-          style.id = 'pw-theme-tokens';
-          style.textContent = css;
-          const existing = document.getElementById('pw-theme-tokens');
-          if (existing) {
-            existing.replaceWith(style);
-          } else {
-            document.head.append(style);
-          }
-        },
-        theme,
-        themeStylesheet(),
-      );
-
-      // Let the engine restyle before measuring.
-      const pairs = await browser.execute(async () => {
-        document.body.getBoundingClientRect(); // forces style and layout
-        await new Promise<void>((resolve) => {
-          const fallback = setTimeout(resolve, 250);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              clearTimeout(fallback);
-              resolve();
-            });
-          });
-        });
-        const background = (element: Element | null): string => {
-          for (let node = element; node; node = node.parentElement) {
-            const color = getComputedStyle(node).backgroundColor;
-            if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
-              return color;
-            }
-          }
-          return getComputedStyle(document.body).backgroundColor;
-        };
-        const main = document.querySelector('main');
-        const diagnostics = main
-          ? {
-              theme: document.documentElement.dataset['theme'] ?? '',
-              surfaceVariable: getComputedStyle(main).getPropertyValue('--pw-color-surface').trim(),
-              textVariable: getComputedStyle(main).getPropertyValue('--pw-color-text').trim(),
-              mainBackground: getComputedStyle(main).backgroundColor,
-            }
-          : null;
-        const selectors = [
-          'h1',
-          'header p',
-          'h2',
-          '[data-testid="check-summary"]',
-          '[data-check] span',
-          'button',
-          'footer span',
-        ];
-        return selectors.flatMap((selector) =>
-          Array.from(document.querySelectorAll(selector)).map((element) => ({
-            selector,
-            text: element.textContent.trim(),
-            color: getComputedStyle(element).color,
-            background: background(element),
-            diagnostics,
-          })),
-        );
-      });
-
-      expect(pairs.length).toBeGreaterThan(10);
-      // The theme really is active: the main surface has this theme's colour.
-      const mainBackground = pairs[0]?.diagnostics?.mainBackground ?? '';
-      expect(rgbToHex(mainBackground).toUpperCase()).toBe(themes[theme].surface.toUpperCase());
-      // Report every failing element at once, with its colours and ratio.
-      const failures = pairs
-        .filter((p) => p.text !== '' && p.text !== '·')
-        .map((p) => ({ ...p, ratio: contrastRatio(rgbToHex(p.color), rgbToHex(p.background)) }))
-        .filter((p) => p.ratio < MIN_TEXT_CONTRAST);
-      expect(failures).toEqual([]);
-    });
-  }
+  it('meets the text contrast of section 6 in the theme it starts with', async () => {
+    // The app follows the system setting at start (section 11).
+    const startTheme = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
+    expect(['dark', 'light']).toContain(startTheme);
+    expectContrast(await measureStartScreen(), startTheme as ThemeName);
+  });
 
   it('puts the button first in the tab order and shows a visible focus ring', async () => {
     // The embedded WebDriver sends synthetic key events, and browsers ignore
     // untrusted Tab presses for focus navigation. So the tab order is checked
-    // structurally and focus is set programmatically (see docs/status.md).
+    // structurally and focus is set programmatically (see ADR 0003).
     const focused = await browser.execute(() => {
       const tabbable = Array.from(
         document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]'),
@@ -251,4 +252,14 @@ describe('Project Write – Phase 1 smoke test', () => {
     await $('button').click();
     await waitForChecks();
   });
+
+  // Runs last: switches the theme at runtime exactly like applyTheme().
+  for (const theme of ['dark', 'light'] as ThemeName[]) {
+    it(`keeps the text contrast after switching to the ${theme} theme at runtime`, async () => {
+      await browser.execute((scheme: string) => {
+        document.documentElement.dataset['theme'] = scheme;
+      }, theme);
+      expectContrast(await measureStartScreen(), theme);
+    });
+  }
 });

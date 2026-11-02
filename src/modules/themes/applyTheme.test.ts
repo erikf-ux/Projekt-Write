@@ -33,14 +33,12 @@ describe('applyTheme', () => {
     root.remove();
   });
 
-  it('keeps exactly one copy of the theme rules and replaces it on every switch', () => {
+  it('installs the theme rules exactly once', () => {
     installThemeStyles();
-    const first = document.getElementById('pw-theme-tokens');
+    installThemeStyles();
     applyTheme('dark');
-    applyTheme('light');
     const styles = document.querySelectorAll('#pw-theme-tokens');
     expect(styles).toHaveLength(1);
-    expect(styles[0]).not.toBe(first);
     expect(styles[0]?.textContent).toBe(themeStylesheet());
   });
 });
