@@ -43,7 +43,8 @@ export const config: WebdriverIO.Config = {
   framework: 'mocha',
   reporters: ['spec'],
   mochaOpts: { ui: 'bdd', timeout: 120_000 },
+  // No outputDir: worker and service logs go to the console, so CI logs show
+  // why a worker failed to start.
   logLevel: 'warn',
-  outputDir: path.join(root, 'tests', 'e2e', 'logs'),
   waitforTimeout: 20_000,
 };

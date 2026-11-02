@@ -97,14 +97,6 @@ jobs:
         if: runner.os != 'Linux'
         run: npm run test:e2e
 
-      - name: Upload end-to-end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-logs-${{ matrix.os }}
-          path: tests/e2e/logs/
-          if-no-files-found: ignore
-
   release-check:
     name: Release build contains no test plugins
     runs-on: ubuntu-24.04
