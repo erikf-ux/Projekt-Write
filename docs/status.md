@@ -51,6 +51,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 ### Entscheidungen des Auftraggebers
 
 - Erledigt: Bundle-Kennung `app.projectwrite.desktop` bestätigt; App-Icon festgelegt (Schreibmaschine).
+- CI-Lauf 22 (Commit `a89afae`, App-Icon): Linux, Windows, Release-Prüfung und Audits grün. Der macOS-Job bekam zweimal keinen Runner zugeteilt und wurde nach 15 Minuten abgebrochen, ohne einen Schritt auszuführen – kein Codefehler, aber das Icon ist unter macOS noch nicht in CI geprüft. Beim nächsten Push erneut prüfen.
 
 Noch offen (vor Phase 14):
 
