@@ -16,104 +16,6 @@ async function waitForChecks() {
   });
 }
 
-function rgbToHex(rgb: string): string {
-  const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb);
-  if (!match) {
-    throw new Error(`Unexpected colour: ${rgb}`);
-  }
-  return `#${[match[1], match[2], match[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`;
-}
-
-interface ContrastSample {
-  selector: string;
-  text: string;
-  color: string;
-  background: string;
-  theme: string;
-  surfaceVariable: string;
-  textVariable: string;
-  mainBackground: string;
-}
-
-/** Measures text colour and effective background of every text element. */
-async function measureStartScreen(): Promise<ContrastSample[]> {
-  return browser.execute(async () => {
-    document.body.getBoundingClientRect(); // forces style and layout
-    await new Promise<void>((resolve) => {
-      const fallback = setTimeout(resolve, 250);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          clearTimeout(fallback);
-          resolve();
-        });
-      });
-    });
-    const background = (element: Element | null): string => {
-      for (let node = element; node; node = node.parentElement) {
-        const color = getComputedStyle(node).backgroundColor;
-        if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
-          return color;
-        }
-      }
-      return getComputedStyle(document.body).backgroundColor;
-    };
-    const main = document.querySelector('main');
-    const mainStyle = main ? getComputedStyle(main) : null;
-    const context = {
-      theme: document.documentElement.dataset['theme'] ?? '',
-      surfaceVariable: mainStyle?.getPropertyValue('--pw-color-surface').trim() ?? '',
-      textVariable: mainStyle?.getPropertyValue('--pw-color-text').trim() ?? '',
-      mainBackground: mainStyle?.backgroundColor ?? '',
-    };
-    const selectors = [
-      'h1',
-      'header p',
-      'h2',
-      '[data-testid="check-summary"]',
-      '[data-check] span',
-      'button',
-      'footer span',
-    ];
-    return selectors.flatMap((selector) =>
-      Array.from(document.querySelectorAll(selector)).map((element) => ({
-        selector,
-        text: element.textContent.trim(),
-        color: getComputedStyle(element).color,
-        background: background(element),
-        ...context,
-      })),
-    );
-  });
-}
-
-/** Every problem with `theme` on the start screen, one compact line each (section 6). */
-function contrastFailures(samples: ContrastSample[], theme: ThemeName): string[] {
-  const problems: string[] = [];
-  if (samples.length <= 10) {
-    problems.push(`only ${String(samples.length)} text elements measured`);
-  }
-  if (samples[0]?.theme !== theme) {
-    problems.push(`data-theme is "${samples[0]?.theme ?? ''}", expected "${theme}"`);
-  }
-  const surface = rgbToHex(samples[0]?.mainBackground ?? 'rgb(0, 0, 0)').toUpperCase();
-  if (surface !== themes[theme].surface.toUpperCase()) {
-    problems.push(`main background ${surface}, expected ${themes[theme].surface}`);
-  }
-  for (const sample of samples) {
-    if (sample.text === '' || sample.text === '·') {
-      continue;
-    }
-    const ratio = contrastRatio(rgbToHex(sample.color), rgbToHex(sample.background));
-    if (ratio < MIN_TEXT_CONTRAST) {
-      problems.push(
-        `${sample.selector} "${sample.text}": ${sample.color} on ${sample.background} = ${ratio.toFixed(2)} ` +
-          `(--pw-color-text ${sample.textVariable})`,
-      );
-    }
-  }
-  return problems;
-}
-
 /**
  * Renders a frame and returns it as an image.
  *
@@ -150,13 +52,85 @@ async function backgroundPoints() {
   });
 }
 
+/** Selectors of every text element on the start screen. */
+const TEXT_SELECTORS = [
+  'h1',
+  'header p',
+  'h2',
+  '[data-testid="check-summary"]',
+  '[data-check] span',
+  'button',
+  'footer span',
+];
+
+/** Text boxes (CSS pixels) of every non-empty text element. */
+async function textBoxes() {
+  return browser.execute((selectors: string[]) => {
+    return selectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector))
+        .map((element) => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const rect = range.getBoundingClientRect();
+          return {
+            selector,
+            text: element.textContent.trim(),
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((box) => box.text !== '' && box.text !== '·' && box.width > 0 && box.height > 0),
+    );
+  }, TEXT_SELECTORS);
+}
+
 /**
- * Asserts that `theme` is rendered and every text reaches 4.5:1 (section 6):
- * computed colours after a rendered frame, plus the rendered background pixels.
+ * Rendered contrast of one text box: background is the most frequent pixel in
+ * the box, text colour the pixel with the highest contrast against it (glyph
+ * cores reach the full text colour; checked at 1x and 2x scale).
+ */
+function renderedContrast(
+  image: Image,
+  scale: number,
+  box: { x: number; y: number; width: number; height: number },
+) {
+  const counts = new Map<string, number>();
+  const pixels: string[] = [];
+  for (let y = Math.ceil(box.y * scale); y < Math.floor((box.y + box.height) * scale); y++) {
+    for (let x = Math.ceil(box.x * scale); x < Math.floor((box.x + box.width) * scale); x++) {
+      const pixel = pixelHex(image, x, y);
+      pixels.push(pixel);
+      counts.set(pixel, (counts.get(pixel) ?? 0) + 1);
+    }
+  }
+  const background = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '#000000';
+  let text = background;
+  let ratio = 1;
+  for (const pixel of pixels) {
+    const candidate = contrastRatio(pixel, background);
+    if (candidate > ratio) {
+      ratio = candidate;
+      text = pixel;
+    }
+  }
+  return { text, background, ratio };
+}
+
+/**
+ * Asserts that `theme` is on screen and every text reaches 4.5:1 (section 6),
+ * measured on the rendered pixels – what the user sees. Computed styles are
+ * not used for colours: in the CI windows on macOS and Windows they lag behind
+ * the rendered frame (docs/adr/0003).
  */
 async function expectContrast(theme: ThemeName) {
   const { image, scale } = await renderFrame();
-  const problems = contrastFailures(await measureStartScreen(), theme);
+  const problems: string[] = [];
+  const active = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
+  if (active !== theme) {
+    problems.push(`data-theme is "${active}", expected "${theme}"`);
+  }
   const points = await backgroundPoints();
   for (const [token, point] of Object.entries(points) as [
     'surface' | 'sidebar',
@@ -165,6 +139,16 @@ async function expectContrast(theme: ThemeName) {
     const pixel = pixelHex(image, Math.round(point.x * scale), Math.round(point.y * scale));
     if (colourDistance(pixel, themes[theme][token]) > PIXEL_TOLERANCE) {
       problems.push(`rendered ${token} pixel ${pixel}, expected ${themes[theme][token]}`);
+    }
+  }
+  const boxes = await textBoxes();
+  if (boxes.length <= 10) {
+    problems.push(`only ${String(boxes.length)} text elements found`);
+  }
+  for (const box of boxes) {
+    const { text, background, ratio } = renderedContrast(image, scale, box);
+    if (ratio < MIN_TEXT_CONTRAST) {
+      problems.push(`${box.selector} "${box.text}": ${text} on ${background} = ${ratio.toFixed(2)}`);
     }
   }
   expect(problems).toEqual([]);
@@ -289,13 +273,11 @@ describe('Project Write – Phase 1 smoke test', () => {
       }
       first.focus({ focusVisible: true });
       const active = document.activeElement as HTMLElement;
-      const style = getComputedStyle(active);
       return {
         tabbable: tabbable.length,
         tag: active.tagName,
         isFirst: active === first,
         focusVisible: active.matches(':focus-visible'),
-        outlineStyle: style.outlineStyle,
       };
     });
     expect(focused).toMatchObject({
@@ -303,47 +285,36 @@ describe('Project Write – Phase 1 smoke test', () => {
       tag: 'BUTTON',
       isFirst: true,
       focusVisible: true,
-      outlineStyle: 'solid',
     });
     // Section 6: graphical elements need 3:1 against their surroundings.
-    // Measured on a rendered frame: computed style and the ring's pixels.
+    // Measured on the rendered pixels, like the text contrast.
     const { image, scale } = await renderFrame();
     const ring = await browser.execute(() => {
-      const button = document.activeElement as HTMLElement;
-      const style = getComputedStyle(button);
-      const rect = button.getBoundingClientRect();
+      const rect = (document.activeElement as HTMLElement).getBoundingClientRect();
       return {
-        width: style.outlineWidth,
-        color: style.outlineColor,
         left: rect.left,
         middle: rect.top + rect.height / 2,
+        theme: document.documentElement.dataset['theme'] ?? '',
       };
     });
-    const problems: string[] = [];
-    // index.css sets 2px; WebKit on macOS reports 3px. Section 11 asks for a
-    // visible focus, so at least 2px is accepted.
-    if (parseFloat(ring.width) < 2) {
-      problems.push(`outline width ${ring.width}`);
-    }
-    const currentTheme = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
-    const expectedRing = themes[currentTheme as ThemeName].accent;
-    if (colourDistance(rgbToHex(ring.color), expectedRing) > PIXEL_TOLERANCE) {
-      problems.push(`computed outline colour ${ring.color}, expected ${expectedRing}`);
-    }
+    const expectedRing = themes[ring.theme as ThemeName].accent;
     // The ring lies 2px (outline-offset) left of the button. Scan the row of
     // pixels from 12px left of the button up to its edge: the ring must show
-    // up there in the accent colour, separated from the card background.
+    // up there in the accent colour, at least 2px wide (section 11: visible
+    // focus; index.css sets 2px, WebKit on macOS draws 3px), separated from
+    // the card background.
     const y = Math.round(ring.middle * scale);
     const row: string[] = [];
     for (let x = Math.floor((ring.left - 12) * scale); x < Math.floor(ring.left * scale); x++) {
       row.push(pixelHex(image, x, y));
     }
-    const ringPixel = row.find((pixel) => colourDistance(pixel, expectedRing) <= PIXEL_TOLERANCE);
+    const ringPixels = row.filter((pixel) => colourDistance(pixel, expectedRing) <= PIXEL_TOLERANCE);
     const outsidePixel = row[0] ?? '#000000';
-    const ratio = ringPixel ? contrastRatio(ringPixel, outsidePixel) : 0;
-    if (!ringPixel || ratio < 3) {
+    const ratio = ringPixels[0] ? contrastRatio(ringPixels[0], outsidePixel) : 0;
+    const problems: string[] = [];
+    if (ringPixels.length / scale < 2 || ratio < 3) {
       problems.push(
-        `rendered ring ${ringPixel ?? 'not found'} next to ${outsidePixel} = ${ratio.toFixed(2)}; ` +
+        `rendered ring ${String(ringPixels.length)} px of ${expectedRing} next to ${outsidePixel} = ${ratio.toFixed(2)}; ` +
           `row (scale ${scale.toFixed(2)}): ${row.join(' ')}`,
       );
     }

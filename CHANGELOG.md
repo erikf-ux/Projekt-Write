@@ -24,4 +24,4 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 #### Behoben
 
-- E2E-Farbmessungen unter macOS und Windows lieferten veraltete Werte, weil die CI-Fenster nicht von selbst rendern. Die Tests erzwingen jetzt einen Frame und prüfen zusätzlich Bildschirmpixel (F-1, F-2 in `docs/status.md`).
+- E2E-Farbmessungen unter macOS und Windows lieferten veraltete Werte, weil die CI-Fenster nicht von selbst rendern. Die Tests messen Farben jetzt an Screenshot-Pixeln (F-1, F-2 in `docs/status.md`).
