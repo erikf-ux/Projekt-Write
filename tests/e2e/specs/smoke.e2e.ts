@@ -1,0 +1,175 @@
+/**
+ * Phase 1 acceptance tests in the running app (section 25):
+ * start, CSP, rejected file system access, contrast, keyboard focus.
+ */
+import { browser, $, $$, expect } from '@wdio/globals';
+import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
+import { themes, tokenVariables, type ThemeName } from '../../../src/modules/themes/tokens';
+
+const READY_TEXTS = ['Alles bereit.', 'Everything is ready.'];
+
+async function waitForChecks() {
+  const summary = await $('[data-testid="check-summary"]');
+  await summary.waitUntil(async () => READY_TEXTS.includes(await summary.getText()), {
+    timeoutMsg: 'system check did not report "ready"',
+  });
+}
+
+function rgbToHex(rgb: string): string {
+  const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb);
+  if (!match) {
+    throw new Error(`Unexpected colour: ${rgb}`);
+  }
+  return `#${[match[1], match[2], match[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+describe('Project Write – Phase 1 smoke test', () => {
+  before(async () => {
+    await $('h1').waitForExist({ timeout: 60_000 });
+  });
+
+  it('starts and shows the start screen', async () => {
+    await expect($('h1')).toHaveText('Project Write');
+    await waitForChecks();
+    const rows = await $$('[data-check]');
+    expect(rows).toHaveLength(4);
+    for (const row of rows) {
+      expect(await row.getAttribute('data-passed')).toBe('true');
+    }
+  });
+
+  it('enforces the CSP: no inline script, no image from the web', async () => {
+    const result = await browser.execute(
+      () =>
+        new Promise<{ inlineRan: boolean; imageLoaded: boolean; violations: string[] }>((resolve) => {
+          const violations: string[] = [];
+          document.addEventListener('securitypolicyviolation', (event) => {
+            violations.push(event.effectiveDirective || event.violatedDirective);
+          });
+          const flags = window as unknown as { __pwInlineRan?: boolean };
+          flags.__pwInlineRan = false;
+
+          const script = document.createElement('script');
+          script.textContent = 'window.__pwInlineRan = true;';
+          document.head.appendChild(script);
+
+          const image = new Image();
+          const finish = (imageLoaded: boolean) => {
+            setTimeout(() => {
+              resolve({ inlineRan: flags.__pwInlineRan === true, imageLoaded, violations });
+            }, 250);
+          };
+          image.onload = () => {
+            finish(true);
+          };
+          image.onerror = () => {
+            finish(false);
+          };
+          image.src = 'https://example.com/project-write-csp-probe.png';
+        }),
+    );
+    expect(result.inlineRan).toBe(false);
+    expect(result.imageLoaded).toBe(false);
+    expect(result.violations.some((d) => d.startsWith('script-src'))).toBe(true);
+    expect(result.violations.some((d) => d.startsWith('img-src'))).toBe(true);
+  });
+
+  it('rejects file system, shell, sql and path access from the frontend', async () => {
+    const outcome = await browser.execute(async () => {
+      const internals = (
+        window as unknown as {
+          __TAURI_INTERNALS__: { invoke: (cmd: string, args?: unknown) => Promise<unknown> };
+        }
+      ).__TAURI_INTERNALS__;
+      const attempts: [string, unknown][] = [
+        ['plugin:fs|read_text_file', { path: '/etc/hosts' }],
+        ['plugin:fs|write_text_file', { path: 'pw-e2e.txt', data: 'x' }],
+        ['plugin:fs|read_dir', { path: '.' }],
+        ['plugin:shell|execute', { program: 'sh', args: ['-c', 'echo hi'] }],
+        ['plugin:sql|load', { db: 'sqlite:pw-e2e.db' }],
+        ['plugin:path|resolve_directory', { directory: 11 }],
+        ['plugin:opener|open_path', { path: '/' }],
+      ];
+      const results: Record<string, string> = {};
+      for (const [command, args] of attempts) {
+        try {
+          await internals.invoke(command, args);
+          results[command] = 'allowed';
+        } catch {
+          results[command] = 'rejected';
+        }
+      }
+      const allowed = await internals.invoke('system_check', { request: { checks: ['database'] } });
+      return {
+        results,
+        allowed,
+        globalTauri: typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__,
+        frozen: Object.isFrozen(Object.prototype),
+      };
+    });
+
+    for (const [command, result] of Object.entries(outcome.results)) {
+      expect(`${command}: ${result}`).toBe(`${command}: rejected`);
+    }
+    expect(outcome.allowed).toMatchObject({ results: [{ check: 'database', passed: true }] });
+    expect(outcome.globalTauri).toBe('undefined');
+    expect(outcome.frozen).toBe(true);
+  });
+
+  for (const theme of ['dark', 'light'] as ThemeName[]) {
+    it(`meets the text contrast of section 6 in the ${theme} theme`, async () => {
+      const variables = Object.fromEntries(
+        Object.entries(tokenVariables).map(([token, variable]) => [
+          variable,
+          themes[theme][token as keyof (typeof themes)[ThemeName]],
+        ]),
+      );
+      const pairs = await browser.execute((vars: Record<string, string>) => {
+        const root = document.documentElement;
+        for (const [name, value] of Object.entries(vars)) {
+          root.style.setProperty(name, value);
+        }
+        const background = (element: Element | null): string => {
+          for (let node = element; node; node = node.parentElement) {
+            const color = getComputedStyle(node).backgroundColor;
+            if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
+              return color;
+            }
+          }
+          return getComputedStyle(document.body).backgroundColor;
+        };
+        const selectors = ['h1', 'header p', 'h2', '[data-testid="check-summary"]', '[data-check] span', 'button', 'footer span'];
+        return selectors.flatMap((selector) =>
+          Array.from(document.querySelectorAll(selector)).map((element) => ({
+            selector,
+            text: (element.textContent ?? '').trim(),
+            color: getComputedStyle(element).color,
+            background: background(element),
+          })),
+        );
+      }, variables);
+
+      expect(pairs.length).toBeGreaterThan(10);
+      for (const pair of pairs.filter((p) => p.text !== '' && p.text !== '·')) {
+        const ratio = contrastRatio(rgbToHex(pair.color), rgbToHex(pair.background));
+        expect({ ...pair, ok: ratio >= MIN_TEXT_CONTRAST }).toMatchObject({ ok: true });
+      }
+    });
+  }
+
+  it('reaches the button with the keyboard and shows a visible focus ring', async () => {
+    await browser.keys('Tab');
+    const focused = await browser.execute(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element) {
+        return null;
+      }
+      const style = getComputedStyle(element);
+      return { tag: element.tagName, outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+    });
+    expect(focused).toMatchObject({ tag: 'BUTTON', outlineStyle: 'solid', outlineWidth: '2px' });
+
+    await browser.keys('Enter');
+    await waitForChecks();
+  });
+});

@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind utilities read the design tokens from CSS custom properties that
+ * src/modules/themes/applyTheme.ts sets. Colours live only in tokens.ts.
+ */
+@theme inline {
+  --color-surface: var(--pw-color-surface);
+  --color-sidebar: var(--pw-color-sidebar);
+  --color-fg: var(--pw-color-text);
+  --color-muted: var(--pw-color-text-muted);
+  --color-accent: var(--pw-color-accent);
+  --color-danger: var(--pw-color-error);
+  --color-success: var(--pw-color-success);
+
+  /* System fonts only; nothing is loaded from the network (section 11). */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-ui: 13px;
+  --text-ui--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.6;
+
+  --radius-pw: 4px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--pw-color-surface);
+    color: var(--pw-color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-ui);
+  }
+
+  /* Visible keyboard focus everywhere (section 11). */
+  :focus-visible {
+    outline: 2px solid var(--pw-color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

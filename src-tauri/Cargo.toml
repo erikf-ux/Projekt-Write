@@ -1,0 +1,45 @@
+[package]
+name = "project-write"
+version = "0.1.0"
+description = "Project Write – local, cross-platform writing and knowledge management"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[lib]
+name = "project_write_lib"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "project-write"
+path = "src/main.rs"
+
+[features]
+# Debug-only end-to-end test support (embedded WebDriver server).
+# Never enabled for release builds: see src/lib.rs and the CI release check.
+e2e = ["dep:tauri-plugin-wdio-webdriver"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+log = "0.4.35"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "migrate", "macros"] }
+thiserror = "2.0.21"
+ts-rs = { version = "12.0.1", features = ["no-serde-warnings"] }
+tauri-plugin-wdio-webdriver = { version = "1.5.1", optional = true }
+
+[dev-dependencies]
+tauri = { version = "2.12.5", features = ["test"] }
+tempfile = "3.27.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

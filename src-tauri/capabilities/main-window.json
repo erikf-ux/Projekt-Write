@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The only window. Grants exactly the app's own commands; no fs, shell, sql, path or other plugin permissions (section 20).",
+  "windows": ["main"],
+  "permissions": ["allow-system-check"]
+}
