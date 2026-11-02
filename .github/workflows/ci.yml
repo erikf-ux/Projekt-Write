@@ -72,7 +72,12 @@ jobs:
           cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features e2e -- -D warnings
 
       - name: Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        shell: bash
+        # The generated types are deleted first, so the next step only passes if
+        # the tests wrote them again into src/types/generated (.cargo/config.toml).
+        run: |
+          rm -rf src/types/generated
+          cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Generated TypeScript types are up to date
         shell: bash

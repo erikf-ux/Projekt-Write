@@ -21,9 +21,10 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 - CI auf Windows, macOS und Linux; Prüfung des Release-Builds auf Testplugins; `cargo audit`, `cargo deny`, `npm audit`.
 - Dokumentation: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, Lizenzliste.
 - Windows: Common-Controls-v6-Manifest wird auch in Test-Executables gelinkt.
-- App-Icon (Schreibmaschine) nach Vorlage des Auftraggebers; Windows-Logo aus der Vorlage entfernt.
+- App-Icon (Schreibmaschine) nach Vorlage des Auftraggebers, größte Größe 256 × 256 px; Windows-Logo aus der Vorlage entfernt. Neu erzeugen mit `node scripts/app-icons.mjs`.
 - Bundle-Kennung `app.projectwrite.desktop` bestätigt.
 
 #### Behoben
 
 - E2E-Farbmessungen unter macOS und Windows lieferten veraltete Werte, weil die CI-Fenster nicht von selbst rendern. Die Tests messen Farben jetzt an Screenshot-Pixeln (F-1, F-2 in `docs/status.md`).
+- `cargo test --manifest-path src-tauri/Cargo.toml` schrieb die TypeScript-Typen nach `src-tauri/bindings/` statt nach `src/types/generated/`; die CI-Prüfung auf aktuelle Typen war dadurch wirkungslos (F-3 in `docs/status.md`).

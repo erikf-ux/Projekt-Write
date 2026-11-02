@@ -1,3 +1,6 @@
 [env]
 # ts-rs writes the generated TypeScript types into the frontend.
-TS_RS_EXPORT_DIR = { value = "../src/types/generated", relative = true }
+# This file sits in the repository root because Cargo looks for configuration
+# from the current directory upwards, not from the manifest: commands such as
+# `cargo test --manifest-path src-tauri/Cargo.toml` (README, CI) run from here.
+TS_RS_EXPORT_DIR = { value = "src/types/generated", relative = true }
