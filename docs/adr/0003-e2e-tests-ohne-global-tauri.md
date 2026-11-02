@@ -23,6 +23,11 @@ Untersucht wurde der Quelltext des Dienstes (`dist/esm/index.js`): Das Plugin wi
 
 Der eingebettete WebDriver erzeugt Tastatureingaben als synthetische JavaScript-Ereignisse. Browser führen für solche Ereignisse keine Standardaktion aus; `Tab` verschiebt den Fokus deshalb nicht. Die Tabulator-Reihenfolge wird im E2E-Test strukturell geprüft (erstes fokussierbares Element), der sichtbare Fokus durch programmatisches Fokussieren. Echte Tastaturnavigation (Abschnitt 25, Phase 3) braucht eine zusätzliche Prüfung, etwa mit `tauri-driver` und nativen Eingaben unter Linux und Windows oder manuell.
 
+## Plattformunterschiede
+
+- WebKit unter macOS meldet für den Fokusring aus `index.css` (`outline: 2px solid`) eine Breite von 3 px. Der E2E-Test verlangt deshalb einen durchgezogenen Ring von mindestens 2 px mit 3:1 Kontrast, nicht exakt 2 px.
+- Der Kontrasttest setzt beim Umschalten des Themes dieselben Werte wie `applyTheme()` (Tokens, `data-theme`, `color-scheme`).
+
 ## Folgen
 
 - Mocking über `browser.tauri.mock()` steht nicht zur Verfügung. Frontend-Tests mit gemocktem IPC laufen in Vitest mit `mockIPC`.

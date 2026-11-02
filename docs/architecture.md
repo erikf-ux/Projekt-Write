@@ -36,22 +36,22 @@ Keine Schicht wird übersprungen (Abschnitt 8). ESLint verbietet `@tauri-apps/ap
 
 ## 3. Backend (`src-tauri/`)
 
-| Datei / Modul                                       | Aufgabe                                                                                            | Phase        |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------ |
-| `src/lib.rs`                                        | App-Aufbau, Plugin- und Befehlsregistrierung, `compile_error!`-Schutz gegen Testplugins im Release | 1            |
-| `src/state.rs`                                      | `AppState` (geteilte Dienste)                                                                      | 1            |
-| `src/error.rs`                                      | `ErrorCode`, `CommandError` – einheitliches Fehlerformat                                           | 1            |
-| `src/commands/mod.rs`                               | `COMMAND_NAMES`, `handler()` mit `generate_handler!`                                               | 1            |
-| `src/commands/input.rs`                             | `Input<T>` und `Validate` (ADR 0002)                                                               | 1            |
-| `src/commands/system.rs`                            | Befehl `system_check`                                                                              | 1            |
-| `src/services/system.rs`                            | Systemprüfung: Datenspeicher, Schema, Fremdschlüssel, Volltextsuche                                | 1            |
-| `src/database/mod.rs`                               | `Database`: Schreibverbindung + Lese-Pool, Pragmas, Migrationen                                    | 1            |
-| `src/database/diagnostics.rs`                       | Lesende Prüfungen (`quick_check`, `integrity_check`, Pragmas, Compile-Optionen)                    | 1            |
-| `src/database/fts.rs`                               | FTS5-Definitionen aus Abschnitt 19, `quote_term`, FTS5-Probe                                       | 1 (Suche: 9) |
-| `migrations/`                                       | Einziger Ort für Migrationen, eingebettet mit `sqlx::migrate!`                                     | 1            |
-| `capabilities/main-window.json`                     | Einzige Capability: genau die eigenen Befehle                                                      | 1            |
-| `build.rs`                                          | App-Manifest: jeder eigene Befehl ist ohne Capability verboten                                     | 1            |
-| `src/filesystem/`, `src/security/`, `src/language/` | entstehen in Phase 2, 2/8 und 12                                                                   | –            |
+| Datei / Modul                                       | Aufgabe                                                                                                                                                                                                   | Phase        |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `src/lib.rs`                                        | App-Aufbau, Plugin- und Befehlsregistrierung, `compile_error!`-Schutz gegen Testplugins im Release                                                                                                        | 1            |
+| `src/state.rs`                                      | `AppState` (geteilte Dienste)                                                                                                                                                                             | 1            |
+| `src/error.rs`                                      | `ErrorCode`, `CommandError` – einheitliches Fehlerformat                                                                                                                                                  | 1            |
+| `src/commands/mod.rs`                               | `COMMAND_NAMES`, `handler()` mit `generate_handler!`                                                                                                                                                      | 1            |
+| `src/commands/input.rs`                             | `Input<T>` und `Validate` (ADR 0002)                                                                                                                                                                      | 1            |
+| `src/commands/system.rs`                            | Befehl `system_check`                                                                                                                                                                                     | 1            |
+| `src/services/system.rs`                            | Systemprüfung: Datenspeicher, Schema, Fremdschlüssel, Volltextsuche                                                                                                                                       | 1            |
+| `src/database/mod.rs`                               | `Database`: Schreibverbindung + Lese-Pool, Pragmas, Migrationen                                                                                                                                           | 1            |
+| `src/database/diagnostics.rs`                       | Lesende Prüfungen (`quick_check`, `integrity_check`, Pragmas, Compile-Optionen)                                                                                                                           | 1            |
+| `src/database/fts.rs`                               | FTS5-Definitionen aus Abschnitt 19, `quote_term`, FTS5-Probe                                                                                                                                              | 1 (Suche: 9) |
+| `migrations/`                                       | Einziger Ort für Migrationen, eingebettet mit `sqlx::migrate!`                                                                                                                                            | 1            |
+| `capabilities/main-window.json`                     | Einzige Capability: genau die eigenen Befehle                                                                                                                                                             | 1            |
+| `build.rs`, `windows-app-manifest.xml`              | App-Manifest: jeder eigene Befehl ist ohne Capability verboten. Unter Windows wird das Common-Controls-v6-Manifest in App **und** Test-Executables gelinkt (sonst `STATUS_ENTRYPOINT_NOT_FOUND` in Tests) | 1            |
+| `src/filesystem/`, `src/security/`, `src/language/` | entstehen in Phase 2, 2/8 und 12                                                                                                                                                                          | –            |
 
 ## 4. Frontend (`src/`)
 

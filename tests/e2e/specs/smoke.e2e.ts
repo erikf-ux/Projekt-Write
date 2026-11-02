@@ -124,45 +124,69 @@ describe('Project Write – Phase 1 smoke test', () => {
           themes[theme][token as keyof (typeof themes)[ThemeName]],
         ]),
       );
-      const pairs = await browser.execute(
+      // Same steps as applyTheme(): tokens, data-theme and color-scheme.
+      await browser.execute(
         (vars: Record<string, string>, scheme: string) => {
-          // Same steps as applyTheme(): tokens, data-theme and color-scheme.
           const root = document.documentElement;
           for (const [name, value] of Object.entries(vars)) {
             root.style.setProperty(name, value);
           }
           root.dataset['theme'] = scheme;
           root.style.colorScheme = scheme;
-          const background = (element: Element | null): string => {
-            for (let node = element; node; node = node.parentElement) {
-              const color = getComputedStyle(node).backgroundColor;
-              if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
-                return color;
-              }
-            }
-            return getComputedStyle(document.body).backgroundColor;
-          };
-          const selectors = [
-            'h1',
-            'header p',
-            'h2',
-            '[data-testid="check-summary"]',
-            '[data-check] span',
-            'button',
-            'footer span',
-          ];
-          return selectors.flatMap((selector) =>
-            Array.from(document.querySelectorAll(selector)).map((element) => ({
-              selector,
-              text: element.textContent.trim(),
-              color: getComputedStyle(element).color,
-              background: background(element),
-            })),
-          );
         },
         variables,
         theme,
       );
+
+      // Give the engine time to restyle before measuring: on macOS, WebKit
+      // reported stale background colours when measured in the same script.
+      const pairs = await browser.execute(async () => {
+        document.body.getBoundingClientRect(); // forces style and layout
+        await new Promise<void>((resolve) => {
+          const fallback = setTimeout(resolve, 250);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              clearTimeout(fallback);
+              resolve();
+            });
+          });
+        });
+        const background = (element: Element | null): string => {
+          for (let node = element; node; node = node.parentElement) {
+            const color = getComputedStyle(node).backgroundColor;
+            if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) {
+              return color;
+            }
+          }
+          return getComputedStyle(document.body).backgroundColor;
+        };
+        const main = document.querySelector('main');
+        const diagnostics = main
+          ? {
+              surfaceVariable: getComputedStyle(main).getPropertyValue('--pw-color-surface').trim(),
+              textVariable: getComputedStyle(main).getPropertyValue('--pw-color-text').trim(),
+              mainBackground: getComputedStyle(main).backgroundColor,
+            }
+          : null;
+        const selectors = [
+          'h1',
+          'header p',
+          'h2',
+          '[data-testid="check-summary"]',
+          '[data-check] span',
+          'button',
+          'footer span',
+        ];
+        return selectors.flatMap((selector) =>
+          Array.from(document.querySelectorAll(selector)).map((element) => ({
+            selector,
+            text: element.textContent.trim(),
+            color: getComputedStyle(element).color,
+            background: background(element),
+            diagnostics,
+          })),
+        );
+      });
 
       expect(pairs.length).toBeGreaterThan(10);
       // Report every failing element at once, with its colours and ratio.
