@@ -1,15 +1,43 @@
-import { themes, tokenVariables, type ThemeName } from './tokens';
+import { themes, tokenVariables, type ThemeName, type ThemeTokens } from './tokens';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
+const STYLE_ID = 'pw-theme-tokens';
 
-/** Writes the tokens of `theme` as CSS custom properties onto `root`. */
-export function applyTheme(theme: ThemeName, root: HTMLElement = document.documentElement): void {
-  const tokens = themes[theme];
-  for (const [token, variable] of Object.entries(tokenVariables) as [keyof typeof tokens, string][]) {
-    root.style.setProperty(variable, tokens[token]);
+/**
+ * CSS rules with the custom properties of every theme, generated from
+ * tokens.ts (the only source of colours):
+ * `[data-theme="dark"] { --pw-color-surface: …; color-scheme: dark }`.
+ *
+ * Switching a theme only changes the `data-theme` attribute. Rewriting the
+ * custom properties inline on <html> left stale computed colours in WebKit on
+ * macOS (some elements kept the old text or background colour); a change of
+ * matching rules is invalidated reliably by every engine.
+ */
+export function themeStylesheet(): string {
+  const tokenNames = Object.keys(tokenVariables) as (keyof ThemeTokens)[];
+  return (Object.keys(themes) as ThemeName[])
+    .map((name) => {
+      const declarations = tokenNames.map((token) => `${tokenVariables[token]}: ${themes[name][token]};`);
+      return `[data-theme="${name}"] { ${declarations.join(' ')} color-scheme: ${name}; }`;
+    })
+    .join('\n');
+}
+
+/** Adds the theme rules to the document once. */
+export function installThemeStyles(doc: Document = document): void {
+  if (doc.getElementById(STYLE_ID)) {
+    return;
   }
+  const style = doc.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = themeStylesheet();
+  doc.head.append(style);
+}
+
+/** Activates `theme` for `root` and everything inside it. */
+export function applyTheme(theme: ThemeName, root: HTMLElement = document.documentElement): void {
+  installThemeStyles(root.ownerDocument);
   root.dataset['theme'] = theme;
-  root.style.colorScheme = theme;
 }
 
 /** The theme matching the operating system setting. */

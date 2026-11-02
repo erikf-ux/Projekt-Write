@@ -68,7 +68,7 @@ Keine Schicht wird übersprungen (Abschnitt 8). ESLint verbietet `@tauri-apps/ap
 | `test/setup.ts`                                      | Vitest-Setup (jsdom)                                                                           |
 | `index.css`                                          | Tailwind 4, Zuordnung Tokens → Utility-Farben, Basisstile, Fokusring, `prefers-reduced-motion` |
 
-**Theming:** `modules/themes/tokens.ts` ist die einzige Quelle der Farben. `applyTheme` schreibt sie als `--pw-color-*` auf `<html>`. Tailwind-Klassen wie `bg-surface` oder `text-muted` verweisen per `@theme inline` auf diese Variablen. Importierbare Theme-Dateien (Phase 3) liefern nur andere Werte für dieselben Tokens.
+**Theming:** `modules/themes/tokens.ts` ist die einzige Quelle der Farben. `applyTheme` erzeugt daraus einmal ein `<style>` mit Regeln `[data-theme="dark"|"light"] { --pw-color-*: …; color-scheme: … }` und schaltet nur noch das Attribut `data-theme` an `<html>` um. Tailwind-Klassen wie `bg-surface` oder `text-muted` verweisen per `@theme inline` auf die Variablen. Hintergrund: Das direkte Umschreiben der Variablen als Inline-Stil an `<html>` hinterließ in WebKit unter macOS veraltete berechnete Farben (im E2E-Test belegt); das Umschalten über Selektoren wird von allen Engines zuverlässig neu berechnet. Importierbare Theme-Dateien (Phase 3) liefern andere Werte für dieselben Tokens.
 
 **Sprache:** Deutsch und Englisch, standardmäßig nach `navigator.languages`. Fehlermeldungen kommen als `messageKey` aus Rust und werden im Frontend übersetzt. Ein Rust-Test prüft, dass jeder `messageKey` in beiden Sprachdateien steht.
 
@@ -94,6 +94,7 @@ Siehe ADR 0002. Kurzfassung:
 | Eingefrorene Prototypen             | `freezePrototype: true`                                                     | Konfigurationstest, E2E (`Object.isFrozen(Object.prototype)`)                                                         |
 | Asset-Protokoll aus                 | `assetProtocol.enable: false`                                               | Konfigurationstest                                                                                                    |
 | Keine Plugin-Rechte                 | Capability enthält nur `allow-system-check`; keine Plugins außer Testplugin | Konfigurationstest, E2E (`fs`, `shell`, `sql`, `path`, `opener` abgelehnt)                                            |
+| IPC nur von eigenen Seiten          | keine `remote`-Capability; Tauri lehnt fremde Ursprünge ab                  | `tests/ipc.rs` (`https://example.com` u. a. abgelehnt), Konfigurationstest                                            |
 | Eigene Befehle nur nach Freigabe    | App-Manifest in `build.rs`                                                  | Konfigurationstest                                                                                                    |
 | Eingaben validiert                  | `Input<T>` + `Validate`, `deny_unknown_fields`                              | `tests/ipc.rs`                                                                                                        |
 | Keine internen Details in Fehlern   | `CommandError` ohne Quelltext; Frontend verwirft fremde Fehlertexte         | Unit-Tests Rust und Vitest                                                                                            |

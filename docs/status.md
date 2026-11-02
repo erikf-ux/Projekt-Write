@@ -17,7 +17,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 | 5       | IPC-Vertrag: `Input<T>` + `Validate`, `CommandError`, `ts-rs` (ADR 0002)                                | erledigt                             |
 | 6       | SQLx-Schicht: Schreibverbindung + Lese-Pool, Pragmas, Migration 0001, FTS5-Probe (ADR 0004)             | erledigt                             |
 | 7       | Befehl `system_check`, Startbildschirm (de/en, Dark/Light)                                              | erledigt                             |
-| 8       | Tests: Rust (40), Vitest (65), WebdriverIO (6)                                                          | erledigt, lokal auf Linux grün       |
+| 8       | Tests: Rust (41), Vitest (65), WebdriverIO (6)                                                          | erledigt, lokal auf Linux grün       |
 | 9       | CI: Windows, macOS, Linux; Release-Prüfung; Audits                                                      | eingerichtet, Ergebnis siehe Bericht |
 | 10      | Doku: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, CHANGELOG, Lizenzliste                    | erledigt                             |
 

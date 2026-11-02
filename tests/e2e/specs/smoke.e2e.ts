@@ -4,7 +4,7 @@
  */
 import { browser, $, $$, expect } from '@wdio/globals';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
-import { themes, tokenVariables, type ThemeName } from '../../../src/modules/themes/tokens';
+import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
 
 const READY_TEXTS = ['Alles bereit.', 'Everything is ready.'];
 
@@ -118,28 +118,12 @@ describe('Project Write – Phase 1 smoke test', () => {
 
   for (const theme of ['dark', 'light'] as ThemeName[]) {
     it(`meets the text contrast of section 6 in the ${theme} theme`, async () => {
-      const variables = Object.fromEntries(
-        Object.entries(tokenVariables).map(([token, variable]) => [
-          variable,
-          themes[theme][token as keyof (typeof themes)[ThemeName]],
-        ]),
-      );
-      // Same steps as applyTheme(): tokens, data-theme and color-scheme.
-      await browser.execute(
-        (vars: Record<string, string>, scheme: string) => {
-          const root = document.documentElement;
-          for (const [name, value] of Object.entries(vars)) {
-            root.style.setProperty(name, value);
-          }
-          root.dataset['theme'] = scheme;
-          root.style.colorScheme = scheme;
-        },
-        variables,
-        theme,
-      );
+      // Exactly what applyTheme() does: switch the data-theme attribute.
+      await browser.execute((scheme: string) => {
+        document.documentElement.dataset['theme'] = scheme;
+      }, theme);
 
-      // Give the engine time to restyle before measuring: on macOS, WebKit
-      // reported stale background colours when measured in the same script.
+      // Let the engine restyle before measuring.
       const pairs = await browser.execute(async () => {
         document.body.getBoundingClientRect(); // forces style and layout
         await new Promise<void>((resolve) => {
@@ -163,6 +147,7 @@ describe('Project Write – Phase 1 smoke test', () => {
         const main = document.querySelector('main');
         const diagnostics = main
           ? {
+              theme: document.documentElement.dataset['theme'] ?? '',
               surfaceVariable: getComputedStyle(main).getPropertyValue('--pw-color-surface').trim(),
               textVariable: getComputedStyle(main).getPropertyValue('--pw-color-text').trim(),
               mainBackground: getComputedStyle(main).backgroundColor,
@@ -189,6 +174,9 @@ describe('Project Write – Phase 1 smoke test', () => {
       });
 
       expect(pairs.length).toBeGreaterThan(10);
+      // The theme really is active: the main surface has this theme's colour.
+      const mainBackground = pairs[0]?.diagnostics?.mainBackground ?? '';
+      expect(rgbToHex(mainBackground).toUpperCase()).toBe(themes[theme].surface.toUpperCase());
       // Report every failing element at once, with its colours and ratio.
       const failures = pairs
         .filter((p) => p.text !== '' && p.text !== '·')

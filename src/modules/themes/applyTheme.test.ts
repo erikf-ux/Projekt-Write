@@ -1,23 +1,44 @@
-import { describe, expect, it } from 'vitest';
-import { applyTheme } from './applyTheme';
-import { themes, tokenVariables } from './tokens';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { applyTheme, installThemeStyles, themeStylesheet } from './applyTheme';
+import { themes, tokenVariables, type ThemeName } from './tokens';
+
+beforeEach(() => {
+  document.getElementById('pw-theme-tokens')?.remove();
+});
+
+describe('themeStylesheet', () => {
+  it('declares every token of every theme', () => {
+    const css = themeStylesheet();
+    for (const name of Object.keys(themes) as ThemeName[]) {
+      const rule = css.split('\n').find((line) => line.startsWith(`[data-theme="${name}"]`));
+      expect(rule).toBeDefined();
+      for (const [token, variable] of Object.entries(tokenVariables)) {
+        expect(rule).toContain(`${variable}: ${themes[name][token as keyof (typeof themes)[ThemeName]]};`);
+      }
+      expect(rule).toContain(`color-scheme: ${name};`);
+    }
+  });
+});
 
 describe('applyTheme', () => {
-  it('writes every token as a CSS custom property', () => {
+  it('switches themes through the data-theme attribute', () => {
     const root = document.createElement('div');
+    document.body.append(root);
     applyTheme('light', root);
-    for (const [token, variable] of Object.entries(tokenVariables)) {
-      expect(root.style.getPropertyValue(variable)).toBe(themes.light[token as keyof typeof themes.light]);
-    }
     expect(root.dataset['theme']).toBe('light');
-    expect(root.style.colorScheme).toBe('light');
+    applyTheme('dark', root);
+    expect(root.dataset['theme']).toBe('dark');
+    // No colours are written inline; they come from the generated rules.
+    expect(root.getAttribute('style')).toBeNull();
+    root.remove();
   });
 
-  it('switches between dark and light', () => {
-    const root = document.createElement('div');
-    applyTheme('dark', root);
-    expect(root.style.getPropertyValue('--pw-color-surface')).toBe('#1E1E1E');
-    applyTheme('light', root);
-    expect(root.style.getPropertyValue('--pw-color-surface')).toBe('#FFFFFF');
+  it('installs the theme rules exactly once', () => {
+    installThemeStyles();
+    installThemeStyles();
+    applyTheme('dark');
+    const styles = document.querySelectorAll('#pw-theme-tokens');
+    expect(styles).toHaveLength(1);
+    expect(styles[0]?.textContent).toBe(themeStylesheet());
   });
 });
