@@ -51,6 +51,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ### Entscheidungen des Auftraggebers
 
+- macOS vorerst zurückgestellt (2. November 2026): CI läuft nur auf Windows und Linux. Priorität: zuerst Windows, dann Linux. macOS-spezifische Arbeiten ruhen, bis der Auftraggeber sie wieder freigibt.
 - Erledigt: Bundle-Kennung `app.projectwrite.desktop` bestätigt; App-Icon festgelegt (Schreibmaschine, größte Größe 256 × 256 px, erzeugt mit `scripts/app-icons.mjs`).
 - CI-Lauf 22 (Commit `a89afae`, App-Icon): Linux, Windows, Release-Prüfung und Audits grün. Der macOS-Job bekam zweimal keinen Runner zugeteilt und wurde nach 15 Minuten abgebrochen, ohne einen Schritt auszuführen – kein Codefehler. Das Icon (jetzt 256 × 256 px) unter macOS beim nächsten CI-Lauf prüfen.
 
