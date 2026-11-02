@@ -90,14 +90,19 @@ function expectContrast(samples: ContrastSample[], theme: ThemeName) {
   expect(samples.length).toBeGreaterThan(10);
   expect(samples[0]?.theme).toBe(theme);
   expect(rgbToHex(samples[0]?.mainBackground ?? '').toUpperCase()).toBe(themes[theme].surface.toUpperCase());
-  // Report every failing element at once, with its colours and ratio.
+  // One compact line per failing element: selector, text, colours, ratio.
   const failures = samples
     .filter((sample) => sample.text !== '' && sample.text !== '·')
     .map((sample) => ({
       ...sample,
       ratio: contrastRatio(rgbToHex(sample.color), rgbToHex(sample.background)),
     }))
-    .filter((sample) => sample.ratio < MIN_TEXT_CONTRAST);
+    .filter((sample) => sample.ratio < MIN_TEXT_CONTRAST)
+    .map(
+      (sample) =>
+        `${sample.selector} "${sample.text}": ${sample.color} on ${sample.background} = ${sample.ratio.toFixed(2)} ` +
+        `(--pw-color-text ${sample.textVariable})`,
+    );
   expect(failures).toEqual([]);
 }
 
@@ -244,9 +249,10 @@ describe('Project Write – Phase 1 smoke test', () => {
       // requires a visible focus, so at least 2px is accepted.
       expect(parseFloat(focused.outlineWidth)).toBeGreaterThanOrEqual(2);
       // Section 6: graphical elements need 3:1 against their surroundings.
-      expect(
-        contrastRatio(rgbToHex(focused.outlineColor), rgbToHex(focused.background)),
-      ).toBeGreaterThanOrEqual(3);
+      const ring = contrastRatio(rgbToHex(focused.outlineColor), rgbToHex(focused.background));
+      expect(ring >= 3 ? 'ok' : `${focused.outlineColor} on ${focused.background} = ${ring.toFixed(2)}`).toBe(
+        'ok',
+      );
     }
 
     await $('button').click();
