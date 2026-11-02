@@ -30,8 +30,27 @@ fn app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
     (app, webview)
 }
 
+/// Origin of the app's own pages: Tauri serves them from `http://tauri.localhost`
+/// on Windows and from `tauri://localhost` elsewhere.
+fn local_origin() -> &'static str {
+    if cfg!(windows) {
+        "http://tauri.localhost"
+    } else {
+        "tauri://localhost"
+    }
+}
+
 fn invoke(
     webview: &WebviewWindow<MockRuntime>,
+    command: &str,
+    body: Value,
+) -> Result<Value, Value> {
+    invoke_from(webview, local_origin(), command, body)
+}
+
+fn invoke_from(
+    webview: &WebviewWindow<MockRuntime>,
+    origin: &str,
     command: &str,
     body: Value,
 ) -> Result<Value, Value> {
@@ -41,7 +60,7 @@ fn invoke(
             cmd: command.into(),
             callback: CallbackFn(0),
             error: CallbackFn(1),
-            url: "tauri://localhost".parse().unwrap(),
+            url: origin.parse().unwrap(),
             body: InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: INVOKE_KEY.to_string(),
@@ -136,4 +155,15 @@ fn unknown_commands_are_rejected_by_tauri() {
     let (_app, webview) = app();
     let error = invoke(&webview, "read_text_file", json!({ "path": "/etc/passwd" })).unwrap_err();
     assert!(error.is_string(), "{error}");
+}
+
+#[test]
+fn commands_are_refused_for_remote_origins() {
+    // Only the app's own pages may use IPC; there is no "remote" capability.
+    let (_app, webview) = app();
+    let body = json!({ "request": { "checks": ["database"] } });
+    for origin in ["https://example.com", "http://tauri.localhost.example.net"] {
+        let error = invoke_from(&webview, origin, "system_check", body.clone()).unwrap_err();
+        assert!(error.is_string(), "{origin}: {error}");
+    }
 }
