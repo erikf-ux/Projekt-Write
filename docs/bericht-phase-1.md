@@ -18,51 +18,63 @@ Alle Dateien sind neu (leeres Repository). Wichtigste Orte: `src-tauri/src/` (Be
 
 ## Welche Tests wurden durchgeführt?
 
-Letzter vollständiger CI-Lauf: Run 13 (Commit `39bb969`).
+Letzter vollständiger CI-Lauf: **Run 19 (Commit `9c750a1`) – auf allen drei Systemen grün.**
 
-| Prüfung                                                             | Linux     | Windows                  | macOS                    |
-| ------------------------------------------------------------------- | --------- | ------------------------ | ------------------------ |
-| Prettier, ESLint, TypeScript                                        | bestanden | bestanden                | bestanden                |
-| Vitest (66)                                                         | bestanden | bestanden                | bestanden                |
-| rustfmt, Clippy `-D warnings` (mit/ohne `e2e`)                      | bestanden | bestanden                | bestanden                |
-| Rust-Tests (41)                                                     | bestanden | bestanden                | bestanden                |
-| Erzeugte Typen / Lizenzliste aktuell                                | bestanden | bestanden                | bestanden                |
-| E2E-Build                                                           | bestanden | bestanden                | bestanden                |
-| E2E: App startet, Startbildschirm                                   | bestanden | bestanden                | bestanden                |
-| E2E: CSP (Inline-Skript, Webbild)                                   | bestanden | bestanden                | bestanden                |
-| E2E: `fs`/`shell`/`sql`/`path`/`opener` abgelehnt                   | bestanden | bestanden                | bestanden                |
-| E2E: Kontrast im Start-Theme                                        | bestanden | bestanden                | bestanden                |
-| E2E: Tabulator-Reihenfolge, Fokusring 3:1                           | bestanden | **fehlgeschlagen (F-2)** | **fehlgeschlagen (F-2)** |
-| E2E: Kontrast nach Wechsel zu Dark                                  | bestanden | **fehlgeschlagen (F-1)** | **fehlgeschlagen (F-1)** |
-| E2E: Kontrast nach Wechsel zu Light                                 | bestanden | bestanden                | **fehlgeschlagen (F-1)** |
-| Release ohne Testplugins (Job auf Linux)                            | bestanden | –                        | –                        |
-| `cargo audit`, `cargo deny`, `npm audit --omit=dev` (Job auf Linux) | bestanden | –                        | –                        |
+| Prüfung                                                             | Linux     | Windows   | macOS     |
+| ------------------------------------------------------------------- | --------- | --------- | --------- |
+| Prettier, ESLint, TypeScript                                        | bestanden | bestanden | bestanden |
+| Vitest (66)                                                         | bestanden | bestanden | bestanden |
+| rustfmt, Clippy `-D warnings` (mit/ohne `e2e`)                      | bestanden | bestanden | bestanden |
+| Rust-Tests (41)                                                     | bestanden | bestanden | bestanden |
+| Erzeugte Typen / Lizenzliste aktuell                                | bestanden | bestanden | bestanden |
+| E2E-Build                                                           | bestanden | bestanden | bestanden |
+| E2E: App startet, Startbildschirm                                   | bestanden | bestanden | bestanden |
+| E2E: CSP (Inline-Skript, Webbild)                                   | bestanden | bestanden | bestanden |
+| E2E: `fs`/`shell`/`sql`/`path`/`opener` abgelehnt                   | bestanden | bestanden | bestanden |
+| E2E: Kontrast im Start-Theme (Pixel)                                | bestanden | bestanden | bestanden |
+| E2E: Tabulator-Reihenfolge, Fokusring ≥ 2 px, 3:1 (Pixel)           | bestanden | bestanden | bestanden |
+| E2E: Kontrast nach Wechsel zu Dark (Pixel)                          | bestanden | bestanden | bestanden |
+| E2E: Kontrast nach Wechsel zu Light (Pixel)                         | bestanden | bestanden | bestanden |
+| Release ohne Testplugins (Job auf Linux)                            | bestanden | –         | –         |
+| `cargo audit`, `cargo deny`, `npm audit --omit=dev` (Job auf Linux) | bestanden | –         | –         |
 
-Zusätzlich lokal (Linux, Xvfb): alle 41 Rust-, 66 Vitest- und 7 E2E-Tests bestanden; Release-Binary 4,96 MB; `cargo check --release --features e2e` bricht wie vorgesehen ab; Positivkontrolle des Testplugin-Scans (E2E-Binary enthält die Kennung 78-mal); E2E schreibt nichts außerhalb des Projektordners (Linux geprüft).
+Zusätzlich lokal (Linux, Xvfb): alle Tests bestanden; Release-Binary 4,96 MB; `cargo check --release --features e2e` bricht wie vorgesehen ab; Positivkontrolle des Testplugin-Scans (E2E-Binary enthält die Kennung 78-mal); E2E schreibt nichts außerhalb des Projektordners (Linux geprüft); pixelbasierte Kontrastmessung in Chromium bei 1- und 2-facher Skalierung gegen die Token-Werte geprüft (exakt).
+
+### Behobene Fehler während der Phase
+
+| Befund                                                                  | Ursache                                                                                          | Lösung                                                                                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Lizenzliste in CI abweichend                                            | `CARGO_TERM_COLOR=always` färbte `cargo tree`                                                    | `--color never`, ANSI-Codes entfernt, `cargo` ohne Shell                                                 |
+| Windows: Test-Executables starten nicht (`STATUS_ENTRYPOINT_NOT_FOUND`) | Common-Controls-v6-Manifest nur im App-Binary                                                    | Manifest per `build.rs` für alle Ziele gelinkt                                                           |
+| Windows: IPC-Tests abgelehnt                                            | Lokaler Ursprung dort `http://tauri.localhost`                                                   | Ursprung je Plattform; neuer Test: fremde Ursprünge werden abgelehnt                                     |
+| Windows: E2E-Worker stürzt ab                                           | Worker löschte den WebView2-Ordner der laufenden App                                             | Aufräumen nur im Launcher                                                                                |
+| macOS/Windows: veraltete Farben im E2E (F-1, F-2)                       | CI-Fenster rendern verzögert; `getComputedStyle` und einzelne Screenshots zeigten Zwischenstände | Farben werden an einem eingeschwungenen Screenshot gemessen (Pixel). Die Farben der App waren nie falsch |
 
 ## Abnahmekriterien Phase 1
 
-| Kriterium                                                                 | Stand                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App startet auf allen drei Systemen, WebdriverIO-Rauchtest grün           | **Teilweise.** Start und Kerntests auf allen drei Systemen grün; die Suite ist unter Windows (2 Tests) und macOS (3 Tests) rot wegen F-1/F-2                                                                                |
-| Testbefehl: typisiertes Ergebnis bzw. einheitliches Fehlerformat          | erfüllt (Rust-IPC-Tests auf allen drei Systemen)                                                                                                                                                                            |
-| Migration auf leerer DB, zweiter Lauf ändert nichts, Fremdschlüssel aktiv | erfüllt (alle drei Systeme)                                                                                                                                                                                                 |
-| FTS5 aktiv, beide Tabellen, `"C++"`                                       | erfüllt (alle drei Systeme)                                                                                                                                                                                                 |
-| CSP: Inline-Skript läuft nicht, Webbild lädt nicht                        | erfüllt (E2E auf allen drei Systemen)                                                                                                                                                                                       |
-| Frontend-Zugriff auf Dateisystem-Befehle abgelehnt                        | erfüllt (E2E auf allen drei Systemen)                                                                                                                                                                                       |
-| Startbildschirm erfüllt in Dark und Light die Kontrastwerte               | **Teilweise.** Token-Paare beider Themes erfüllt (Unit-Tests, alle Systeme); gerendertes Start-Theme erfüllt (E2E, alle Systeme); nach Theme-Wechsel zur Laufzeit und Fokusring unter Windows/macOS nicht belegt (F-1, F-2) |
-| ADR zum Isolation Pattern                                                 | erfüllt (ADR 0005, mit Versuch)                                                                                                                                                                                             |
+| Kriterium                                                                 | Stand                                                                                                          |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| App startet auf allen drei Systemen, WebdriverIO-Rauchtest grün           | erfüllt (CI-Lauf 19)                                                                                           |
+| Testbefehl: typisiertes Ergebnis bzw. einheitliches Fehlerformat          | erfüllt (alle drei Systeme)                                                                                    |
+| Migration auf leerer DB, zweiter Lauf ändert nichts, Fremdschlüssel aktiv | erfüllt (alle drei Systeme)                                                                                    |
+| FTS5 aktiv, beide Tabellen, `"C++"`                                       | erfüllt (alle drei Systeme)                                                                                    |
+| CSP: Inline-Skript läuft nicht, Webbild lädt nicht                        | erfüllt (alle drei Systeme)                                                                                    |
+| Frontend-Zugriff auf Dateisystem-Befehle abgelehnt                        | erfüllt (alle drei Systeme)                                                                                    |
+| Startbildschirm erfüllt in Dark und Light die Kontrastwerte               | erfüllt: Token-Paare (Unit-Tests) und gerenderte Pixel in Start-Theme, Dark und Light (E2E, alle drei Systeme) |
+| ADR zum Isolation Pattern                                                 | erfüllt (ADR 0005, mit Versuch)                                                                                |
+
+Abweichung, offen benannt: Der Fokusring wird unter macOS 3 px statt der in `index.css` gesetzten 2 px breit gezeichnet. Der Test verlangt deshalb „mindestens 2 px“ statt exakt 2 px.
 
 ## Was konnte nicht getestet werden und warum?
 
 - Echte Tab-Navigation: Der eingebettete WebDriver erzeugt nur synthetische Tastatureingaben (ADR 0003).
 - `cargo audit`/`cargo deny` lokal: Ausführen heruntergeladener Binärdateien wurde vom Berechtigungssystem abgelehnt; in CI ausgeführt und bestanden.
 - Messungen auf dem Referenzgerät: nicht verfügbar; Leistungswerte sind Thema von Phase 14.
-- Darstellung unter Windows/macOS als Bildschirmfoto: Artefakte und Log-Downloads sind aus dieser Umgebung über den Proxy nicht erreichbar.
+- Unter macOS lässt sich der WebKit-Datenordner der E2E-Tests nicht in den Projektordner umlenken (ADR 0003).
 
 ## Offene Fehler
 
-- **F-1** und **F-2**, siehe `docs/status.md`.
+Keine.
 
 ## Gefundene Widersprüche im Auftrag
 
@@ -76,8 +88,7 @@ Zusätzlich lokal (Linux, Xvfb): alle 41 Rust-, 66 Vitest- und 7 E2E-Tests besta
 
 ## Rückfragen an den Auftraggeber
 
-1. **F-1/F-2:** Abnahmekriterien „Rauchtest grün auf allen Systemen“ und „Kontrast in Dark und Light“ sind unter Windows/macOS nur teilweise belegt (Abschnitt 2, Regel 6). Vorschlag: Phase 1 mit diesen zwei dokumentierten Fehlern freigeben und die Analyse (mit Bildschirmfotos) an den Anfang von Phase 3 (Themes, Fokus) legen – oder vor Phase 2 weiter untersuchen.
-2. Bundle-Kennung `app.projectwrite.desktop` vorläufig bestätigen (endgültig vor Phase 14).
+1. Bundle-Kennung `app.projectwrite.desktop` vorläufig bestätigen (endgültig vor Phase 14).
 
 ## Nächster Schritt
 

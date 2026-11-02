@@ -8,18 +8,18 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Stand Phase 1
 
-| Schritt | Inhalt                                                                                                  | Stand                            |
-| ------- | ------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| 1       | Auftrag als `docs/master-prompt.md`                                                                     | erledigt                         |
-| 2       | Versionen und Kompatibilität (ADR 0001, `docs/dependencies.md`)                                         | erledigt                         |
-| 3       | Frontend-Gerüst: Vite 8, React 19, TypeScript 6 strict, Tailwind 4, Zustand 5, ESLint, Prettier, Vitest | erledigt                         |
-| 4       | Tauri-2-Gerüst: App-Manifest in `build.rs`, eine Capability, CSP, Härtung                               | erledigt                         |
-| 5       | IPC-Vertrag: `Input<T>` + `Validate`, `CommandError`, `ts-rs` (ADR 0002)                                | erledigt                         |
-| 6       | SQLx-Schicht: Schreibverbindung + Lese-Pool, Pragmas, Migration 0001, FTS5-Probe (ADR 0004)             | erledigt                         |
-| 7       | Befehl `system_check`, Startbildschirm (de/en, Dark/Light)                                              | erledigt                         |
-| 8       | Tests: Rust (41), Vitest (66), WebdriverIO (7)                                                          | erledigt, Ergebnis siehe Bericht |
-| 9       | CI: Windows, macOS, Linux; Release-Prüfung; Audits                                                      | siehe Bericht                    |
-| 10      | Doku: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, CHANGELOG, Lizenzliste                    | erledigt                         |
+| Schritt | Inhalt                                                                                                  | Stand                                             |
+| ------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 1       | Auftrag als `docs/master-prompt.md`                                                                     | erledigt                                          |
+| 2       | Versionen und Kompatibilität (ADR 0001, `docs/dependencies.md`)                                         | erledigt                                          |
+| 3       | Frontend-Gerüst: Vite 8, React 19, TypeScript 6 strict, Tailwind 4, Zustand 5, ESLint, Prettier, Vitest | erledigt                                          |
+| 4       | Tauri-2-Gerüst: App-Manifest in `build.rs`, eine Capability, CSP, Härtung                               | erledigt                                          |
+| 5       | IPC-Vertrag: `Input<T>` + `Validate`, `CommandError`, `ts-rs` (ADR 0002)                                | erledigt                                          |
+| 6       | SQLx-Schicht: Schreibverbindung + Lese-Pool, Pragmas, Migration 0001, FTS5-Probe (ADR 0004)             | erledigt                                          |
+| 7       | Befehl `system_check`, Startbildschirm (de/en, Dark/Light)                                              | erledigt                                          |
+| 8       | Tests: Rust (41), Vitest (66), WebdriverIO (7)                                                          | erledigt, CI-Lauf 19 grün                         |
+| 9       | CI: Windows, macOS, Linux; Release-Prüfung; Audits                                                      | erledigt, CI-Lauf 19 auf allen drei Systemen grün |
+| 10      | Doku: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, CHANGELOG, Lizenzliste                    | erledigt                                          |
 
 ## Behobene Fehler
 
