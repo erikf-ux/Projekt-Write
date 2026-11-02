@@ -8,10 +8,11 @@ const STYLE_ID = 'pw-theme-tokens';
  * tokens.ts (the only source of colours):
  * `[data-theme="dark"] { --pw-color-surface: …; color-scheme: dark }`.
  *
- * Switching a theme only changes the `data-theme` attribute. Rewriting the
- * custom properties inline on <html> left stale computed colours in WebKit on
- * macOS (some elements kept the old text or background colour); a change of
- * matching rules is invalidated reliably by every engine.
+ * Switching a theme sets the `data-theme` attribute and replaces this
+ * stylesheet. WebKit on macOS kept stale inherited colours for some elements
+ * when only custom properties changed (inline or via the attribute); a
+ * stylesheet change makes every engine recompute all styles. Unlike the
+ * `display: none` trick it keeps focus and scroll position.
  */
 export function themeStylesheet(): string {
   const tokenNames = Object.keys(tokenVariables) as (keyof ThemeTokens)[];
@@ -23,21 +24,23 @@ export function themeStylesheet(): string {
     .join('\n');
 }
 
-/** Adds the theme rules to the document once. */
+/** Adds the theme rules to the document, replacing an existing copy. */
 export function installThemeStyles(doc: Document = document): void {
-  if (doc.getElementById(STYLE_ID)) {
-    return;
-  }
   const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = themeStylesheet();
-  doc.head.append(style);
+  const existing = doc.getElementById(STYLE_ID);
+  if (existing) {
+    existing.replaceWith(style);
+  } else {
+    doc.head.append(style);
+  }
 }
 
 /** Activates `theme` for `root` and everything inside it. */
 export function applyTheme(theme: ThemeName, root: HTMLElement = document.documentElement): void {
-  installThemeStyles(root.ownerDocument);
   root.dataset['theme'] = theme;
+  installThemeStyles(root.ownerDocument);
 }
 
 /** The theme matching the operating system setting. */

@@ -3,6 +3,7 @@
  * start, CSP, rejected file system access, contrast, keyboard focus.
  */
 import { browser, $, $$, expect } from '@wdio/globals';
+import { themeStylesheet } from '../../../src/modules/themes/applyTheme';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
 import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
 
@@ -118,10 +119,23 @@ describe('Project Write – Phase 1 smoke test', () => {
 
   for (const theme of ['dark', 'light'] as ThemeName[]) {
     it(`meets the text contrast of section 6 in the ${theme} theme`, async () => {
-      // Exactly what applyTheme() does: switch the data-theme attribute.
-      await browser.execute((scheme: string) => {
-        document.documentElement.dataset['theme'] = scheme;
-      }, theme);
+      // The same DOM steps as applyTheme(): set data-theme, replace the theme stylesheet.
+      await browser.execute(
+        (scheme: string, css: string) => {
+          document.documentElement.dataset['theme'] = scheme;
+          const style = document.createElement('style');
+          style.id = 'pw-theme-tokens';
+          style.textContent = css;
+          const existing = document.getElementById('pw-theme-tokens');
+          if (existing) {
+            existing.replaceWith(style);
+          } else {
+            document.head.append(style);
+          }
+        },
+        theme,
+        themeStylesheet(),
+      );
 
       // Let the engine restyle before measuring.
       const pairs = await browser.execute(async () => {
