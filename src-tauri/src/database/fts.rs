@@ -7,12 +7,36 @@
 
 use sqlx::SqlitePool;
 
+// The definitions are macros so they can be spliced into SQL literals with
+// `concat!`: SQLx 0.9 only accepts `&'static str` SQL without an explicit
+// audit marker.
+macro_rules! search_words_definition {
+    () => {
+        "title, body, tags, subnets, meta, tokenize = 'unicode61 remove_diacritics 2', prefix = '2 3'"
+    };
+}
+macro_rules! search_parts_definition {
+    () => {
+        "title, body, tokenize = 'trigram remove_diacritics 1'"
+    };
+}
+
 /// Column and option list of `search_words` (section 19).
-pub const SEARCH_WORDS_DEFINITION: &str =
-    "title, body, tags, subnets, meta, tokenize = 'unicode61 remove_diacritics 2', prefix = '2 3'";
+pub const SEARCH_WORDS_DEFINITION: &str = search_words_definition!();
 
 /// Column and option list of `search_parts` (section 19).
-pub const SEARCH_PARTS_DEFINITION: &str = "title, body, tokenize = 'trigram remove_diacritics 1'";
+pub const SEARCH_PARTS_DEFINITION: &str = search_parts_definition!();
+
+const PROBE_WORDS_SQL: &str = concat!(
+    "CREATE VIRTUAL TABLE temp.pw_probe_words USING fts5(",
+    search_words_definition!(),
+    ")"
+);
+const PROBE_PARTS_SQL: &str = concat!(
+    "CREATE VIRTUAL TABLE temp.pw_probe_parts USING fts5(",
+    search_parts_definition!(),
+    ")"
+);
 
 /// Quotes one search term as an FTS5 string: wraps it in `"` and doubles every
 /// `"` inside. Without this, input such as `C++` or a lone `"` is a syntax
@@ -47,7 +71,11 @@ pub struct FtsProbe {
 
 impl FtsProbe {
     pub fn passed(&self) -> bool {
-        self.compiled_in && self.words_table && self.parts_table && self.quoted_query && self.part_query
+        self.compiled_in
+            && self.words_table
+            && self.parts_table
+            && self.quoted_query
+            && self.part_query
     }
 }
 
@@ -61,18 +89,8 @@ pub async fn probe(writer: &SqlitePool) -> Result<FtsProbe, sqlx::Error> {
         .any(|option| option == "ENABLE_FTS5");
 
     let mut tx = writer.begin().await?;
-    let words_table = sqlx::query(&format!(
-        "CREATE VIRTUAL TABLE temp.pw_probe_words USING fts5({SEARCH_WORDS_DEFINITION})"
-    ))
-    .execute(&mut *tx)
-    .await
-    .is_ok();
-    let parts_table = sqlx::query(&format!(
-        "CREATE VIRTUAL TABLE temp.pw_probe_parts USING fts5({SEARCH_PARTS_DEFINITION})"
-    ))
-    .execute(&mut *tx)
-    .await
-    .is_ok();
+    let words_table = sqlx::query(PROBE_WORDS_SQL).execute(&mut *tx).await.is_ok();
+    let parts_table = sqlx::query(PROBE_PARTS_SQL).execute(&mut *tx).await.is_ok();
 
     let mut quoted_query = false;
     let mut part_query = false;
@@ -87,16 +105,20 @@ pub async fn probe(writer: &SqlitePool) -> Result<FtsProbe, sqlx::Error> {
             .execute(&mut *tx)
             .await?;
 
-        let hits: i64 = sqlx::query_scalar("SELECT count(*) FROM temp.pw_probe_words WHERE pw_probe_words MATCH ?1")
-            .bind(quote_term("C++"))
-            .fetch_one(&mut *tx)
-            .await?;
+        let hits: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM temp.pw_probe_words WHERE pw_probe_words MATCH ?1",
+        )
+        .bind(quote_term("C++"))
+        .fetch_one(&mut *tx)
+        .await?;
         quoted_query = hits == 1;
 
-        let hits: i64 = sqlx::query_scalar("SELECT count(*) FROM temp.pw_probe_parts WHERE pw_probe_parts MATCH ?1")
-            .bind(quote_term("haus"))
-            .fetch_one(&mut *tx)
-            .await?;
+        let hits: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM temp.pw_probe_parts WHERE pw_probe_parts MATCH ?1",
+        )
+        .bind(quote_term("haus"))
+        .fetch_one(&mut *tx)
+        .await?;
         part_query = hits == 1;
     }
     tx.rollback().await?;

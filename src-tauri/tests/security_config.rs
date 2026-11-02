@@ -38,12 +38,22 @@ fn csp_is_exactly_the_section_20_policy() {
     });
     let config = tauri_config();
     let security = &config["app"]["security"];
-    assert_eq!(security["csp"], expected, "every CSP change needs an ADR (section 20)");
+    assert_eq!(
+        security["csp"], expected,
+        "every CSP change needs an ADR (section 20)"
+    );
     let csp_text = security["csp"].to_string();
     assert!(!csp_text.contains("unsafe-eval"));
     assert!(!csp_text.contains("https:"));
-    assert!(security.get("devCsp").is_none(), "no separate, looser development CSP");
-    assert!(security.get("dangerousDisableAssetCspModification").is_none());
+    assert!(
+        security.get("devCsp").is_none(),
+        "no separate, looser development CSP"
+    );
+    assert!(
+        security
+            .get("dangerousDisableAssetCspModification")
+            .is_none()
+    );
 }
 
 #[test]
@@ -53,7 +63,10 @@ fn webview_hardening_is_enabled() {
     assert_eq!(config["app"]["security"]["freezePrototype"], true);
     assert_eq!(config["app"]["security"]["assetProtocol"]["enable"], false);
     for window in config["app"]["windows"].as_array().unwrap() {
-        assert_eq!(window["dragDropEnabled"], false, "section 11: HTML5 drag and drop");
+        assert_eq!(
+            window["dragDropEnabled"], false,
+            "section 11: HTML5 drag and drop"
+        );
     }
 }
 
@@ -68,7 +81,10 @@ fn capabilities_grant_only_the_apps_own_commands() {
         .collect();
     assert_eq!(enabled, ["main-window"]);
 
-    let mut expected: Vec<String> = COMMAND_NAMES.iter().map(|name| format!("allow-{}", name.replace('_', "-"))).collect();
+    let mut expected: Vec<String> = COMMAND_NAMES
+        .iter()
+        .map(|name| format!("allow-{}", name.replace('_', "-")))
+        .collect();
     expected.sort();
 
     let dir = manifest_dir().join("capabilities");
@@ -84,11 +100,18 @@ fn capabilities_grant_only_the_apps_own_commands() {
             .as_array()
             .unwrap()
             .iter()
-            .map(|p| p.as_str().expect("permissions are plain identifiers, no scopes").to_owned())
+            .map(|p| {
+                p.as_str()
+                    .expect("permissions are plain identifiers, no scopes")
+                    .to_owned()
+            })
             .collect();
         permissions.sort();
         assert_eq!(permissions, expected, "{}", path.display());
-        assert!(capability.get("remote").is_none(), "no remote origins may use IPC");
+        assert!(
+            capability.get("remote").is_none(),
+            "no remote origins may use IPC"
+        );
     }
     assert_eq!(files, 1, "exactly one capability file");
 }
@@ -97,18 +120,33 @@ fn capabilities_grant_only_the_apps_own_commands() {
 fn every_command_is_in_the_app_manifest() {
     let build_rs = fs::read_to_string(manifest_dir().join("build.rs")).unwrap();
     for name in COMMAND_NAMES {
-        assert!(build_rs.contains(&format!("\"{name}\"")), "{name} missing in build.rs app manifest");
+        assert!(
+            build_rs.contains(&format!("\"{name}\"")),
+            "{name} missing in build.rs app manifest"
+        );
     }
 }
 
 #[test]
 fn forbidden_dependencies_are_absent() {
     let cargo_toml = fs::read_to_string(manifest_dir().join("Cargo.toml")).unwrap();
-    for forbidden in ["rusqlite", "tauri-plugin-sql", "tauri-plugin-fs", "tauri-plugin-shell", "tauri-plugin-http"] {
-        assert!(!cargo_toml.contains(forbidden), "{forbidden} must not be a dependency (sections 7 and 20)");
+    for forbidden in [
+        "rusqlite",
+        "tauri-plugin-sql",
+        "tauri-plugin-fs",
+        "tauri-plugin-shell",
+        "tauri-plugin-http",
+    ] {
+        assert!(
+            !cargo_toml.contains(forbidden),
+            "{forbidden} must not be a dependency (sections 7 and 20)"
+        );
     }
     let package_json = fs::read_to_string(manifest_dir().join("../package.json")).unwrap();
-    assert!(!package_json.contains("@tauri-apps/plugin-"), "the frontend gets no Tauri plugins");
+    assert!(
+        !package_json.contains("@tauri-apps/plugin-"),
+        "the frontend gets no Tauri plugins"
+    );
 }
 
 #[test]
@@ -129,7 +167,10 @@ fn every_error_message_key_is_translated() {
         let dictionary = read_json(&manifest_dir().join(format!("../src/i18n/{language}.json")));
         for code in ErrorCode::ALL {
             let key = code.message_key();
-            assert!(dictionary.get(key).and_then(Value::as_str).is_some(), "{key} missing in {language}.json");
+            assert!(
+                dictionary.get(key).and_then(Value::as_str).is_some(),
+                "{key} missing in {language}.json"
+            );
         }
     }
 }

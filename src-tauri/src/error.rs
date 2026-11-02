@@ -110,7 +110,10 @@ mod tests {
     #[test]
     fn serializes_to_uniform_format_without_details() {
         let value = serde_json::to_value(CommandError::new(ErrorCode::Internal)).unwrap();
-        assert_eq!(value, json!({ "code": "INTERNAL", "messageKey": "error.internal" }));
+        assert_eq!(
+            value,
+            json!({ "code": "INTERNAL", "messageKey": "error.internal" })
+        );
     }
 
     #[test]

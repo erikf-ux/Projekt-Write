@@ -149,20 +149,34 @@ impl Database {
             return Err(DatabaseError::SchemaTooNew { found, supported });
         }
 
-        MIGRATOR.run(&self.writer).await.map_err(|error| match error {
-            MigrateError::VersionMissing(found) => DatabaseError::SchemaTooNew { found, supported },
-            other => DatabaseError::Migration(other),
-        })?;
+        MIGRATOR
+            .run(&self.writer)
+            .await
+            .map_err(|error| match error {
+                MigrateError::VersionMissing(found) => {
+                    DatabaseError::SchemaTooNew { found, supported }
+                }
+                other => DatabaseError::Migration(other),
+            })?;
 
         let after = self.applied_versions().await?;
-        let applied = after.iter().copied().filter(|v| !before.contains(v)).collect();
+        let applied = after
+            .iter()
+            .copied()
+            .filter(|v| !before.contains(v))
+            .collect();
         let version = after.iter().copied().max().unwrap_or(0);
         Ok(MigrationReport { applied, version })
     }
 
     /// Current schema version (0 for an empty database).
     pub async fn schema_version(&self) -> Result<i64, DatabaseError> {
-        Ok(self.applied_versions().await?.into_iter().max().unwrap_or(0))
+        Ok(self
+            .applied_versions()
+            .await?
+            .into_iter()
+            .max()
+            .unwrap_or(0))
     }
 
     async fn applied_versions(&self) -> Result<Vec<i64>, DatabaseError> {
@@ -174,9 +188,10 @@ impl Database {
         if !table_exists {
             return Ok(Vec::new());
         }
-        let rows = sqlx::query("SELECT version FROM _sqlx_migrations WHERE success = 1 ORDER BY version")
-            .fetch_all(&self.writer)
-            .await?;
+        let rows =
+            sqlx::query("SELECT version FROM _sqlx_migrations WHERE success = 1 ORDER BY version")
+                .fetch_all(&self.writer)
+                .await?;
         Ok(rows.iter().map(|row| row.get::<i64, _>(0)).collect())
     }
 

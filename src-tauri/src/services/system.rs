@@ -113,7 +113,9 @@ pub async fn run_checks(
 async fn run_check(database: &Database, check: SystemCheckId) -> Result<bool, DatabaseError> {
     Ok(match check {
         SystemCheckId::Database => diagnostics::quick_check(database.reader()).await?,
-        SystemCheckId::Migrations => database.schema_version().await? == Database::supported_version(),
+        SystemCheckId::Migrations => {
+            database.schema_version().await? == Database::supported_version()
+        }
         SystemCheckId::ForeignKeys => diagnostics::foreign_keys_enabled(database.writer()).await?,
         SystemCheckId::FullTextSearch => fts::probe(database.writer()).await?.passed(),
     })
@@ -137,7 +139,10 @@ mod tests {
     fn validation_rejects_empty_and_duplicates() {
         for (checks, reason) in [
             (vec![], "empty"),
-            (vec![SystemCheckId::Database, SystemCheckId::Database], "duplicate"),
+            (
+                vec![SystemCheckId::Database, SystemCheckId::Database],
+                "duplicate",
+            ),
         ] {
             let error = request(checks).validate().unwrap_err();
             assert_eq!(error.code, ErrorCode::InvalidInput);
@@ -158,7 +163,9 @@ mod tests {
     #[tokio::test]
     async fn migration_check_fails_before_migrating() {
         let database = Database::open_in_memory().await.unwrap();
-        let response = run_checks(&database, &[SystemCheckId::Migrations]).await.unwrap();
+        let response = run_checks(&database, &[SystemCheckId::Migrations])
+            .await
+            .unwrap();
         assert_eq!(response.schema_version, 0);
         assert!(!response.results[0].passed);
     }

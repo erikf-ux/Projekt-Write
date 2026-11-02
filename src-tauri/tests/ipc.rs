@@ -7,7 +7,9 @@ use project_write_lib::database::Database;
 use project_write_lib::state::AppState;
 use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets};
+use tauri::test::{
+    INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets,
+};
 use tauri::webview::InvokeRequest;
 use tauri::{App, WebviewWindow, WebviewWindowBuilder};
 
@@ -28,7 +30,11 @@ fn app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
     (app, webview)
 }
 
-fn invoke(webview: &WebviewWindow<MockRuntime>, command: &str, body: Value) -> Result<Value, Value> {
+fn invoke(
+    webview: &WebviewWindow<MockRuntime>,
+    command: &str,
+    body: Value,
+) -> Result<Value, Value> {
     get_ipc_response(
         webview,
         InvokeRequest {
@@ -45,7 +51,9 @@ fn invoke(webview: &WebviewWindow<MockRuntime>, command: &str, body: Value) -> R
 }
 
 fn assert_uniform_error(error: &Value, field: &str) {
-    let object = error.as_object().unwrap_or_else(|| panic!("error is not an object: {error}"));
+    let object = error
+        .as_object()
+        .unwrap_or_else(|| panic!("error is not an object: {error}"));
     let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
     keys.sort_unstable();
     assert_eq!(keys, ["code", "details", "messageKey"], "{error}");
@@ -70,8 +78,14 @@ fn valid_request_returns_typed_result() {
     assert!(value["sqliteVersion"].as_str().unwrap().starts_with("3."));
     assert_eq!(value["schemaVersion"], Database::supported_version());
     let results = value["results"].as_array().unwrap();
-    let checks: Vec<&str> = results.iter().map(|r| r["check"].as_str().unwrap()).collect();
-    assert_eq!(checks, ["database", "migrations", "foreignKeys", "fullTextSearch"]);
+    let checks: Vec<&str> = results
+        .iter()
+        .map(|r| r["check"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        checks,
+        ["database", "migrations", "foreignKeys", "fullTextSearch"]
+    );
     assert!(results.iter().all(|r| r["passed"] == true), "{value}");
 }
 
@@ -83,14 +97,27 @@ fn invalid_requests_return_the_uniform_error_format() {
         (json!({ "request": null }), "request"),
         (json!({ "request": "database" }), "request"),
         (json!({ "request": { "checks": "database" } }), "request"),
-        (json!({ "request": { "checks": ["database", 7] } }), "request"),
-        (json!({ "request": { "checks": ["../../etc/passwd"] } }), "request"),
-        (json!({ "request": { "checks": ["database"], "path": "/etc" } }), "request"),
+        (
+            json!({ "request": { "checks": ["database", 7] } }),
+            "request",
+        ),
+        (
+            json!({ "request": { "checks": ["../../etc/passwd"] } }),
+            "request",
+        ),
+        (
+            json!({ "request": { "checks": ["database"], "path": "/etc" } }),
+            "request",
+        ),
         (json!({ "request": { "checks": [] } }), "checks"),
-        (json!({ "request": { "checks": ["database", "database"] } }), "checks"),
+        (
+            json!({ "request": { "checks": ["database", "database"] } }),
+            "checks",
+        ),
     ];
     for (body, field) in cases {
-        let error = invoke(&webview, "system_check", body.clone()).expect_err(&format!("must fail: {body}"));
+        let error = invoke(&webview, "system_check", body.clone())
+            .expect_err(&format!("must fail: {body}"));
         assert_uniform_error(&error, field);
     }
 }

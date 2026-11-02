@@ -15,7 +15,9 @@ use tauri::Manager;
 
 // Test plugins exist only in debug builds (section 20).
 #[cfg(all(feature = "e2e", not(debug_assertions)))]
-compile_error!("the `e2e` feature embeds a WebDriver server and must never be part of a release build");
+compile_error!(
+    "the `e2e` feature embeds a WebDriver server and must never be part of a release build"
+);
 
 /// Starts the application.
 pub fn run() {

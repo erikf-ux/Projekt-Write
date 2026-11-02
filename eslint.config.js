@@ -5,16 +5,21 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/', 'dist-isolation/', 'src-tauri/', 'src/types/generated/', 'node_modules/', 'tests/e2e/.tmp/'],
+    ignores: [
+      'dist/',
+      'dist-isolation/',
+      'src-tauri/',
+      'src/types/generated/',
+      'node_modules/',
+      'tests/e2e/.tmp/',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['eslint.config.js'],
-        },
+        project: ['./tsconfig.json', './tsconfig.node.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -56,7 +61,18 @@ export default tseslint.config(
     },
   },
   {
-    files: ['tests/e2e/**/*.ts', '*.config.{ts,js}'],
+    // Tests simulate Tauri, which rejects with plain values instead of Error objects.
+    files: ['src/**/*.test.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/only-throw-error': 'off',
+    },
+  },
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ['tests/e2e/**/*.ts', 'scripts/**/*.{ts,mjs}', '*.config.{ts,js}'],
     languageOptions: {
       globals: { ...globals.node, ...globals.mocha },
     },

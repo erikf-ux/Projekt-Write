@@ -21,7 +21,9 @@ export const useSystemStatus = create<SystemStatusState>((set, get) => ({
     // A newer run may have started meanwhile; the last call wins either way.
     if (get().status.phase === 'running') {
       set({
-        status: result.ok ? { phase: 'done', response: result.value } : { phase: 'error', error: result.error },
+        status: result.ok
+          ? { phase: 'done', response: result.value }
+          : { phase: 'error', error: result.error },
       });
     }
   },

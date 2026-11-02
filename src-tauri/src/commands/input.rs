@@ -87,7 +87,11 @@ mod tests {
 
     #[test]
     fn rejects_wrong_type_and_unknown_fields() {
-        for value in [json!({ "count": "three" }), json!({ "count": 1, "path": "/etc" }), json!(42)] {
+        for value in [
+            json!({ "count": "three" }),
+            json!({ "count": 1, "path": "/etc" }),
+            json!(42),
+        ] {
             let error = Input::<Sample>::parse("request", Some(&value)).unwrap_err();
             assert_eq!(error.code, ErrorCode::InvalidInput);
             assert_eq!(error.details.as_ref().unwrap()["field"], "request");

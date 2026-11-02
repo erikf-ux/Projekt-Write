@@ -27,7 +27,11 @@ export function isMessageKey(key: string): key is MessageKey {
 }
 
 /** Translates `key`; `{name}` placeholders are replaced from `params`. */
-export function translate(locale: Locale, key: MessageKey, params: Record<string, string | number> = {}): string {
+export function translate(
+  locale: Locale,
+  key: MessageKey,
+  params: Record<string, string | number> = {},
+): string {
   const template = dictionaries[locale][key];
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = params[name];

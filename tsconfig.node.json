@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -15,5 +15,11 @@
     "noEmit": true,
     "types": ["node", "mocha", "@wdio/globals/types"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js", "tests/e2e/**/*.ts", "scripts/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "eslint.config.js",
+    "tests/e2e/**/*.ts",
+    "scripts/**/*.ts"
+  ]
 }

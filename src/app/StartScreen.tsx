@@ -60,12 +60,21 @@ export function StartScreen() {
           </div>
         </header>
 
-        <section aria-labelledby="checks-title" className="rounded-pw bg-sidebar p-4" data-testid="system-check">
+        <section
+          aria-labelledby="checks-title"
+          className="rounded-pw bg-sidebar p-4"
+          data-testid="system-check"
+        >
           <h2 id="checks-title" className="text-ui mb-2 font-semibold tracking-wide text-muted uppercase">
             {t('start.checks.title')}
           </h2>
 
-          <p role="status" aria-live="polite" className={`text-ui mb-3 ${summaryTone}`} data-testid="check-summary">
+          <p
+            role="status"
+            aria-live="polite"
+            className={`text-ui mb-3 ${summaryTone}`}
+            data-testid="check-summary"
+          >
             {summary}
           </p>
 

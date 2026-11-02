@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Checks and tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev xvfb
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Format (Prettier)
+        run: npm run format:check
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Frontend tests (Vitest)
+        run: npm test
+
+      - name: Format (rustfmt)
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Lint (Clippy)
+        run: |
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features e2e -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Generated TypeScript types are up to date
+        shell: bash
+        run: |
+          git add --intent-to-add src/types/generated
+          git diff --exit-code -- src/types/generated
+
+      - name: Third-party license list is up to date
+        shell: bash
+        run: |
+          node scripts/third-party-licenses.mjs
+          git diff --exit-code -- THIRD-PARTY-LICENSES
+
+      - name: Build debug app with end-to-end support
+        run: npm run build:e2e
+
+      - name: End-to-end tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+
+      - name: End-to-end tests (Windows, macOS)
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+
+      - name: Upload end-to-end logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs-${{ matrix.os }}
+          path: tests/e2e/logs/
+          if-no-files-found: ignore
+
+  release-check:
+    name: Release build contains no test plugins
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: The e2e feature is refused in release builds
+        run: |
+          if cargo check --manifest-path src-tauri/Cargo.toml --release --features e2e 2>err.txt; then
+            echo "::error::release build with the e2e feature must fail"; exit 1
+          fi
+          grep -q "must never be part of a release build" err.txt
+
+      - name: Build release binary
+        run: npx tauri build --no-bundle
+
+      - name: Scan release dependency graph and binary for test plugins
+        run: bash scripts/check-release-no-test-plugins.sh src-tauri/target/release/project-write
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+
+      - name: cargo audit
+        run: cargo audit --file src-tauri/Cargo.lock
+
+      - name: cargo deny
+        run: cargo deny --manifest-path src-tauri/Cargo.toml check
+
+      - run: npm ci --ignore-scripts
+
+      - name: npm audit (shipped dependencies, blocking)
+        run: npm audit --omit=dev
+
+      - name: npm audit (development tools, report only – see docs/dependencies.md)
+        continue-on-error: true
+        run: npm audit
