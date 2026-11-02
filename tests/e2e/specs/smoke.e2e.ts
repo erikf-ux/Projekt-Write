@@ -85,25 +85,49 @@ async function measureStartScreen(): Promise<ContrastSample[]> {
   });
 }
 
-/** Asserts that `theme` is active and every text reaches 4.5:1 (section 6). */
-function expectContrast(samples: ContrastSample[], theme: ThemeName) {
-  expect(samples.length).toBeGreaterThan(10);
-  expect(samples[0]?.theme).toBe(theme);
-  expect(rgbToHex(samples[0]?.mainBackground ?? '').toUpperCase()).toBe(themes[theme].surface.toUpperCase());
-  // One compact line per failing element: selector, text, colours, ratio.
-  const failures = samples
-    .filter((sample) => sample.text !== '' && sample.text !== '·')
-    .map((sample) => ({
-      ...sample,
-      ratio: contrastRatio(rgbToHex(sample.color), rgbToHex(sample.background)),
-    }))
-    .filter((sample) => sample.ratio < MIN_TEXT_CONTRAST)
-    .map(
-      (sample) =>
-        `${sample.selector} "${sample.text}": ${sample.color} on ${sample.background} = ${sample.ratio.toFixed(2)} ` +
-        `(--pw-color-text ${sample.textVariable})`,
-    );
-  expect(failures).toEqual([]);
+/** Every problem with `theme` on the start screen, one compact line each (section 6). */
+function contrastFailures(samples: ContrastSample[], theme: ThemeName): string[] {
+  const problems: string[] = [];
+  if (samples.length <= 10) {
+    problems.push(`only ${String(samples.length)} text elements measured`);
+  }
+  if (samples[0]?.theme !== theme) {
+    problems.push(`data-theme is "${samples[0]?.theme ?? ''}", expected "${theme}"`);
+  }
+  const surface = rgbToHex(samples[0]?.mainBackground ?? 'rgb(0, 0, 0)').toUpperCase();
+  if (surface !== themes[theme].surface.toUpperCase()) {
+    problems.push(`main background ${surface}, expected ${themes[theme].surface}`);
+  }
+  for (const sample of samples) {
+    if (sample.text === '' || sample.text === '·') {
+      continue;
+    }
+    const ratio = contrastRatio(rgbToHex(sample.color), rgbToHex(sample.background));
+    if (ratio < MIN_TEXT_CONTRAST) {
+      problems.push(
+        `${sample.selector} "${sample.text}": ${sample.color} on ${sample.background} = ${ratio.toFixed(2)} ` +
+          `(--pw-color-text ${sample.textVariable})`,
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Measures the contrast; if it fails, forces the webview to render a frame (a
+ * WebDriver screenshot does that) and measures again. Both results are
+ * reported and both must be clean: this distinguishes a real colour problem
+ * from computed styles that are stale in a window that does not render
+ * (see docs/status.md, F-1).
+ */
+async function expectContrast(theme: ThemeName) {
+  const before = contrastFailures(await measureStartScreen(), theme);
+  let afterFrame: string[] = [];
+  if (before.length > 0) {
+    await browser.takeScreenshot();
+    afterFrame = contrastFailures(await measureStartScreen(), theme);
+  }
+  expect({ before, afterFrame }).toEqual({ before: [], afterFrame: [] });
 }
 
 describe('Project Write – Phase 1 smoke test', () => {
@@ -203,7 +227,7 @@ describe('Project Write – Phase 1 smoke test', () => {
     // The app follows the system setting at start (section 11).
     const startTheme = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
     expect(['dark', 'light']).toContain(startTheme);
-    expectContrast(await measureStartScreen(), startTheme as ThemeName);
+    await expectContrast(startTheme as ThemeName);
   });
 
   it('puts the button first in the tab order and shows a visible focus ring', async () => {
@@ -232,9 +256,6 @@ describe('Project Write – Phase 1 smoke test', () => {
         isFirst: active === first,
         focusVisible: active.matches(':focus-visible'),
         outlineStyle: style.outlineStyle,
-        outlineWidth: style.outlineWidth,
-        outlineColor: style.outlineColor,
-        background: getComputedStyle(document.body).backgroundColor,
       };
     });
     expect(focused).toMatchObject({
@@ -244,16 +265,31 @@ describe('Project Write – Phase 1 smoke test', () => {
       focusVisible: true,
       outlineStyle: 'solid',
     });
-    if (focused) {
-      // index.css sets 2px; WebKit on macOS reports a wider ring (3px). Section 11
-      // requires a visible focus, so at least 2px is accepted.
-      expect(parseFloat(focused.outlineWidth)).toBeGreaterThanOrEqual(2);
-      // Section 6: graphical elements need 3:1 against their surroundings.
-      const ring = contrastRatio(rgbToHex(focused.outlineColor), rgbToHex(focused.background));
-      expect(ring >= 3 ? 'ok' : `${focused.outlineColor} on ${focused.background} = ${ring.toFixed(2)}`).toBe(
-        'ok',
-      );
+    // Section 6: graphical elements need 3:1 against their surroundings. As
+    // for text, a failing value is measured again after forcing a frame.
+    const ringProblem = async () => {
+      const ring = await browser.execute(() => {
+        const style = getComputedStyle(document.activeElement as HTMLElement);
+        return {
+          width: style.outlineWidth,
+          color: style.outlineColor,
+          background: getComputedStyle(document.body).backgroundColor,
+        };
+      });
+      const ratio = contrastRatio(rgbToHex(ring.color), rgbToHex(ring.background));
+      // index.css sets 2px; WebKit on macOS reports 3px. Section 11 asks for a
+      // visible focus, so at least 2px is accepted.
+      return parseFloat(ring.width) >= 2 && ratio >= 3
+        ? ''
+        : `${ring.width} ${ring.color} on ${ring.background} = ${ratio.toFixed(2)}`;
+    };
+    const before = await ringProblem();
+    let afterFrame = '';
+    if (before !== '') {
+      await browser.takeScreenshot();
+      afterFrame = await ringProblem();
     }
+    expect({ before, afterFrame }).toEqual({ before: '', afterFrame: '' });
 
     await $('button').click();
     await waitForChecks();
@@ -265,7 +301,7 @@ describe('Project Write – Phase 1 smoke test', () => {
       await browser.execute((scheme: string) => {
         document.documentElement.dataset['theme'] = scheme;
       }, theme);
-      expectContrast(await measureStartScreen(), theme);
+      await expectContrast(theme);
     });
   }
 });
