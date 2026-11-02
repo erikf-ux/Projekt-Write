@@ -5,6 +5,7 @@
 import { browser, $, $$, expect } from '@wdio/globals';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
 import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
+import { decodePng, pixelHex, type Image } from '../png';
 
 const READY_TEXTS = ['Alles bereit.', 'Everything is ready.'];
 
@@ -114,20 +115,59 @@ function contrastFailures(samples: ContrastSample[], theme: ThemeName): string[]
 }
 
 /**
- * Measures the contrast; if it fails, forces the webview to render a frame (a
- * WebDriver screenshot does that) and measures again. Both results are
- * reported and both must be clean: this distinguishes a real colour problem
- * from computed styles that are stale in a window that does not render
- * (see docs/status.md, F-1).
+ * Renders a frame and returns it as an image.
+ *
+ * The CI windows on Windows and macOS do not render on their own: until the
+ * next frame, getComputedStyle there still reports colours from before a
+ * change (measured in CI: values one theme switch behind, all correct after
+ * a forced frame). A WebDriver screenshot renders a frame, so every check
+ * measures what is really on screen (docs/adr/0003).
+ */
+async function renderFrame(): Promise<{ image: Image; scale: number }> {
+  const image = decodePng(Buffer.from(await browser.takeScreenshot(), 'base64'));
+  const viewportWidth = await browser.execute(() => window.innerWidth);
+  return { image, scale: image.width / viewportWidth };
+}
+
+/** Distance between two `#RRGGBB` colours (largest channel difference). */
+function colourDistance(a: string, b: string): number {
+  const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [x, y] = [channels(a), channels(b)];
+  return Math.max(...x.map((value, i) => Math.abs(value - (y[i] ?? 0))));
+}
+
+/** Rendering may convert colour spaces slightly (macOS); allow small deviations. */
+const PIXEL_TOLERANCE = 8;
+
+/** Screen position (CSS pixels) inside the main surface and inside the system-check card. */
+async function backgroundPoints() {
+  return browser.execute(() => {
+    const card = document.querySelector('[data-testid="system-check"]')?.getBoundingClientRect();
+    return {
+      surface: { x: 6, y: 6 },
+      sidebar: card ? { x: card.left + 8, y: card.top + 8 } : { x: 0, y: 0 },
+    };
+  });
+}
+
+/**
+ * Asserts that `theme` is rendered and every text reaches 4.5:1 (section 6):
+ * computed colours after a rendered frame, plus the rendered background pixels.
  */
 async function expectContrast(theme: ThemeName) {
-  const before = contrastFailures(await measureStartScreen(), theme);
-  let afterFrame: string[] = [];
-  if (before.length > 0) {
-    await browser.takeScreenshot();
-    afterFrame = contrastFailures(await measureStartScreen(), theme);
+  const { image, scale } = await renderFrame();
+  const problems = contrastFailures(await measureStartScreen(), theme);
+  const points = await backgroundPoints();
+  for (const [token, point] of Object.entries(points) as [
+    'surface' | 'sidebar',
+    { x: number; y: number },
+  ][]) {
+    const pixel = pixelHex(image, Math.round(point.x * scale), Math.round(point.y * scale));
+    if (colourDistance(pixel, themes[theme][token]) > PIXEL_TOLERANCE) {
+      problems.push(`rendered ${token} pixel ${pixel}, expected ${themes[theme][token]}`);
+    }
   }
-  expect({ before, afterFrame }).toEqual({ before: [], afterFrame: [] });
+  expect(problems).toEqual([]);
 }
 
 describe('Project Write – Phase 1 smoke test', () => {
@@ -265,31 +305,41 @@ describe('Project Write – Phase 1 smoke test', () => {
       focusVisible: true,
       outlineStyle: 'solid',
     });
-    // Section 6: graphical elements need 3:1 against their surroundings. As
-    // for text, a failing value is measured again after forcing a frame.
-    const ringProblem = async () => {
-      const ring = await browser.execute(() => {
-        const style = getComputedStyle(document.activeElement as HTMLElement);
-        return {
-          width: style.outlineWidth,
-          color: style.outlineColor,
-          background: getComputedStyle(document.body).backgroundColor,
-        };
-      });
-      const ratio = contrastRatio(rgbToHex(ring.color), rgbToHex(ring.background));
-      // index.css sets 2px; WebKit on macOS reports 3px. Section 11 asks for a
-      // visible focus, so at least 2px is accepted.
-      return parseFloat(ring.width) >= 2 && ratio >= 3
-        ? ''
-        : `${ring.width} ${ring.color} on ${ring.background} = ${ratio.toFixed(2)}`;
-    };
-    const before = await ringProblem();
-    let afterFrame = '';
-    if (before !== '') {
-      await browser.takeScreenshot();
-      afterFrame = await ringProblem();
+    // Section 6: graphical elements need 3:1 against their surroundings.
+    // Measured on a rendered frame: computed style and the ring's pixels.
+    const { image, scale } = await renderFrame();
+    const ring = await browser.execute(() => {
+      const button = document.activeElement as HTMLElement;
+      const style = getComputedStyle(button);
+      const rect = button.getBoundingClientRect();
+      return {
+        width: style.outlineWidth,
+        color: style.outlineColor,
+        left: rect.left,
+        middle: rect.top + rect.height / 2,
+      };
+    });
+    const problems: string[] = [];
+    // index.css sets 2px; WebKit on macOS reports 3px. Section 11 asks for a
+    // visible focus, so at least 2px is accepted.
+    if (parseFloat(ring.width) < 2) {
+      problems.push(`outline width ${ring.width}`);
     }
-    expect({ before, afterFrame }).toEqual({ before: '', afterFrame: '' });
+    const currentTheme = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
+    const expectedRing = themes[currentTheme as ThemeName].accent;
+    if (colourDistance(rgbToHex(ring.color), expectedRing) > PIXEL_TOLERANCE) {
+      problems.push(`computed outline colour ${ring.color}, expected ${expectedRing}`);
+    }
+    // The ring starts 2px (outline-offset) left of the button; sample its middle
+    // and the card background just outside it.
+    const y = Math.round(ring.middle * scale);
+    const ringPixel = pixelHex(image, Math.round((ring.left - 3) * scale), y);
+    const outsidePixel = pixelHex(image, Math.round((ring.left - 8) * scale), y);
+    const ratio = contrastRatio(ringPixel, outsidePixel);
+    if (colourDistance(ringPixel, expectedRing) > PIXEL_TOLERANCE || ratio < 3) {
+      problems.push(`rendered ring ${ringPixel} next to ${outsidePixel} = ${ratio.toFixed(2)}`);
+    }
+    expect(problems).toEqual([]);
 
     await $('button').click();
     await waitForChecks();

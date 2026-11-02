@@ -22,7 +22,6 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 - Dokumentation: Architektur, Datenbank, Abhängigkeiten, ADRs 0001–0005, Lizenzliste.
 - Windows: Common-Controls-v6-Manifest wird auch in Test-Executables gelinkt.
 
-#### Bekannte Fehler
+#### Behoben
 
-- F-1: macOS und Windows – nach einem Theme-Wechsel zur Laufzeit werden geerbte Textfarben veraltet gemeldet (siehe `docs/status.md`).
-- F-2: macOS und Windows – die Farbe des Fokusrings wird als Textfarbe des Buttons gemeldet (siehe `docs/status.md`).
+- E2E-Farbmessungen unter macOS und Windows lieferten veraltete Werte, weil die CI-Fenster nicht von selbst rendern. Die Tests erzwingen jetzt einen Frame und prüfen zusätzlich Bildschirmpixel (F-1, F-2 in `docs/status.md`).

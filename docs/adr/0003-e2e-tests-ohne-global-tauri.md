@@ -25,9 +25,9 @@ Der eingebettete WebDriver erzeugt Tastatureingaben als synthetische JavaScript-
 
 ## Plattformunterschiede
 
-- WebKit unter macOS meldet für den Fokusring aus `index.css` (`outline: 2px solid`) eine Breite von 3 px. Der E2E-Test verlangt deshalb einen durchgezogenen Ring von mindestens 2 px mit 3:1 Kontrast, nicht exakt 2 px. Unter macOS und Windows ist die gemeldete Farbe zudem Weiß statt der Akzentfarbe (F-2); der Kontrastteil des Tests ist dort rot.
+- WebKit unter macOS meldet für den Fokusring aus `index.css` (`outline: 2px solid`) eine Breite von 3 px. Der E2E-Test verlangt deshalb einen durchgezogenen Ring von mindestens 2 px mit 3:1 Kontrast, nicht exakt 2 px.
+- **Gerenderte Frames:** Die CI-Fenster unter macOS und Windows rendern nicht von selbst. Bis zum nächsten Frame liefert `getComputedStyle` dort Werte von vor einer Änderung (CI-Lauf 15: vor einem erzwungenen Frame veraltet, danach korrekt). Jede Farbmessung erzwingt deshalb zuerst einen Frame per WebDriver-Screenshot und prüft zusätzlich Pixel des Screenshots (`tests/e2e/png.ts`, eigener PNG-Leser auf Basis von `node:zlib`, keine neue Abhängigkeit).
 - Der Kontrast wird zweifach geprüft: im Theme, mit dem die App startet (folgt dem System), und nach einem Wechsel zur Laufzeit (dieselben DOM-Schritte wie `applyTheme()`).
-- Unter macOS und Windows (CI) wurden nach einem Theme-Wechsel zur Laufzeit geerbte Textfarben veraltet gemeldet, obwohl die CSS-Variablen schon den neuen Wert hatten (F-1 in `docs/status.md`).
 - Unter Windows lädt Tauri die App von `http://tauri.localhost`, sonst von `tauri://localhost`. IPC-Tests müssen den passenden Ursprung verwenden, sonst gilt die Anfrage als fremd und wird abgelehnt.
 
 ## Folgen
