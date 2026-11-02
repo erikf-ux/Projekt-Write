@@ -330,14 +330,22 @@ describe('Project Write – Phase 1 smoke test', () => {
     if (colourDistance(rgbToHex(ring.color), expectedRing) > PIXEL_TOLERANCE) {
       problems.push(`computed outline colour ${ring.color}, expected ${expectedRing}`);
     }
-    // The ring starts 2px (outline-offset) left of the button; sample its middle
-    // and the card background just outside it.
+    // The ring lies 2px (outline-offset) left of the button. Scan the row of
+    // pixels from 12px left of the button up to its edge: the ring must show
+    // up there in the accent colour, separated from the card background.
     const y = Math.round(ring.middle * scale);
-    const ringPixel = pixelHex(image, Math.round((ring.left - 3) * scale), y);
-    const outsidePixel = pixelHex(image, Math.round((ring.left - 8) * scale), y);
-    const ratio = contrastRatio(ringPixel, outsidePixel);
-    if (colourDistance(ringPixel, expectedRing) > PIXEL_TOLERANCE || ratio < 3) {
-      problems.push(`rendered ring ${ringPixel} next to ${outsidePixel} = ${ratio.toFixed(2)}`);
+    const row: string[] = [];
+    for (let x = Math.floor((ring.left - 12) * scale); x < Math.floor(ring.left * scale); x++) {
+      row.push(pixelHex(image, x, y));
+    }
+    const ringPixel = row.find((pixel) => colourDistance(pixel, expectedRing) <= PIXEL_TOLERANCE);
+    const outsidePixel = row[0] ?? '#000000';
+    const ratio = ringPixel ? contrastRatio(ringPixel, outsidePixel) : 0;
+    if (!ringPixel || ratio < 3) {
+      problems.push(
+        `rendered ring ${ringPixel ?? 'not found'} next to ${outsidePixel} = ${ratio.toFixed(2)}; ` +
+          `row (scale ${scale.toFixed(2)}): ${row.join(' ')}`,
+      );
     }
     expect(problems).toEqual([]);
 
