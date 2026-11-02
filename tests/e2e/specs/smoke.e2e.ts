@@ -2,6 +2,7 @@
  * Phase 1 acceptance tests in the running app (section 25):
  * start, CSP, rejected file system access, contrast, keyboard focus.
  */
+import { createHash } from 'node:crypto';
 import { browser, $, $$, expect } from '@wdio/globals';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
 import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
@@ -17,17 +18,37 @@ async function waitForChecks() {
 }
 
 /**
- * Renders a frame and returns it as an image.
+ * Waits until the window shows a settled frame and returns it as an image.
  *
- * The CI windows on Windows and macOS do not render on their own: until the
- * next frame, getComputedStyle there still reports colours from before a
- * change (measured in CI: values one theme switch behind, all correct after
- * a forced frame). A WebDriver screenshot renders a frame, so every check
- * measures what is really on screen (docs/adr/0003).
+ * The CI windows on Windows and macOS render asynchronously and throttled:
+ * getComputedStyle lagged behind changes there, and on macOS even a single
+ * screenshot could still show the previous state (CI runs 15–18). So the test
+ * takes screenshots until two in a row are pixel-identical and, if a theme is
+ * given, its surface colour is on screen – then measures that frame. In a
+ * visible window this settles within a frame; the checks themselves are as
+ * strict as before.
  */
-async function renderFrame(): Promise<{ image: Image; scale: number }> {
-  const image = decodePng(Buffer.from(await browser.takeScreenshot(), 'base64'));
+async function settledFrame(theme?: ThemeName): Promise<{ image: Image; scale: number }> {
   const viewportWidth = await browser.execute(() => window.innerWidth);
+  let previous = '';
+  let latest: Image | undefined;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const image = decodePng(Buffer.from(await browser.takeScreenshot(), 'base64'));
+    const scale = image.width / viewportWidth;
+    const fingerprint = createHash('sha256').update(image.pixels).digest('hex');
+    const themeVisible =
+      theme === undefined ||
+      colourDistance(pixelHex(image, Math.round(6 * scale), Math.round(6 * scale)), themes[theme].surface) <=
+        PIXEL_TOLERANCE;
+    if (fingerprint === previous && themeVisible) {
+      return { image, scale };
+    }
+    previous = fingerprint;
+    latest = image;
+    await browser.pause(300);
+  }
+  // Not settled: measure the last frame; the assertions report what is wrong.
+  const image = latest ?? decodePng(Buffer.from(await browser.takeScreenshot(), 'base64'));
   return { image, scale: image.width / viewportWidth };
 }
 
@@ -125,7 +146,7 @@ function renderedContrast(
  * the rendered frame (docs/adr/0003).
  */
 async function expectContrast(theme: ThemeName) {
-  const { image, scale } = await renderFrame();
+  const { image, scale } = await settledFrame(theme);
   const problems: string[] = [];
   const active = await browser.execute(() => document.documentElement.dataset['theme'] ?? '');
   if (active !== theme) {
@@ -288,7 +309,7 @@ describe('Project Write – Phase 1 smoke test', () => {
     });
     // Section 6: graphical elements need 3:1 against their surroundings.
     // Measured on the rendered pixels, like the text contrast.
-    const { image, scale } = await renderFrame();
+    const { image, scale } = await settledFrame();
     const ring = await browser.execute(() => {
       const rect = (document.activeElement as HTMLElement).getBoundingClientRect();
       return {
