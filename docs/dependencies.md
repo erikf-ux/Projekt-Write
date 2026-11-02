@@ -74,12 +74,12 @@ Stand: 2. November 2026 (Phase 1). Jede neue Abhängigkeit wird hier mit Zweck, 
 
 ## Grafiken
 
-| Datei                                                   | Herkunft                                                               | Bearbeitung                                                                                                                                                                                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src-tauri/icons/app-icon.png` (Quelle aller App-Icons) | Vom Auftraggeber bereitgestellt, 2. November 2026 (JPEG, 627 × 627 px) | Windows-Logo auf dem Schreibmaschinengehäuse entfernt (Marke von Microsoft, wäre auch im macOS- und Linux-Icon erschienen); Kachel quadratisch zugeschnitten, auf 1024 × 1024 px skaliert, Ecken abgerundet und transparent |
-| `src-tauri/icons/*.png`, `icon.ico`, `icon.icns`        | Erzeugt aus `app-icon.png`                                             | `npx tauri icon src-tauri/icons/app-icon.png -o src-tauri/icons`, danach die Varianten für Android, iOS und den Microsoft Store löschen                                                                                     |
+| Datei                                                   | Herkunft                                                               | Bearbeitung                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/icons/app-icon.png` (Quelle aller App-Icons) | Vom Auftraggeber bereitgestellt, 2. November 2026 (JPEG, 627 × 627 px) | Windows-Logo auf dem Schreibmaschinengehäuse entfernt (Marke von Microsoft, wäre auch im macOS- und Linux-Icon erschienen); Kachel quadratisch zugeschnitten, auf 256 × 256 px verkleinert, Ecken abgerundet und transparent |
+| `src-tauri/icons/*.png`, `icon.ico`, `icon.icns`        | Erzeugt aus `app-icon.png`                                             | `node scripts/app-icons.mjs`: ruft `tauri icon` auf, übernimmt PNG- und ICO-Dateien und behält in `icon.icns` nur die Einträge bis 256 px; Varianten für Android, iOS und den Microsoft Store werden nicht verwendet         |
 
-Die Quelle ist von 627 auf 1024 px hochskaliert; in sehr großen Darstellungen (macOS 512 pt @2x) kann sie leicht weich wirken. Eine höher aufgelöste Vorlage würde das beheben.
+Größte Icongröße ist 256 × 256 px (Vorgabe des Auftraggebers, 2. November 2026). Die Vorlage wird dafür nur verkleinert, nie vergrößert. Enthaltene Größen: PNG 32, 128 und 256 px; `icon.ico` 16, 24, 32, 48, 64 und 256 px; `icon.icns` 16 bis 256 px (ohne 512 und 1024 px). Zeigt macOS das Icon größer als 256 px an (z. B. sehr große Finder-Symbole), vergrößert das System es selbst.
 
 ## Lizenzen
 

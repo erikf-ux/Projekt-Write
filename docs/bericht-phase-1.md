@@ -89,7 +89,7 @@ Keine.
 ## Entscheidungen des Auftraggebers
 
 - Bundle-Kennung `app.projectwrite.desktop` bestätigt (Nachtrag in ADR 0001).
-- App-Icon: Schreibmaschine nach Vorlage des Auftraggebers. Das Windows-Logo der Vorlage wurde entfernt (Markenrecht, Icon erscheint auf allen drei Systemen); Herkunft und Bearbeitung in `docs/dependencies.md`.
+- App-Icon: Schreibmaschine nach Vorlage des Auftraggebers, größte Größe 256 × 256 px (nichts hochskaliert). Das Windows-Logo der Vorlage wurde entfernt (Markenrecht, Icon erscheint auf allen drei Systemen); Herkunft und Bearbeitung in `docs/dependencies.md`.
 
 ## Nächster Schritt
 

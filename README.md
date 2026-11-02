@@ -13,17 +13,17 @@ Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Wi
 
 ## Befehle
 
-| Zweck                                          | Befehl                                                                                                                  |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Abhängigkeiten installieren                    | `npm ci`                                                                                                                |
-| App im Entwicklungsmodus                       | `npm run tauri dev`                                                                                                     |
-| Alle Frontend-Prüfungen                        | `npm run check` (Prettier, ESLint, TypeScript, Vitest)                                                                  |
-| Rust-Tests (erzeugt auch die TypeScript-Typen) | `cargo test --manifest-path src-tauri/Cargo.toml`                                                                       |
-| Debug-Build für E2E                            | `npm run build:e2e`                                                                                                     |
-| E2E-Tests                                      | `npm run test:e2e` (Linux ohne Bildschirm: `xvfb-run -a npm run test:e2e`)                                              |
-| Lizenzliste aktualisieren                      | `node scripts/third-party-licenses.mjs`                                                                                 |
-| Release-Binary                                 | `npx tauri build --no-bundle`                                                                                           |
-| App-Icons neu erzeugen                         | `npx tauri icon src-tauri/icons/app-icon.png -o src-tauri/icons`, danach die Android-, iOS- und Store-Varianten löschen |
+| Zweck                                          | Befehl                                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Abhängigkeiten installieren                    | `npm ci`                                                                           |
+| App im Entwicklungsmodus                       | `npm run tauri dev`                                                                |
+| Alle Frontend-Prüfungen                        | `npm run check` (Prettier, ESLint, TypeScript, Vitest)                             |
+| Rust-Tests (erzeugt auch die TypeScript-Typen) | `cargo test --manifest-path src-tauri/Cargo.toml`                                  |
+| Debug-Build für E2E                            | `npm run build:e2e`                                                                |
+| E2E-Tests                                      | `npm run test:e2e` (Linux ohne Bildschirm: `xvfb-run -a npm run test:e2e`)         |
+| Lizenzliste aktualisieren                      | `node scripts/third-party-licenses.mjs`                                            |
+| Release-Binary                                 | `npx tauri build --no-bundle`                                                      |
+| App-Icons neu erzeugen                         | `node scripts/app-icons.mjs` (Quelle `src-tauri/icons/app-icon.png`, 256 × 256 px) |
 
 ## Dokumentation
 
