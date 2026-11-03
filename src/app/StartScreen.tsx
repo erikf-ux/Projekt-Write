@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { isMessageKey, useT, type MessageKey } from '@/i18n';
 import { LibraryPanel } from '@/modules/library/LibraryPanel';
 import { useLibrary } from '@/modules/library/libraryStore';
+import { useUi } from '@/modules/settings/uiStore';
+import type { LanguageSetting } from '@/types/generated/LanguageSetting';
 import type { SystemCheckId } from '@/types/generated/SystemCheckId';
 import { Logo } from './Logo';
 import { useSystemStatus } from './systemStatusStore';
@@ -73,6 +75,7 @@ export function StartScreen() {
           </div>
         </header>
 
+        <LanguageChoice />
         <LibraryPanel />
 
         <section
@@ -141,5 +144,53 @@ export function StartScreen() {
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * First start (section 11): the language, before the library. Applies at
+ * once and is saved in settings.json.
+ */
+function LanguageChoice() {
+  const t = useT();
+  const language = useUi((state) => state.state?.settings.language);
+  const update = useUi((state) => state.update);
+  if (language === undefined) {
+    return null;
+  }
+  const options: { value: LanguageSetting; label: string }[] = [
+    { value: 'system', label: t('settings.language.system') },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'en', label: 'English' },
+  ];
+  return (
+    <section
+      aria-labelledby="first-start-language"
+      className="mb-4 rounded-pw bg-sidebar p-4"
+      data-testid="first-start-language"
+    >
+      <h2 id="first-start-language" className="text-ui mb-2 font-semibold tracking-wide text-muted uppercase">
+        {t('settings.language')}
+      </h2>
+      <div
+        role="radiogroup"
+        aria-labelledby="first-start-language"
+        className="flex flex-wrap gap-x-4 gap-y-1"
+      >
+        {options.map((option) => (
+          <label key={option.value} className="text-ui flex items-center gap-2">
+            <input
+              type="radio"
+              name="first-start-language"
+              value={option.value}
+              checked={language === option.value}
+              data-testid={`first-start-language-${option.value}`}
+              onChange={() => void update({ language: option.value })}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -9,7 +9,7 @@ export interface ContextMenuItem {
   id: string;
   label: string;
   /** Shortcut as shown to the user. */
-  shortcut?: string;
+  shortcut?: string | undefined;
   onSelect: () => void;
 }
 

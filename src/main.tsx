@@ -1,11 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
-import { followSystemTheme } from './modules/themes/applyTheme';
+import { applyThemeSetting } from './modules/settings/uiStore';
 import './index.css';
 
-// Apply the colour tokens before the first render to avoid a flash.
-followSystemTheme();
+// Apply the colour tokens before the first render to avoid a flash; the
+// saved theme follows as soon as the settings are loaded.
+applyThemeSetting('system', []);
 
 const container = document.getElementById('root');
 if (!container) {

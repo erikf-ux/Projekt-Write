@@ -15,7 +15,7 @@ export interface PaletteEntry {
   title: string;
   category: string;
   /** Shortcut as shown to the user. */
-  shortcut?: string;
+  shortcut?: string | undefined;
 }
 
 /** Entries whose title or category contains every word of the query. */

@@ -35,6 +35,8 @@ interface UiStore {
   /** The shortcut recorder has the keyboard. */
   recording: boolean;
   notice: Notice | null;
+  /** Quitting although a save failed: ask first. */
+  closePrompt: boolean;
   load: () => Promise<void>;
   /** Changes some settings; returns whether they were saved. */
   update: (change: Partial<UiSettings>) => Promise<boolean>;
@@ -82,6 +84,7 @@ export const useUi = create<UiStore>((set, get) => ({
   settingsSection: null,
   recording: false,
   notice: null,
+  closePrompt: false,
 
   load: async () => {
     const result = await call('ui_state', {});
