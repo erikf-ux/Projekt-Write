@@ -1,6 +1,8 @@
 import { CircleCheck, CircleX, RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 import { isMessageKey, useT, type MessageKey } from '@/i18n';
+import { LibraryPanel } from '@/modules/library/LibraryPanel';
+import { useLibrary } from '@/modules/library/libraryStore';
 import type { SystemCheckId } from '@/types/generated/SystemCheckId';
 import { Logo } from './Logo';
 import { useSystemStatus } from './systemStatusStore';
@@ -22,10 +24,21 @@ export function StartScreen() {
   const t = useT();
   const status = useSystemStatus((state) => state.status);
   const run = useSystemStatus((state) => state.run);
+  // The check examines the open library's database, so it runs again
+  // whenever another library is opened (and once the first status is known).
+  const library = useLibrary((state) => {
+    const current = state.status;
+    if (current === null) {
+      return null;
+    }
+    return current.state === 'open' ? `open:${current.library.displayPath}` : current.state;
+  });
 
   useEffect(() => {
-    void run();
-  }, [run]);
+    if (library !== null && library !== 'moving') {
+      void run();
+    }
+  }, [run, library]);
 
   let summary: string;
   let summaryTone = 'text-muted';
@@ -59,6 +72,8 @@ export function StartScreen() {
             <p className="text-ui text-muted">{t('start.tagline')}</p>
           </div>
         </header>
+
+        <LibraryPanel />
 
         <section
           aria-labelledby="checks-title"
@@ -103,6 +118,7 @@ export function StartScreen() {
 
           <button
             type="button"
+            data-testid="check-retry"
             onClick={() => void run()}
             disabled={status.phase === 'running'}
             className="text-ui inline-flex h-7 items-center gap-2 rounded-pw bg-accent px-3 font-medium text-surface disabled:opacity-60"

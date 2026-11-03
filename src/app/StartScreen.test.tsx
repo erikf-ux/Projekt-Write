@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useLocale } from '@/i18n';
+import { useLibrary } from '@/modules/library/libraryStore';
 import { StartScreen } from './StartScreen';
 import { useSystemStatus } from './systemStatusStore';
 
@@ -18,9 +19,31 @@ function response(passed: Record<string, boolean>) {
 
 const allPassed = { database: true, migrations: true, foreignKeys: true, fullTextSearch: true };
 
+const closedLibrary = { state: 'closed', configuredPath: null, error: null, settingsNotice: null };
+
+/**
+ * Answers the library commands with "no library yet" and passes
+ * system_check to `onCheck`.
+ */
+function mockApp(onCheck: (args: unknown) => unknown) {
+  mockIPC((command, args) => {
+    switch (command) {
+      case 'library_status':
+        return closedLibrary;
+      case 'library_default_location':
+        return null;
+      case 'system_check':
+        return onCheck(args);
+      default:
+        throw new Error(`unexpected command ${command}`);
+    }
+  });
+}
+
 beforeEach(() => {
   useLocale.setState({ locale: 'de' });
   useSystemStatus.setState({ status: { phase: 'running' } });
+  useLibrary.setState(useLibrary.getInitialState(), true);
 });
 
 afterEach(() => {
@@ -30,19 +53,18 @@ afterEach(() => {
 describe('StartScreen', () => {
   it('requests every check and shows the results with icon and text', async () => {
     const requests: unknown[] = [];
-    mockIPC((command, args) => {
-      requests.push({ command, args });
+    mockApp((args) => {
+      requests.push(args);
       return response(allPassed);
     });
 
     render(<StartScreen />);
 
     expect(await screen.findByText('Alles bereit.')).toBeInTheDocument();
-    expect(requests[0]).toEqual({
-      command: 'system_check',
-      args: { request: { checks: ['database', 'migrations', 'foreignKeys', 'fullTextSearch'] } },
-    });
-    const list = screen.getByRole('list');
+    expect(requests).toEqual([
+      { request: { checks: ['database', 'migrations', 'foreignKeys', 'fullTextSearch'] } },
+    ]);
+    const list = within(screen.getByTestId('system-check')).getByRole('list');
     expect(within(list).getAllByRole('listitem')).toHaveLength(4);
     // Colour never carries the meaning alone: every row has a status word.
     expect(within(list).getAllByText('bereit')).toHaveLength(4);
@@ -52,7 +74,7 @@ describe('StartScreen', () => {
   });
 
   it('marks failed checks in words', async () => {
-    mockIPC(() => response({ ...allPassed, fullTextSearch: false }));
+    mockApp(() => response({ ...allPassed, fullTextSearch: false }));
     render(<StartScreen />);
 
     expect(await screen.findByText('Mindestens eine Prüfung ist fehlgeschlagen.')).toBeInTheDocument();
@@ -62,7 +84,7 @@ describe('StartScreen', () => {
   });
 
   it('shows the translated error message of a command error', async () => {
-    mockIPC(() => {
+    mockApp(() => {
       throw { code: 'DATABASE', messageKey: 'error.database' };
     });
     render(<StartScreen />);
@@ -70,7 +92,7 @@ describe('StartScreen', () => {
   });
 
   it('never shows raw rejection text', async () => {
-    mockIPC(() => {
+    mockApp(() => {
       throw 'internal failure at /home/user/library/database/projectwrite.db';
     });
     render(<StartScreen />);
@@ -80,7 +102,7 @@ describe('StartScreen', () => {
 
   it('runs the checks again from the keyboard-accessible button', async () => {
     let calls = 0;
-    mockIPC(() => {
+    mockApp(() => {
       calls += 1;
       return response(allPassed);
     });
@@ -97,7 +119,7 @@ describe('StartScreen', () => {
 
   it('is available in English', async () => {
     useLocale.setState({ locale: 'en' });
-    mockIPC(() => response(allPassed));
+    mockApp(() => response(allPassed));
     render(<StartScreen />);
     expect(await screen.findByText('Everything is ready.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();

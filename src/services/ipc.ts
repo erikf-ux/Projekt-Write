@@ -8,15 +8,37 @@
  *   capability does not allow – are normalised to `IPC_REJECTED`; their raw
  *   text is discarded because it may contain internals.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
+import type { ChooseLocationRequest } from '@/types/generated/ChooseLocationRequest';
 import type { CommandError } from '@/types/generated/CommandError';
+import type { CreateLibraryRequest } from '@/types/generated/CreateLibraryRequest';
+import type { EmptyRequest } from '@/types/generated/EmptyRequest';
 import type { ErrorCode } from '@/types/generated/ErrorCode';
+import type { LibraryStatus } from '@/types/generated/LibraryStatus';
+import type { LocationChoice } from '@/types/generated/LocationChoice';
+import type { MoveLibraryRequest } from '@/types/generated/MoveLibraryRequest';
+import type { MoveProgress } from '@/types/generated/MoveProgress';
+import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
 
 /** Every app command with its request and response type. */
 export interface Commands {
   system_check: { request: SystemCheckRequest; response: SystemCheckResponse };
+  library_status: { request: EmptyRequest; response: LibraryStatus };
+  library_default_location: { request: EmptyRequest; response: LocationChoice | null };
+  library_choose_location: { request: ChooseLocationRequest; response: LocationChoice | null };
+  library_create: { request: CreateLibraryRequest; response: LibraryStatus };
+  library_open: { request: OpenLibraryRequest; response: LibraryStatus };
+  library_reopen: { request: EmptyRequest; response: LibraryStatus };
+  library_move: { request: MoveLibraryRequest; response: LibraryStatus };
+  library_cancel_move: { request: EmptyRequest; response: boolean };
+  library_accept_location: { request: EmptyRequest; response: LibraryStatus };
+}
+
+/** Commands that report progress through a channel argument `onProgress`. */
+export interface ProgressCommands {
+  library_move: MoveProgress;
 }
 
 export type CommandName = keyof Commands;
@@ -80,6 +102,25 @@ export async function call<C extends CommandName>(
 ): Promise<CommandResult<Commands[C]['response']>> {
   try {
     const value = await invoke<Commands[C]['response']>(command, { request });
+    return { ok: true, value };
+  } catch (raw) {
+    return { ok: false, error: normalizeError(raw) };
+  }
+}
+
+/**
+ * Calls a command that streams progress. Progress messages arrive through a
+ * Tauri channel (no event permission needed). Never throws.
+ */
+export async function callWithProgress<C extends CommandName & keyof ProgressCommands>(
+  command: C,
+  request: Commands[C]['request'],
+  onProgress: (progress: ProgressCommands[C]) => void,
+): Promise<CommandResult<Commands[C]['response']>> {
+  const channel = new Channel<ProgressCommands[C]>();
+  channel.onmessage = onProgress;
+  try {
+    const value = await invoke<Commands[C]['response']>(command, { request, onProgress: channel });
     return { ok: true, value };
   } catch (raw) {
     return { ok: false, error: normalizeError(raw) };
