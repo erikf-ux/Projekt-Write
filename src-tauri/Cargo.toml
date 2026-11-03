@@ -54,6 +54,11 @@ tauri = { version = "2.12.5", features = ["test"] }
 tempfile = "3.27.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
+# Dependencies need no debug info in debug builds; this keeps target/ small
+# (our own crate keeps full debug info).
+[profile.dev.package."*"]
+debug = false
+
 # Debug builds (tests, E2E) hash and query noticeably faster with optimised
 # SHA-256 and SQLite; behaviour is unchanged.
 [profile.dev.package.sha2]
