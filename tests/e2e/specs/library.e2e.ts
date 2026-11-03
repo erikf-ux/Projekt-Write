@@ -103,6 +103,15 @@ describe('Project Write – Phase 2 library', () => {
         throw error;
       }
     });
+    // The WebDriver server runs inside the app, so the session ended with
+    // it. The runner still ends the session after the last test; that
+    // request would fail (connection refused) and fail the whole file.
+    // overwriteCommand's types list only WebdriverIO's own commands; at run
+    // time it replaces protocol commands such as deleteSession as well.
+    const overwrite = browser.overwriteCommand as (name: string, command: () => Promise<void>) => void;
+    overwrite('deleteSession', async () => {
+      // Nothing left to delete.
+    });
     const log = path.join(appDirs, 'logs', 'project-write.log');
     const deadline = Date.now() + 30_000;
     let text = '';

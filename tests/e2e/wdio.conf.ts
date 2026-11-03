@@ -29,7 +29,7 @@ process.env['XDG_CACHE_HOME'] = path.join(sandbox, 'cache');
 process.env['WEBVIEW2_USER_DATA_FOLDER'] = path.join(sandbox, 'webview2');
 
 // App folders of the e2e build and the answers of the folder dialog
-// (WebDriver cannot operate native dialogs; see ADR 0006).
+// (WebDriver cannot operate native dialogs; see ADR 0008).
 process.env['PW_E2E_APP_DIRS'] = appDirs;
 process.env['PW_E2E_PICK_FOLDERS'] = [pickedFolders.local, pickedFolders.moveTarget].join(path.delimiter);
 
