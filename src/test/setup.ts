@@ -21,3 +21,8 @@ if (typeof window.matchMedia !== 'function') {
       }) as unknown as MediaQueryList,
   });
 }
+
+// jsdom has no layout: scrolling into view is a no-op there.
+Element.prototype.scrollIntoView = function scrollIntoView() {
+  // Nothing to scroll in jsdom.
+};

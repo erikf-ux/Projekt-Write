@@ -334,6 +334,14 @@ pub fn validate_chord(chord: &str) -> Result<(), &'static str> {
     if is_function_key(key) {
         return Ok(());
     }
+    if *key == "Plus" {
+        // `+` is a character: Shift is part of typing it.
+        return match (command_modifier, has("Shift")) {
+            (true, false) => Ok(()),
+            (_, true) => Err("Shift with a character"),
+            (false, false) => Err("needs Ctrl or Alt"),
+        };
+    }
     if NAMED_KEYS.contains(key) {
         return if command_modifier {
             Ok(())
@@ -412,6 +420,8 @@ mod tests {
             "Ctrl+",
             "Ctrl++",
             "Ctrl+Shift+=",
+            "Ctrl+Shift+Plus",
+            "Plus",
             "Ctrl+ ",
             "Ctrl+\u{7}",
             "Ctrl+AB",
