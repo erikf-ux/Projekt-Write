@@ -58,3 +58,37 @@ export function followSystemTheme(root: HTMLElement = document.documentElement):
     query.removeEventListener('change', update);
   };
 }
+
+const CUSTOM_STYLE_ID = 'pw-theme-custom';
+const HEX_COLOUR = /^#[0-9A-Fa-f]{6}$/;
+
+/** Colours of an imported theme, keyed like `ThemeTokens`. */
+export interface CustomThemeColors {
+  base: ThemeName;
+  colors: ThemeTokens;
+}
+
+/**
+ * Activates an imported theme. Rust has checked every colour (format and
+ * contrast); the format is checked again before it becomes CSS.
+ */
+export function applyCustomTheme(
+  theme: CustomThemeColors,
+  root: HTMLElement = document.documentElement,
+): void {
+  const doc = root.ownerDocument;
+  installThemeStyles(doc);
+  const tokenNames = Object.keys(tokenVariables) as (keyof ThemeTokens)[];
+  if (!tokenNames.every((token) => HEX_COLOUR.test(theme.colors[token]))) {
+    throw new Error('Invalid theme colour');
+  }
+  const declarations = tokenNames.map((token) => `${tokenVariables[token]}: ${theme.colors[token]};`);
+  let style = doc.getElementById(CUSTOM_STYLE_ID);
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = CUSTOM_STYLE_ID;
+    doc.head.append(style);
+  }
+  style.textContent = `[data-theme="custom"] { ${declarations.join(' ')} color-scheme: ${theme.base}; }`;
+  root.dataset['theme'] = 'custom';
+}
