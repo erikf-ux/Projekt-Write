@@ -86,7 +86,16 @@ Einzelheiten in `docs/status.md`.
 
 ## CI
 
-Der CI-Lauf zum letzten Commit läuft noch; das Ergebnis wird hier eingetragen.
+**CI-Lauf 44** (Commit `03169bc`): alle vier Jobs grün. Der Commit enthält den endgültigen Code; spätere Commits ändern nur diesen Bericht und `docs/status.md`.
+
+| Job                             | Ergebnis                                                                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows (`windows-latest`)      | grün: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy, Rust-Tests (3:22 min, mit den 100 harten Abbrüchen), Referenzbibliothek zweimal gleich (1.000 Dokumente), Typen und Lizenzliste aktuell, E2E 3 von 3 Dateien |
+| Linux (`ubuntu-24.04`)          | grün: dieselben Prüfungen, Rust-Tests 1:59 min, Referenzbibliothek zweimal gleich (10.000 Dokumente, 36 s), E2E 3 von 3 Dateien                                                                                           |
+| Abhängigkeitsprüfung            | grün: `cargo audit`, `cargo deny`, `npm audit`                                                                                                                                                                            |
+| Release-Build ohne Test-Plugins | grün                                                                                                                                                                                                                      |
+
+Davor: CI-Lauf 42 (Commit `31cd31a`) war bis auf das Sitzungsende von `library.e2e.ts` grün (F-5); Lauf 43 wurde durch den nächsten Push abgebrochen.
 
 ## Nächster Schritt
 

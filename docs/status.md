@@ -21,7 +21,7 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2`. Abschnitt 24 sieht einen
 | 7       | Befehle, Einzelinstanz, Ordnerdialog                                                                  | erledigt                                                                                  |
 | 8       | Bibliotheksansicht, E2E-Tests                                                                         | erledigt                                                                                  |
 | 9       | Referenzbibliothek                                                                                    | erledigt für Dokumente; Medien, Subnetze, Tags, Verbindungen in Phase 7, 8, 11 (ADR 0010) |
-| 10      | Doku, CI, Bericht                                                                                     | erledigt; CI-Ergebnis zum letzten Commit folgt                                            |
+| 10      | Doku, CI, Bericht                                                                                     | erledigt, CI-Lauf 44 grün (Windows, Linux)                                                |
 
 ## Stand Phase 1
 
