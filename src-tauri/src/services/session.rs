@@ -570,7 +570,8 @@ impl LibrarySession {
                 };
                 Ok(self.describe(&slot).await)
             }
-            Err((library, error)) => {
+            Err(failure) => {
+                let (library, error) = *failure;
                 *slot = match library {
                     Some(library) => Slot::Open {
                         library: Box::new(library),

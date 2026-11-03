@@ -136,7 +136,9 @@ fn crash_writer_process() {
             })
             .collect();
         println!("\nPW-CRASH-READY");
-        for k in 0u64.. {
+        // Runs until the test kills this process.
+        let mut k = 0u64;
+        loop {
             let version = (seed + 1) * 1_000_000 + k;
             let data = &pool[(k % 16) as usize];
             if k % 10 == 9 {
@@ -151,6 +153,7 @@ fn crash_writer_process() {
                     .unwrap();
             }
             println!("PW-CRASH-SAVED {k}");
+            k += 1;
         }
     });
 }

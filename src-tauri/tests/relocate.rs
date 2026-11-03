@@ -68,7 +68,7 @@ async fn copy_check_switch_and_keep_the_old_folder() {
             recorder.lock().unwrap().push(p);
         })
         .await
-        .map_err(|(_, e)| e)
+        .map_err(|failure| failure.1)
         .unwrap();
 
     assert_eq!(
@@ -140,6 +140,7 @@ async fn invalid_targets_are_refused_and_the_library_stays_open() {
             move_library(library, &target, Arc::new(AtomicBool::new(false)), |_| {})
                 .await
                 .map(|_| ())
+                .map_err(|failure| *failure)
                 .unwrap_err();
         match (&error, expected) {
             (MoveError::TargetInsideLibrary, "inside")
@@ -177,6 +178,7 @@ async fn cancelling_removes_only_what_the_move_created() {
     })
     .await
     .map(|_| ())
+    .map_err(|failure| *failure)
     .unwrap_err();
     assert!(matches!(error, MoveError::Cancelled), "{error:?}");
     assert_eq!(names(&target), [".DS_Store"]);
@@ -192,6 +194,7 @@ async fn cancelling_removes_only_what_the_move_created() {
     let (returned, error) = move_library(library, &fresh, cancel, |_| {})
         .await
         .map(|_| ())
+        .map_err(|failure| *failure)
         .unwrap_err();
     assert!(matches!(error, MoveError::Cancelled));
     assert!(!fresh.exists());
@@ -212,7 +215,7 @@ async fn moving_into_a_sync_folder_switches_to_the_rollback_journal() {
     let target = dir.path().join("Dropbox").join("ProjectWrite");
     let (library, _) = move_library(library, &target, Arc::new(AtomicBool::new(false)), |_| {})
         .await
-        .map_err(|(_, e)| e)
+        .map_err(|failure| failure.1)
         .unwrap();
     assert_eq!(library.journal_mode(), JournalMode::Rollback);
     assert_eq!(
@@ -244,6 +247,7 @@ async fn a_link_inside_the_library_stops_the_move_before_copying() {
         move_library(library, &target, Arc::new(AtomicBool::new(false)), |_| {})
             .await
             .map(|_| ())
+            .map_err(|failure| *failure)
             .unwrap_err();
     assert!(matches!(error, MoveError::UnsafePath(_)), "{error:?}");
     assert!(!target.exists());

@@ -123,8 +123,8 @@ struct Entry {
 
 /// Outcome of [`move_library`] when it fails: the error and the library that
 /// is open afterwards (normally the old one; `None` only if neither library
-/// could be opened).
-pub type MoveFailure = (Option<Library>, MoveError);
+/// could be opened). Boxed: the library handle is large.
+pub type MoveFailure = Box<(Option<Library>, MoveError)>;
 
 /// Moves `library` to `target` (missing or empty folder).
 pub async fn move_library(
@@ -137,7 +137,7 @@ pub async fn move_library(
     let source_root = library.path().to_path_buf();
     let target = match check_target(&source_root, target) {
         Ok(target) => target,
-        Err(error) => return Err((Some(library), error)),
+        Err(error) => return Err(Box::new((Some(library), error))),
     };
 
     // Writes wait until the move is over (copy and check see one state).
@@ -157,7 +157,7 @@ pub async fn move_library(
         Err((error, created)) => {
             remove_created(&target, &created);
             drop(guard);
-            return Err((Some(library), error));
+            return Err(Box::new((Some(library), error)));
         }
     };
 
@@ -212,7 +212,7 @@ pub async fn move_library(
                 .map(|(library, _)| library)
                 .map_err(|reopen| log::error!("old library cannot be reopened: {reopen}"))
                 .ok();
-            Err((reopened, MoveError::SwitchFailed(error)))
+            Err(Box::new((reopened, MoveError::SwitchFailed(error))))
         }
     }
 }
