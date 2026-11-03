@@ -11,6 +11,7 @@
 pub mod diagnostics;
 pub mod documents;
 pub mod fts;
+pub mod settings;
 
 use std::path::Path;
 use std::str::FromStr;

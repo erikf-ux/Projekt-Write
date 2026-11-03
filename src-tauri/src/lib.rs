@@ -10,6 +10,7 @@ pub mod commands;
 pub mod database;
 pub mod error;
 pub mod filesystem;
+pub mod logging;
 pub mod security;
 pub mod services;
 pub mod state;

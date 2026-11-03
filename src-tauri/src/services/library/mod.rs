@@ -29,6 +29,7 @@ use crate::database::{Database, DatabaseError, JournalMode, diagnostics};
 use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, PathError, SafeRoot};
 use crate::services::documents::DocumentRepository;
+use crate::services::settings::library::LibrarySettings;
 
 use layout::{
     DATABASE_FILE, GUARDED_PATHS, INITIAL_DIRS, KNOWN_TOP_LEVEL, LOCK_FILE, MANIFEST_FILE,
@@ -379,6 +380,11 @@ impl Library {
             self.generators.clone(),
             self.write_lock.clone(),
         )
+    }
+
+    /// The library-wide settings.
+    pub fn settings(&self) -> LibrarySettings {
+        LibrarySettings::new(self.database.clone(), self.generators.clone())
     }
 
     /// Closes the database, then releases the lock.
