@@ -415,7 +415,7 @@ async fn damaged_database_is_reported_and_left_alone() {
     ));
     assert_eq!(fs::read(&database).unwrap(), before);
 
-    fs::remove_file(&database).unwrap();
+    common::remove_file_eventually(&database);
     assert!(matches!(
         open(&path).await,
         Err(LibraryError::DatabaseMissing)
