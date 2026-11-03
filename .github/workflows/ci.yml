@@ -80,6 +80,17 @@ jobs:
           rm -rf src/types/generated
           cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Reference library is reproducible
+        shell: bash
+        # Built twice, fingerprints compared (section 25, Phase 2). Full size
+        # on Linux; Windows syncs every file and gets a smaller library.
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            node scripts/reference-library.mjs --check
+          else
+            node scripts/reference-library.mjs --check --documents 1000
+          fi
+
       - name: Generated TypeScript types are up to date
         shell: bash
         run: |
