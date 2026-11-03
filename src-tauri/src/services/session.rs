@@ -28,6 +28,7 @@ use crate::services::dialog::{FolderPicker, PickRequest};
 use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
+use crate::services::documents::DocumentRepository;
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome};
 use crate::services::settings::library::AcceptedLocation;
 
@@ -336,6 +337,25 @@ impl LibrarySession {
                 }
             }
         }
+    }
+
+    /// Runs `operation` with the document repository of the open library.
+    /// The library stays locked meanwhile, so a move never starts in the
+    /// middle of a save (it waits; later calls get `LIBRARY_BUSY`).
+    pub async fn with_documents<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(DocumentRepository) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let repository = match &*slot {
+            Slot::Open { library, .. } => library.documents(),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(repository).await;
+        drop(slot);
+        result
     }
 
     /// The database of the open library (for the system check).

@@ -116,5 +116,10 @@
   "command.focus.toggle": "Fokusmodus",
   "command.zoom.in": "Vergrößern",
   "command.zoom.out": "Verkleinern",
-  "command.zoom.reset": "Originalgröße"
+  "command.zoom.reset": "Originalgröße",
+  "error.documentNotFound": "Das Dokument wurde nicht gefunden.",
+  "error.documentTooLarge": "Das Dokument ist zu groß.",
+  "error.documentNotText": "Die Datei enthält keinen Text in UTF-8.",
+  "error.documentFormatUnsupported": "Dieses Dokumentformat kann noch nicht bearbeitet werden.",
+  "error.importUnsupportedType": "Dieser Dateityp kann nicht importiert werden. Möglich sind Textdateien (.txt) und Markdown (.md)."
 }

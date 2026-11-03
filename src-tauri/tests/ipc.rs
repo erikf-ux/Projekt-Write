@@ -821,3 +821,240 @@ fn ui_event_menu_focus_and_close_commands_validate_their_input() {
     assert_uniform_error(&error, "request");
     app.shut_down();
 }
+
+// ---------------------------------------------------------------------------
+// Documents (Phase 3)
+
+/// An app with a new library at the default location.
+fn app_with_library() -> TestApp {
+    let app = app();
+    let choice = default_location(&app);
+    let status = call(
+        &app,
+        "library_create",
+        json!({ "location": choice["token"], "acceptWarning": false }),
+    )
+    .unwrap();
+    assert_eq!(status["state"], "open", "{status}");
+    app
+}
+
+fn base64(data: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(data)
+}
+
+#[test]
+fn documents_are_created_listed_read_saved_and_renamed() {
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "  Notiz  ", "format": "txt" }),
+    )
+    .unwrap();
+    assert_eq!(created["title"], "Notiz");
+    assert_eq!(created["format"], "txt");
+    assert_eq!(created["sizeBytes"], 0);
+    assert_eq!(created["originalName"], Value::Null);
+    let id = created["id"].as_str().unwrap().to_owned();
+
+    let list = call(&app, "documents_list", json!({})).unwrap();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["id"], id.as_str());
+
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["text"], "");
+
+    let text = "Größe, Maß und „Anführungszeichen“\n\tmit Tab";
+    let saved = call(&app, "document_save", json!({ "id": id, "text": text })).unwrap();
+    assert_eq!(saved["sizeBytes"], text.len());
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["text"], text);
+    // Unchanged text is not written again.
+    let again = call(&app, "document_save", json!({ "id": id, "text": text })).unwrap();
+    assert_eq!(again["updatedAt"], saved["updatedAt"]);
+
+    let renamed = call(
+        &app,
+        "document_rename",
+        json!({ "id": id, "title": "Kapitel 1" }),
+    )
+    .unwrap();
+    assert_eq!(renamed["title"], "Kapitel 1");
+    assert_eq!(
+        call(&app, "document_read", json!({ "id": id })).unwrap()["text"],
+        text,
+        "renaming changes only the title"
+    );
+
+    let markdown = call(
+        &app,
+        "document_create",
+        json!({ "title": "Plan", "format": "md" }),
+    )
+    .unwrap();
+    assert_eq!(markdown["format"], "md");
+    assert_eq!(
+        call(&app, "documents_list", json!({}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    app.shut_down();
+}
+
+#[test]
+fn document_commands_need_an_open_library() {
+    let app = app();
+    let id = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
+    for (command, request) in [
+        ("documents_list", json!({})),
+        ("document_create", json!({ "title": "A", "format": "txt" })),
+        ("document_read", json!({ "id": id })),
+        ("document_save", json!({ "id": id, "text": "" })),
+        ("document_rename", json!({ "id": id, "title": "B" })),
+        (
+            "document_import",
+            json!({ "fileName": "a.txt", "contentBase64": "", "allowDuplicate": false }),
+        ),
+    ] {
+        let error = call(&app, command, request).unwrap_err();
+        assert_error_code(&error, "LIBRARY_NOT_OPEN");
+    }
+    app.shut_down();
+}
+
+#[test]
+fn document_commands_reject_invalid_input_uniformly() {
+    let app = app_with_library();
+    let id = call(
+        &app,
+        "document_create",
+        json!({ "title": "A", "format": "txt" }),
+    )
+    .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let cases = [
+        ("documents_list", json!({ "all": true }), "request"),
+        ("document_create", json!({ "title": "", "format": "txt" }), "title"),
+        ("document_create", json!({ "title": "a\nb", "format": "txt" }), "title"),
+        (
+            "document_create",
+            json!({ "title": "x".repeat(301), "format": "md" }),
+            "title",
+        ),
+        ("document_create", json!({ "title": "A", "format": "pwrite" }), "request"),
+        ("document_create", json!({ "title": "A" }), "request"),
+        ("document_read", json!({ "id": "../../library.json" }), "id"),
+        ("document_read", json!({ "id": id.to_uppercase() }), "id"),
+        ("document_read", json!({ "id": id, "path": "/etc" }), "request"),
+        ("document_save", json!({ "id": id }), "request"),
+        ("document_save", json!({ "id": "x", "text": "" }), "id"),
+        ("document_rename", json!({ "id": id, "title": " " }), "title"),
+        (
+            "document_import",
+            json!({ "fileName": "../a.txt", "contentBase64": "", "allowDuplicate": false }),
+            "fileName",
+        ),
+        (
+            "document_import",
+            json!({ "fileName": "a.txt", "contentBase64": "%%%", "allowDuplicate": false }),
+            "contentBase64",
+        ),
+        (
+            "document_import",
+            json!({ "fileName": "a.txt", "contentBase64": "" }),
+            "request",
+        ),
+    ];
+    for (command, request, field) in cases {
+        let error = call(&app, command, request.clone())
+            .expect_err(&format!("{command} must fail: {request}"));
+        assert_uniform_error(&error, field);
+    }
+    let unknown = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
+    for (command, request) in [
+        ("document_read", json!({ "id": unknown })),
+        ("document_save", json!({ "id": unknown, "text": "x" })),
+        ("document_rename", json!({ "id": unknown, "title": "x" })),
+    ] {
+        assert_error_code(
+            &call(&app, command, request).unwrap_err(),
+            "DOCUMENT_NOT_FOUND",
+        );
+    }
+    app.shut_down();
+}
+
+#[test]
+fn dropped_text_files_are_imported_with_a_duplicate_question() {
+    let app = app_with_library();
+    let content = "\u{FEFF}# Notiz\r\nZeile zwei\r\n".as_bytes();
+    let first = call(
+        &app,
+        "document_import",
+        json!({ "fileName": "Notiz.md", "contentBase64": base64(content), "allowDuplicate": false }),
+    )
+    .unwrap();
+    assert_eq!(first["kind"], "imported", "{first}");
+    let document = &first["document"];
+    assert_eq!(document["title"], "Notiz");
+    assert_eq!(document["format"], "md");
+    assert_eq!(document["originalName"], "Notiz.md");
+    let text = call(&app, "document_read", json!({ "id": document["id"] })).unwrap();
+    assert_eq!(text["text"], "# Notiz\nZeile zwei\n", "BOM removed, LF line ends");
+
+    // The same text again (also from another file name): ask first.
+    let duplicate = call(
+        &app,
+        "document_import",
+        json!({ "fileName": "Kopie.md", "contentBase64": base64("# Notiz\nZeile zwei\n".as_bytes()), "allowDuplicate": false }),
+    )
+    .unwrap();
+    assert_eq!(duplicate["kind"], "duplicate", "{duplicate}");
+    assert_eq!(duplicate["existing"]["id"], document["id"]);
+    let anyway = call(
+        &app,
+        "document_import",
+        json!({ "fileName": "Kopie.md", "contentBase64": base64(content), "allowDuplicate": true }),
+    )
+    .unwrap();
+    assert_eq!(anyway["kind"], "imported");
+    assert_ne!(anyway["document"]["id"], document["id"]);
+
+    // Type checks: extension positive list and content.
+    let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+    assert_error_code(
+        &call(
+            &app,
+            "document_import",
+            json!({ "fileName": "bild.png", "contentBase64": base64(png), "allowDuplicate": false }),
+        )
+        .unwrap_err(),
+        "IMPORT_UNSUPPORTED_TYPE",
+    );
+    assert_error_code(
+        &call(
+            &app,
+            "document_import",
+            json!({ "fileName": "getarnt.txt", "contentBase64": base64(png), "allowDuplicate": false }),
+        )
+        .unwrap_err(),
+        "DOCUMENT_NOT_TEXT",
+    );
+    assert_eq!(
+        call(&app, "documents_list", json!({}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        2,
+        "rejected files leave nothing behind"
+    );
+    app.shut_down();
+}

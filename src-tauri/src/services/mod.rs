@@ -2,6 +2,7 @@
 
 pub mod dialog;
 pub mod documents;
+pub mod import;
 pub mod library;
 pub mod locale;
 pub mod session;

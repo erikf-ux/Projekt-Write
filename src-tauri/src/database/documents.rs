@@ -1,5 +1,5 @@
-//! SQL for the `documents` table (migration 0002). Only the document
-//! repository (`services::documents`) calls these functions.
+//! SQL for the `documents` table (migrations 0002 and 0003). Only the
+//! document repository (`services::documents`) calls these functions.
 
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqlitePool};
@@ -16,12 +16,14 @@ pub struct DocumentRow {
     pub updated_at: String,
     pub archived_at: Option<String>,
     pub deleted_at: Option<String>,
+    /// File name at import (migration 0003).
+    pub original_name: Option<String>,
 }
 
 macro_rules! select_documents {
     ($tail:literal) => {
         concat!(
-            "SELECT id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at FROM documents ",
+            "SELECT id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name FROM documents ",
             $tail
         )
     };
@@ -38,13 +40,14 @@ fn from_row(row: &SqliteRow) -> Result<DocumentRow, sqlx::Error> {
         updated_at: row.try_get("updated_at")?,
         archived_at: row.try_get("archived_at")?,
         deleted_at: row.try_get("deleted_at")?,
+        original_name: row.try_get("original_name")?,
     })
 }
 
 pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     )
     .bind(&row.id)
     .bind(&row.title)
@@ -55,6 +58,7 @@ pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Er
     .bind(&row.updated_at)
     .bind(&row.archived_at)
     .bind(&row.deleted_at)
+    .bind(&row.original_name)
     .execute(pool)
     .await?;
     Ok(())
@@ -80,6 +84,23 @@ pub async fn list_active(pool: &SqlitePool) -> Result<Vec<DocumentRow>, sqlx::Er
     .iter()
     .map(from_row)
     .collect()
+}
+
+/// A document not in the trash with exactly this content (duplicate check
+/// of the import, section 9).
+pub async fn find_active_by_sha256(
+    pool: &SqlitePool,
+    content_sha256: &str,
+) -> Result<Option<DocumentRow>, sqlx::Error> {
+    sqlx::query(select_documents!(
+        "WHERE content_sha256 = ?1 AND deleted_at IS NULL ORDER BY created_at, id LIMIT 1"
+    ))
+    .bind(content_sha256)
+    .fetch_optional(pool)
+    .await?
+    .as_ref()
+    .map(from_row)
+    .transpose()
 }
 
 pub async fn count_active(pool: &SqlitePool) -> Result<i64, sqlx::Error> {

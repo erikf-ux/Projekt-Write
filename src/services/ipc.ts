@@ -12,16 +12,24 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import type { ChooseLocationRequest } from '@/types/generated/ChooseLocationRequest';
 import type { CloseResponseRequest } from '@/types/generated/CloseResponseRequest';
 import type { CommandError } from '@/types/generated/CommandError';
+import type { CreateDocumentRequest } from '@/types/generated/CreateDocumentRequest';
 import type { CreateLibraryRequest } from '@/types/generated/CreateLibraryRequest';
+import type { DocumentRequest } from '@/types/generated/DocumentRequest';
+import type { DocumentSummary } from '@/types/generated/DocumentSummary';
+import type { DocumentText } from '@/types/generated/DocumentText';
 import type { EmptyRequest } from '@/types/generated/EmptyRequest';
 import type { ErrorCode } from '@/types/generated/ErrorCode';
 import type { FocusModeRequest } from '@/types/generated/FocusModeRequest';
+import type { ImportDocumentRequest } from '@/types/generated/ImportDocumentRequest';
+import type { ImportResult } from '@/types/generated/ImportResult';
 import type { LibraryStatus } from '@/types/generated/LibraryStatus';
 import type { LocationChoice } from '@/types/generated/LocationChoice';
 import type { MenuStateRequest } from '@/types/generated/MenuStateRequest';
 import type { MoveLibraryRequest } from '@/types/generated/MoveLibraryRequest';
 import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
+import type { RenameDocumentRequest } from '@/types/generated/RenameDocumentRequest';
+import type { SaveDocumentRequest } from '@/types/generated/SaveDocumentRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
 import type { UiEvent } from '@/types/generated/UiEvent';
@@ -46,6 +54,12 @@ export interface Commands {
   ui_menu_state: { request: MenuStateRequest; response: null };
   ui_set_focus_mode: { request: FocusModeRequest; response: null };
   ui_close_response: { request: CloseResponseRequest; response: null };
+  documents_list: { request: EmptyRequest; response: DocumentSummary[] };
+  document_create: { request: CreateDocumentRequest; response: DocumentSummary };
+  document_read: { request: DocumentRequest; response: DocumentText };
+  document_save: { request: SaveDocumentRequest; response: DocumentSummary };
+  document_rename: { request: RenameDocumentRequest; response: DocumentSummary };
+  document_import: { request: ImportDocumentRequest; response: ImportResult };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -87,6 +101,11 @@ const errorCodes: Record<ErrorCode, true> = {
   MOVE_SWITCH_FAILED: true,
   SETTINGS_READ_ONLY: true,
   SETTINGS_NOT_SAVED: true,
+  DOCUMENT_NOT_FOUND: true,
+  DOCUMENT_TOO_LARGE: true,
+  DOCUMENT_NOT_TEXT: true,
+  DOCUMENT_FORMAT_UNSUPPORTED: true,
+  IMPORT_UNSUPPORTED_TYPE: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

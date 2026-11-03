@@ -19,6 +19,12 @@ fn main() {
         "ui_menu_state",
         "ui_set_focus_mode",
         "ui_close_response",
+        "documents_list",
+        "document_create",
+        "document_read",
+        "document_save",
+        "document_rename",
+        "document_import",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

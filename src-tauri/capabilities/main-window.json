@@ -19,6 +19,12 @@
     "allow-ui-subscribe",
     "allow-ui-menu-state",
     "allow-ui-set-focus-mode",
-    "allow-ui-close-response"
+    "allow-ui-close-response",
+    "allow-documents-list",
+    "allow-document-create",
+    "allow-document-read",
+    "allow-document-save",
+    "allow-document-rename",
+    "allow-document-import"
   ]
 }

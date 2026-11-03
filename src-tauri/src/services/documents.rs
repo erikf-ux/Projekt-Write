@@ -38,8 +38,9 @@ pub const MAX_DOCUMENT_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_TITLE_CHARS: usize = 300;
 
 /// Storage format of a document (section 10).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "lowercase")]
+#[ts(export)]
 pub enum DocumentFormat {
     /// Plain text, `documents/text/<id>.txt`.
     Txt,
@@ -117,6 +118,8 @@ pub struct DocumentMeta {
     pub updated_at: String,
     pub archived_at: Option<String>,
     pub deleted_at: Option<String>,
+    /// File name at import, for imported documents.
+    pub original_name: Option<String>,
 }
 
 /// Result of [`DocumentRepository::save`].
@@ -213,6 +216,40 @@ impl DocumentRepository {
         format: DocumentFormat,
         content: &[u8],
     ) -> Result<DocumentMeta, DocumentError> {
+        self.insert_new(title, format, content, None).await
+    }
+
+    /// Creates a document from an imported file (section 9, "Import in die
+    /// Bibliothek"). The caller has checked the type; `original_name` is the
+    /// file name at import. The original file is never touched: only its
+    /// content arrives here.
+    pub async fn import(
+        &self,
+        title: &str,
+        format: DocumentFormat,
+        content: &[u8],
+        original_name: &str,
+    ) -> Result<DocumentMeta, DocumentError> {
+        self.insert_new(title, format, content, Some(original_name.to_owned()))
+            .await
+    }
+
+    /// A document not in the trash with exactly `content`, if any.
+    pub async fn find_duplicate(&self, content: &[u8]) -> Result<Option<DocumentMeta>, DocumentError> {
+        rows::find_active_by_sha256(self.database.reader(), &sha256_hex(content))
+            .await?
+            .map(meta_from_row)
+            .transpose()
+    }
+
+    /// The file first, then the row; without a row the file is removed again.
+    async fn insert_new(
+        &self,
+        title: &str,
+        format: DocumentFormat,
+        content: &[u8],
+        original_name: Option<String>,
+    ) -> Result<DocumentMeta, DocumentError> {
         let title = validate_title(title)?;
         check_size(content)?;
         let _guard = self.write_lock.lock().await;
@@ -235,6 +272,7 @@ impl DocumentRepository {
             updated_at: now,
             archived_at: None,
             deleted_at: None,
+            original_name,
         };
         if let Err(error) = rows::insert(self.database.writer(), &row).await {
             // Without a row the new file would be an orphan.
@@ -412,6 +450,7 @@ fn meta_from_row(row: DocumentRow) -> Result<DocumentMeta, DocumentError> {
         updated_at: row.updated_at,
         archived_at: row.archived_at,
         deleted_at: row.deleted_at,
+        original_name: row.original_name,
     })
 }
 

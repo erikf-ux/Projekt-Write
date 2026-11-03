@@ -6,6 +6,7 @@
 //! * is listed in [`COMMAND_NAMES`], in the app manifest in `build.rs` and in
 //!   the window capability (checked by `tests/security_config.rs`).
 
+pub mod documents;
 pub mod input;
 pub mod library;
 pub mod system;
@@ -32,6 +33,12 @@ pub const COMMAND_NAMES: &[&str] = &[
     "ui_menu_state",
     "ui_set_focus_mode",
     "ui_close_response",
+    "documents_list",
+    "document_create",
+    "document_read",
+    "document_save",
+    "document_rename",
+    "document_import",
 ];
 
 /// The invoke handler with every app command.
@@ -53,5 +60,11 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         ui::ui_menu_state,
         ui::ui_set_focus_mode,
         ui::ui_close_response,
+        documents::documents_list,
+        documents::document_create,
+        documents::document_read,
+        documents::document_save,
+        documents::document_rename,
+        documents::document_import,
     ]
 }

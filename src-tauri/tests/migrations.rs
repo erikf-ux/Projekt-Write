@@ -34,6 +34,15 @@ const FIXTURES: &[(i64, &str, &str)] = &[
         "SELECT count(*) FROM documents \
          WHERE id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11' AND title = 'Fixture'",
     ),
+    (
+        3,
+        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, original_name) \
+         VALUES ('5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', 'Notiz', 'txt', 0, \
+                 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', \
+                 '2026-11-03T10:00:00.000Z', '2026-11-03T10:00:00.000Z', 'Notiz.txt')",
+        "SELECT count(*) FROM documents \
+         WHERE id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f' AND original_name = 'Notiz.txt'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -48,6 +57,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         2,
         "documents",
         "f99379f2303d326603d0aabc2fcb0a41be5675dc26656111b6164d9489d99f210efb0fe079ad6677ac8371f8438ad477",
+    ),
+    (
+        3,
+        "document import",
+        "f5a8e5b46bdd724029e64b2c3d4c49bb5c643b0bd2b666df0472f830da5d9195d945ecebe43f59e4de45dcf6deb726cb",
     ),
 ];
 

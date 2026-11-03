@@ -116,5 +116,10 @@
   "command.focus.toggle": "Focus mode",
   "command.zoom.in": "Zoom in",
   "command.zoom.out": "Zoom out",
-  "command.zoom.reset": "Reset zoom"
+  "command.zoom.reset": "Reset zoom",
+  "error.documentNotFound": "The document was not found.",
+  "error.documentTooLarge": "The document is too large.",
+  "error.documentNotText": "The file does not contain UTF-8 text.",
+  "error.documentFormatUnsupported": "This document format cannot be edited yet.",
+  "error.importUnsupportedType": "This file type cannot be imported. Text files (.txt) and Markdown (.md) are possible."
 }

@@ -79,11 +79,21 @@ pub enum ErrorCode {
     SettingsReadOnly,
     /// `settings.json` could not be written.
     SettingsNotSaved,
+    /// No document with this id (or it is in the trash).
+    DocumentNotFound,
+    /// The content exceeds the size limit.
+    DocumentTooLarge,
+    /// The content is not UTF-8 text.
+    DocumentNotText,
+    /// The format cannot be edited yet (`.pwrite` before Phase 4).
+    DocumentFormatUnsupported,
+    /// The file type is not on the import positive list.
+    ImportUnsupportedType,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 29] = [
+    pub const ALL: [ErrorCode; 34] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -113,6 +123,11 @@ impl ErrorCode {
         ErrorCode::MoveSwitchFailed,
         ErrorCode::SettingsReadOnly,
         ErrorCode::SettingsNotSaved,
+        ErrorCode::DocumentNotFound,
+        ErrorCode::DocumentTooLarge,
+        ErrorCode::DocumentNotText,
+        ErrorCode::DocumentFormatUnsupported,
+        ErrorCode::ImportUnsupportedType,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -147,6 +162,11 @@ impl ErrorCode {
             ErrorCode::MoveSwitchFailed => "error.moveSwitchFailed",
             ErrorCode::SettingsReadOnly => "error.settingsReadOnly",
             ErrorCode::SettingsNotSaved => "error.settingsNotSaved",
+            ErrorCode::DocumentNotFound => "error.documentNotFound",
+            ErrorCode::DocumentTooLarge => "error.documentTooLarge",
+            ErrorCode::DocumentNotText => "error.documentNotText",
+            ErrorCode::DocumentFormatUnsupported => "error.documentFormatUnsupported",
+            ErrorCode::ImportUnsupportedType => "error.importUnsupportedType",
         }
     }
 }

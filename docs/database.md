@@ -40,12 +40,13 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 | ------- | ------------------------------- | ------------------------------ | ----- |
 | 1       | `0001_application_settings.sql` | Tabelle `application_settings` | 1     |
 | 2       | `0002_documents.sql`            | Tabelle `documents`            | 2     |
+| 3       | `0003_document_import.sql`      | `documents.original_name`      | 3     |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
 | Phase | Inhalt                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 5     | `documents`: `favorited_at`, `last_opened_at`, `original_name`, `import_folder`; Tabelle `document_links`                                  |
+| 5     | `documents`: `favorited_at`, `last_opened_at`, `import_folder`; Tabelle `document_links`                                                   |
 | 6     | `document_history`                                                                                                                         |
 | 7     | `subnets`, `subnet_memberships`, `tags`, `document_tags`                                                                                   |
 | 8     | `media`, `media_tags`, `document_media`                                                                                                    |
@@ -109,23 +110,25 @@ Abgeleitete Verbindungen (Referenz, Tag, Enthalten-in, Abschnitt 15) werden **ni
 
 Appweite Einstellungen (Bibliothekspfad, später Fensterzustand, Sprache, Tastenkürzel) liegen **nicht** hier, sondern in `settings.json` im Konfigurationsordner des Systems (ADR 0009).
 
-### `documents` – vorhanden (Version 2)
+### `documents` – vorhanden (Version 3)
 
-| Spalte           | Typ                   | Regeln                                            | Phase |
-| ---------------- | --------------------- | ------------------------------------------------- | ----- |
-| `id`             | TEXT, Primärschlüssel | UUID in Kleinbuchstaben                           | 2     |
-| `title`          | TEXT                  | 1–300 Zeichen; Rust: getrimmt, ohne Steuerzeichen | 2     |
-| `format`         | TEXT                  | `txt`, `md` oder `pwrite`                         | 2     |
-| `size_bytes`     | INTEGER               | ≥ 0                                               | 2     |
-| `content_sha256` | TEXT                  | 64 Hex-Zeichen                                    | 2     |
-| `created_at`     | TEXT                  | ISO 8601 UTC                                      | 2     |
-| `updated_at`     | TEXT                  | ISO 8601 UTC                                      | 2     |
-| `archived_at`    | TEXT NULL             | ISO 8601 UTC                                      | 2     |
-| `deleted_at`     | TEXT NULL             | ISO 8601 UTC (Papierkorb)                         | 2     |
-| `favorited_at`   | TEXT NULL             | Favorit seit                                      | 5     |
-| `last_opened_at` | TEXT NULL             | für „Zuletzt verwendet“                           | 5     |
-| `original_name`  | TEXT NULL             | Dateiname beim Import (Abschnitt 9)               | 5     |
-| `import_folder`  | TEXT NULL             | Importordner als Anzeigetext (Metadatum)          | 5     |
+| Spalte           | Typ                   | Regeln                                                               | Phase |
+| ---------------- | --------------------- | -------------------------------------------------------------------- | ----- |
+| `id`             | TEXT, Primärschlüssel | UUID in Kleinbuchstaben                                              | 2     |
+| `title`          | TEXT                  | 1–300 Zeichen; Rust: getrimmt, ohne Steuerzeichen                    | 2     |
+| `format`         | TEXT                  | `txt`, `md` oder `pwrite`                                            | 2     |
+| `size_bytes`     | INTEGER               | ≥ 0                                                                  | 2     |
+| `content_sha256` | TEXT                  | 64 Hex-Zeichen                                                       | 2     |
+| `created_at`     | TEXT                  | ISO 8601 UTC                                                         | 2     |
+| `updated_at`     | TEXT                  | ISO 8601 UTC                                                         | 2     |
+| `archived_at`    | TEXT NULL             | ISO 8601 UTC                                                         | 2     |
+| `deleted_at`     | TEXT NULL             | ISO 8601 UTC (Papierkorb)                                            | 2     |
+| `favorited_at`   | TEXT NULL             | Favorit seit                                                         | 5     |
+| `last_opened_at` | TEXT NULL             | für „Zuletzt verwendet“                                              | 5     |
+| `original_name`  | TEXT NULL             | Dateiname beim Import (Abschnitt 9), 1–255 Zeichen                   | 3     |
+| `import_folder`  | TEXT NULL             | Importordner als Anzeigetext (Metadatum); kommt mit dem Ordnerimport | 5     |
+
+`original_name` kam mit dem Drag-&-Drop-Import in Phase 3 statt wie geplant in Phase 5 (Migration 0003). Abgelegte Dateien kommen ohne Ordner an (der Webview nennt nur den Namen); `import_folder` entsteht deshalb erst mit dem Ordnerimport. Bibliotheksdokumente in TXT und MD sind UTF-8 mit LF-Zeilenenden; der Import wandelt CRLF und CR um.
 
 Index: `ix_documents_active_updated_at (updated_at) WHERE deleted_at IS NULL`. Datei: `documents/text/<id>.txt`, `documents/markdown/<id>.md`, `documents/richtext/<id>.pwrite`.
 
