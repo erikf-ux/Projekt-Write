@@ -488,11 +488,17 @@ mod tests {
         }
     }
 
+    /// The canonical form `classify_with` hands to the probe (on Windows
+    /// `/net` becomes `D:\\net`, for example).
+    fn canonical(path: &str) -> PathBuf {
+        canonical_prospective(Path::new(path)).unwrap()
+    }
+
     #[test]
     fn network_beats_sync_root_beats_known_roots_beats_names() {
         let probe = FakeProbe {
-            network: vec![PathBuf::from("/net")],
-            sync_roots: vec![(PathBuf::from("/cloud"), "Dropbox, Inc.".to_owned())],
+            network: vec![canonical("/net")],
+            sync_roots: vec![(canonical("/cloud"), "Dropbox, Inc.".to_owned())],
             known: vec![(PathBuf::from("/announced"), "OneDrive".to_owned())],
         };
         assert_eq!(

@@ -75,3 +75,19 @@ impl SplitMix64 {
         range.start + self.next() % (range.end - range.start)
     }
 }
+
+/// Removes a file, retrying for a moment: on Windows a connection that just
+/// failed may close its handle shortly after the error was returned.
+pub fn remove_file_eventually(path: &Path) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match std::fs::remove_file(path) {
+            Ok(()) => return,
+            Err(error) if std::time::Instant::now() < deadline => {
+                let _ = error;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(error) => panic!("cannot remove {}: {error}", path.display()),
+        }
+    }
+}

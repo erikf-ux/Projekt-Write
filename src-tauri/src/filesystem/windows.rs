@@ -26,16 +26,23 @@ fn wide(text: &OsStr) -> Vec<u16> {
 }
 
 /// Absolute path with the `\\?\` prefix, so Win32 neither normalises names nor
-/// applies the `MAX_PATH` limit. The callers pass validated absolute paths.
-/// Works on UTF-16 units, so no part of the name is lost in conversion.
-fn verbatim(path: &Path) -> Vec<u16> {
-    let units: Vec<u16> = path.as_os_str().encode_wide().collect();
+/// applies the `MAX_PATH` limit. A path that is not verbatim yet is first made
+/// absolute and normalised (`/` to `\\`, `.` and `..` resolved), because the
+/// verbatim form takes every character literally. Works on UTF-16 units, so
+/// no part of the name is lost in conversion.
+fn verbatim(path: &Path) -> io::Result<Vec<u16>> {
     let verbatim_prefix: Vec<u16> = r"\\?\".encode_utf16().collect();
+    let units: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if units.starts_with(&verbatim_prefix) {
+        let mut out = units;
+        out.push(0);
+        return Ok(out);
+    }
+    let absolute = std::path::absolute(path)?;
+    let units: Vec<u16> = absolute.as_os_str().encode_wide().collect();
     let unc_prefix: Vec<u16> = r"\\".encode_utf16().collect();
     let mut out = Vec::with_capacity(units.len() + 9);
-    if units.starts_with(&verbatim_prefix) {
-        out.extend_from_slice(&units);
-    } else if let Some(rest) = units.strip_prefix(unc_prefix.as_slice()) {
+    if let Some(rest) = units.strip_prefix(unc_prefix.as_slice()) {
         out.extend(r"\\?\UNC\".encode_utf16());
         out.extend_from_slice(rest);
     } else {
@@ -43,14 +50,14 @@ fn verbatim(path: &Path) -> Vec<u16> {
         out.extend_from_slice(&units);
     }
     out.push(0);
-    out
+    Ok(out)
 }
 
 /// Replaces `to` by `from` atomically; returns only after the change reached
 /// the disk (`MOVEFILE_WRITE_THROUGH`).
 pub fn replace_file_write_through(from: &Path, to: &Path) -> io::Result<()> {
-    let from = verbatim(from);
-    let to = verbatim(to);
+    let from = verbatim(from)?;
+    let to = verbatim(to)?;
     // SAFETY: `from` and `to` are NUL-terminated UTF-16 strings that outlive
     // the call; MoveFileExW does not keep the pointers.
     let ok = unsafe {
