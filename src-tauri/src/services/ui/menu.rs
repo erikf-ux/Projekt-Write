@@ -26,9 +26,7 @@ use ts_rs::TS;
 use crate::services::locale::Locale;
 
 /// The commands the menu offers (ids of the frontend command registry).
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub enum MenuCommand {
     #[serde(rename = "document.new")]
@@ -317,7 +315,11 @@ mod tests {
             assert_eq!(label, "Neues Dokument");
         }
         assert_eq!(
-            item_label(Locale::En, MenuCommand::DocumentNew, &MenuItemState::default()),
+            item_label(
+                Locale::En,
+                MenuCommand::DocumentNew,
+                &MenuItemState::default()
+            ),
             "New document"
         );
     }

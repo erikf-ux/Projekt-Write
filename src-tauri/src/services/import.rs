@@ -42,7 +42,10 @@ pub fn validate_file_name(name: &str) -> Result<(), ImportError> {
     if length == 0 || length > MAX_FILE_NAME_CHARS {
         return Err(ImportError::InvalidName("length"));
     }
-    if name.chars().any(|c| c.is_control() || c == '/' || c == '\\') {
+    if name
+        .chars()
+        .any(|c| c.is_control() || c == '/' || c == '\\')
+    {
         return Err(ImportError::InvalidName("character"));
     }
     if name.trim().is_empty() || name == "." || name == ".." {
@@ -115,7 +118,11 @@ mod tests {
 
     #[test]
     fn text_files_on_the_positive_list_are_accepted() {
-        let checked = check("Projektplan.md", "# Plan\r\nÄrger über Größe\r\n".as_bytes()).unwrap();
+        let checked = check(
+            "Projektplan.md",
+            "# Plan\r\nÄrger über Größe\r\n".as_bytes(),
+        )
+        .unwrap();
         assert_eq!(checked.title, "Projektplan");
         assert_eq!(checked.format, DocumentFormat::Md);
         assert_eq!(checked.content, "# Plan\nÄrger über Größe\n".as_bytes());
@@ -129,20 +136,36 @@ mod tests {
         assert!(checked.content.is_empty());
 
         assert_eq!(check(".md", b"x").unwrap().title, ".md");
-        assert_eq!(check("tabs.txt", b"a\tb\x0cc").unwrap().content, b"a\tb\x0cc");
+        assert_eq!(
+            check("tabs.txt", b"a\tb\x0cc").unwrap().content,
+            b"a\tb\x0cc"
+        );
     }
 
     #[test]
     fn other_types_are_rejected_by_extension_and_content() {
-        for name in ["bild.png", "README", "skript.md.exe", "dokument.pwrite", "notiz.txt.zip"] {
-            assert_eq!(check(name, b"text"), Err(ImportError::UnsupportedType), "{name}");
+        for name in [
+            "bild.png",
+            "README",
+            "skript.md.exe",
+            "dokument.pwrite",
+            "notiz.txt.zip",
+        ] {
+            assert_eq!(
+                check(name, b"text"),
+                Err(ImportError::UnsupportedType),
+                "{name}"
+            );
         }
         // A binary file renamed to .txt.
         assert_eq!(
             check("getarnt.txt", b"\x89PNG\r\n\x1a\n\0\0\0"),
             Err(ImportError::NotText("not UTF-8"))
         );
-        assert_eq!(check("nul.txt", b"a\0b"), Err(ImportError::NotText("binary")));
+        assert_eq!(
+            check("nul.txt", b"a\0b"),
+            Err(ImportError::NotText("binary"))
+        );
         assert_eq!(
             check("bell.md", b"a\x07b"),
             Err(ImportError::NotText("binary"))
@@ -163,7 +186,15 @@ mod tests {
 
     #[test]
     fn names_must_be_plain_file_names() {
-        for name in ["../geheim.txt", "ordner/a.txt", "C:\\a.txt", "", " ", "a\n.txt", ".."] {
+        for name in [
+            "../geheim.txt",
+            "ordner/a.txt",
+            "C:\\a.txt",
+            "",
+            " ",
+            "a\n.txt",
+            "..",
+        ] {
             assert!(
                 matches!(check(name, b"x"), Err(ImportError::InvalidName(_))),
                 "{name:?}"

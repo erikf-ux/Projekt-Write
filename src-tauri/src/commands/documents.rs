@@ -189,10 +189,14 @@ impl Validate for ImportDocumentRequest {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
 pub enum ImportResult {
-    Imported { document: DocumentSummary },
+    Imported {
+        document: DocumentSummary,
+    },
     /// A document with the same content exists; nothing was imported
     /// (section 9: ask "use the existing one or import anyway").
-    Duplicate { existing: DocumentSummary },
+    Duplicate {
+        existing: DocumentSummary,
+    },
 }
 
 /// Documents of the open library (not in the trash), most recently changed

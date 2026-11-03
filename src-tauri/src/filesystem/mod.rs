@@ -10,4 +10,4 @@ pub mod atomic;
 pub mod location;
 
 #[cfg(windows)]
-mod windows;
+pub(crate) mod windows;

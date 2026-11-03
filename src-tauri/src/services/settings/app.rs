@@ -221,7 +221,10 @@ impl AppSettingsStore {
 enum Parsed {
     Current(AppSettings),
     /// A file of a newer version: what this build understands of it.
-    Newer { version: u64, settings: AppSettings },
+    Newer {
+        version: u64,
+        settings: AppSettings,
+    },
 }
 
 fn parse(data: &[u8]) -> Result<Parsed, String> {

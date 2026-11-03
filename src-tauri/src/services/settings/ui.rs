@@ -128,7 +128,8 @@ const KEY_WINDOW: &str = "window";
 impl UiSettings {
     /// Checks every value (for changes coming from the frontend).
     pub fn validate(&self) -> Result<(), CommandError> {
-        validate_theme(&self.theme).map_err(|reason| CommandError::invalid_input("theme", reason))?;
+        validate_theme(&self.theme)
+            .map_err(|reason| CommandError::invalid_input("theme", reason))?;
         validate_zoom(self.zoom).map_err(|reason| CommandError::invalid_input("zoom", reason))?;
         validate_sidebar(&self.sidebar)
             .map_err(|reason| CommandError::invalid_input("sidebar", reason))?;
@@ -145,7 +146,8 @@ impl UiSettings {
             language: take(object, KEY_LANGUAGE, |_| Ok(())).unwrap_or(defaults.language),
             theme: take(object, KEY_THEME, |theme: &String| validate_theme(theme))
                 .unwrap_or(defaults.theme),
-            zoom: take(object, KEY_ZOOM, |zoom: &f64| validate_zoom(*zoom)).unwrap_or(defaults.zoom),
+            zoom: take(object, KEY_ZOOM, |zoom: &f64| validate_zoom(*zoom))
+                .unwrap_or(defaults.zoom),
             sidebar: take(object, KEY_SIDEBAR, validate_sidebar).unwrap_or(defaults.sidebar),
             limit_line_width: take(object, KEY_LIMIT_LINE_WIDTH, |_| Ok(()))
                 .unwrap_or(defaults.limit_line_width),
@@ -249,10 +251,7 @@ fn validate_theme(theme: &str) -> Result<(), &'static str> {
 
 /// Ids of imported themes: 32 lower-case hex digits.
 pub fn is_theme_id(id: &str) -> bool {
-    id.len() == 32
-        && id
-            .bytes()
-            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 fn validate_zoom(zoom: f64) -> Result<(), &'static str> {
@@ -440,10 +439,23 @@ mod tests {
 
     #[test]
     fn command_ids_need_namespace_and_plain_characters() {
-        for id in ["palette.show", "document.new", "view.zoomIn", "tab.move.left"] {
+        for id in [
+            "palette.show",
+            "document.new",
+            "view.zoomIn",
+            "tab.move.left",
+        ] {
             assert_eq!(validate_command_id(id), Ok(()), "{id}");
         }
-        for id in ["palette", "", "Palette.show", "palette.", ".show", "a.b-c", "a.ü"] {
+        for id in [
+            "palette",
+            "",
+            "Palette.show",
+            "palette.",
+            ".show",
+            "a.b-c",
+            "a.ü",
+        ] {
             assert!(validate_command_id(id).is_err(), "{id:?} accepted");
         }
     }
@@ -465,9 +477,10 @@ mod tests {
         );
 
         settings.theme = format!("custom:{}", "a".repeat(32));
-        settings
-            .keybindings
-            .insert("palette.show".to_owned(), vec!["Ctrl+K".into(), "Ctrl+K".into()]);
+        settings.keybindings.insert(
+            "palette.show".to_owned(),
+            vec!["Ctrl+K".into(), "Ctrl+K".into()],
+        );
         assert_eq!(
             settings.validate().unwrap_err().details.unwrap()["field"],
             "keybindings"
@@ -534,7 +547,9 @@ mod tests {
             limit_line_width: false,
             keybindings: BTreeMap::new(),
         };
-        settings.keybindings.insert("focus.toggle".to_owned(), vec![]);
+        settings
+            .keybindings
+            .insert("focus.toggle".to_owned(), vec![]);
         let mut object = Map::new();
         settings.put_into(&mut object);
         assert_eq!(object["limitLineWidth"], json!(false));

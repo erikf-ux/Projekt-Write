@@ -235,7 +235,10 @@ impl DocumentRepository {
     }
 
     /// A document not in the trash with exactly `content`, if any.
-    pub async fn find_duplicate(&self, content: &[u8]) -> Result<Option<DocumentMeta>, DocumentError> {
+    pub async fn find_duplicate(
+        &self,
+        content: &[u8],
+    ) -> Result<Option<DocumentMeta>, DocumentError> {
         rows::find_active_by_sha256(self.database.reader(), &sha256_hex(content))
             .await?
             .map(meta_from_row)

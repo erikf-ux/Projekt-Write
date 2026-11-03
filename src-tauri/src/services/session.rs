@@ -25,10 +25,10 @@ use crate::error::{CommandError, ErrorCode};
 use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, display_path};
 use crate::services::dialog::{FolderPicker, PickRequest};
+use crate::services::documents::DocumentRepository;
 use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
-use crate::services::documents::DocumentRepository;
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome};
 use crate::services::settings::library::AcceptedLocation;
 

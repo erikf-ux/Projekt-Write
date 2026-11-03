@@ -704,7 +704,10 @@ fn ui_update_rejects_invalid_settings_uniformly() {
             "keybindings",
         ),
         (
-            with("keybindings", json!({ "palette.show": ["Ctrl+K", "Ctrl+K"] })),
+            with(
+                "keybindings",
+                json!({ "palette.show": ["Ctrl+K", "Ctrl+K"] }),
+            ),
             "keybindings",
         ),
         (
@@ -816,8 +819,8 @@ fn ui_event_menu_focus_and_close_commands_validate_their_input() {
             .expect_err(&format!("{command} must fail: {request}"));
         assert_uniform_error(&error, field);
     }
-    let error = invoke(&app.webview, "ui_subscribe", json!({ "request": [] }))
-        .expect_err("array request");
+    let error =
+        invoke(&app.webview, "ui_subscribe", json!({ "request": [] })).expect_err("array request");
     assert_uniform_error(&error, "request");
     app.shut_down();
 }
@@ -941,21 +944,41 @@ fn document_commands_reject_invalid_input_uniformly() {
         .to_owned();
     let cases = [
         ("documents_list", json!({ "all": true }), "request"),
-        ("document_create", json!({ "title": "", "format": "txt" }), "title"),
-        ("document_create", json!({ "title": "a\nb", "format": "txt" }), "title"),
+        (
+            "document_create",
+            json!({ "title": "", "format": "txt" }),
+            "title",
+        ),
+        (
+            "document_create",
+            json!({ "title": "a\nb", "format": "txt" }),
+            "title",
+        ),
         (
             "document_create",
             json!({ "title": "x".repeat(301), "format": "md" }),
             "title",
         ),
-        ("document_create", json!({ "title": "A", "format": "pwrite" }), "request"),
+        (
+            "document_create",
+            json!({ "title": "A", "format": "pwrite" }),
+            "request",
+        ),
         ("document_create", json!({ "title": "A" }), "request"),
         ("document_read", json!({ "id": "../../library.json" }), "id"),
         ("document_read", json!({ "id": id.to_uppercase() }), "id"),
-        ("document_read", json!({ "id": id, "path": "/etc" }), "request"),
+        (
+            "document_read",
+            json!({ "id": id, "path": "/etc" }),
+            "request",
+        ),
         ("document_save", json!({ "id": id }), "request"),
         ("document_save", json!({ "id": "x", "text": "" }), "id"),
-        ("document_rename", json!({ "id": id, "title": " " }), "title"),
+        (
+            "document_rename",
+            json!({ "id": id, "title": " " }),
+            "title",
+        ),
         (
             "document_import",
             json!({ "fileName": "../a.txt", "contentBase64": "", "allowDuplicate": false }),
@@ -1007,7 +1030,10 @@ fn dropped_text_files_are_imported_with_a_duplicate_question() {
     assert_eq!(document["format"], "md");
     assert_eq!(document["originalName"], "Notiz.md");
     let text = call(&app, "document_read", json!({ "id": document["id"] })).unwrap();
-    assert_eq!(text["text"], "# Notiz\nZeile zwei\n", "BOM removed, LF line ends");
+    assert_eq!(
+        text["text"], "# Notiz\nZeile zwei\n",
+        "BOM removed, LF line ends"
+    );
 
     // The same text again (also from another file name): ask first.
     let duplicate = call(
@@ -1125,10 +1151,22 @@ fn theme_commands_reject_invalid_files_and_input() {
 
     for (command, request, field) in [
         ("theme_import", json!({}), "request"),
-        ("theme_import", json!({ "content": " ".repeat(64 * 1024 + 1) }), "content"),
-        ("theme_import", json!({ "content": "{}", "path": "/x" }), "request"),
+        (
+            "theme_import",
+            json!({ "content": " ".repeat(64 * 1024 + 1) }),
+            "content",
+        ),
+        (
+            "theme_import",
+            json!({ "content": "{}", "path": "/x" }),
+            "request",
+        ),
         ("theme_remove", json!({ "id": "../settings" }), "id"),
-        ("theme_remove", json!({ "id": "ABCDEF0123456789ABCDEF0123456789" }), "id"),
+        (
+            "theme_remove",
+            json!({ "id": "ABCDEF0123456789ABCDEF0123456789" }),
+            "id",
+        ),
     ] {
         let error = call(&app, command, request.clone())
             .expect_err(&format!("{command} must fail: {request}"));

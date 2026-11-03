@@ -208,9 +208,7 @@ pub fn parse(content: &str) -> Result<(String, ThemeBase, ThemeColors), ThemeErr
 }
 
 fn is_hex_colour(value: &str) -> bool {
-    value.len() == 7
-        && value.starts_with('#')
-        && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
+    value.len() == 7 && value.starts_with('#') && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn channel(value: u8) -> f64 {
@@ -268,7 +266,12 @@ impl ThemeStore {
                     .ok()
             })
             .collect();
-        themes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.id.cmp(&b.id)));
+        themes.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then(a.id.cmp(&b.id))
+        });
         themes
     }
 
@@ -373,20 +376,86 @@ mod tests {
     fn invalid_files_name_the_problem() {
         let cases: Vec<(serde_json::Value, &str)> = vec![
             (serde_json::json!({ "formatVersion": 2 }), "missing field"),
-            ({ let mut f = dark_file(); f["formatVersion"] = 2.into(); f }, "formatVersion"),
-            ({ let mut f = dark_file(); f["name"] = " ".into(); f }, "name"),
-            ({ let mut f = dark_file(); f["name"] = "x".repeat(61).into(); f }, "name"),
-            ({ let mut f = dark_file(); f["colors"]["accent"] = "blue".into(); f }, "colors.accent"),
-            ({ let mut f = dark_file(); f["colors"]["text"] = "#FFF".into(); f }, "colors.text"),
-            ({ let mut f = dark_file(); f["colors"]["surface"] = "url(x)".into(); f }, "colors.surface"),
-            ({ let mut f = dark_file(); f["colors"]["font"] = "#FFFFFF".into(); f }, "unknown field"),
-            ({ let mut f = dark_file(); f["script"] = "alert(1)".into(); f }, "unknown field"),
-            ({ let mut f = dark_file(); f["base"] = "neon".into(); f }, "unknown variant"),
+            (
+                {
+                    let mut f = dark_file();
+                    f["formatVersion"] = 2.into();
+                    f
+                },
+                "formatVersion",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["name"] = " ".into();
+                    f
+                },
+                "name",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["name"] = "x".repeat(61).into();
+                    f
+                },
+                "name",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["colors"]["accent"] = "blue".into();
+                    f
+                },
+                "colors.accent",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["colors"]["text"] = "#FFF".into();
+                    f
+                },
+                "colors.text",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["colors"]["surface"] = "url(x)".into();
+                    f
+                },
+                "colors.surface",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["colors"]["font"] = "#FFFFFF".into();
+                    f
+                },
+                "unknown field",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["script"] = "alert(1)".into();
+                    f
+                },
+                "unknown field",
+            ),
+            (
+                {
+                    let mut f = dark_file();
+                    f["base"] = "neon".into();
+                    f
+                },
+                "unknown variant",
+            ),
         ];
         for (file, expected) in cases {
             match parse(&file.to_string()) {
                 Err(ThemeError::Invalid { field }) => {
-                    assert!(field.contains(expected), "{field} should contain {expected}");
+                    assert!(
+                        field.contains(expected),
+                        "{field} should contain {expected}"
+                    );
                 }
                 other => panic!("{file}: expected Invalid, got {other:?}"),
             }
@@ -437,6 +506,9 @@ mod tests {
         store.remove(&id).unwrap();
         assert!(store.list().is_empty());
         assert!(matches!(store.remove(&id), Err(ThemeError::NotFound)));
-        assert!(matches!(store.remove("../settings"), Err(ThemeError::NotFound)));
+        assert!(matches!(
+            store.remove("../settings"),
+            Err(ThemeError::NotFound)
+        ));
     }
 }

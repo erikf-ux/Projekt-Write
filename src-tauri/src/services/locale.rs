@@ -97,8 +97,14 @@ mod tests {
 
     #[test]
     fn environment_follows_the_gettext_order() {
-        assert_eq!(from_environment(env(&[("LANG", "de_DE.UTF-8")])), Locale::De);
-        assert_eq!(from_environment(env(&[("LANG", "en_US.UTF-8")])), Locale::En);
+        assert_eq!(
+            from_environment(env(&[("LANG", "de_DE.UTF-8")])),
+            Locale::De
+        );
+        assert_eq!(
+            from_environment(env(&[("LANG", "en_US.UTF-8")])),
+            Locale::En
+        );
         assert_eq!(
             from_environment(env(&[("LANG", "en_US.UTF-8"), ("LC_ALL", "de_AT.UTF-8")])),
             Locale::De
@@ -113,14 +119,26 @@ mod tests {
             Locale::De
         );
         assert_eq!(from_environment(env(&[("LANG", "C")])), Locale::En);
-        assert_eq!(from_environment(env(&[("LC_ALL", "POSIX"), ("LANG", "de_DE")])), Locale::De);
+        assert_eq!(
+            from_environment(env(&[("LC_ALL", "POSIX"), ("LANG", "de_DE")])),
+            Locale::De
+        );
         assert_eq!(from_environment(env(&[])), Locale::En);
     }
 
     #[test]
     fn explicit_settings_override_the_system() {
-        assert_eq!(Locale::effective(LanguageSetting::System, Locale::De), Locale::De);
-        assert_eq!(Locale::effective(LanguageSetting::En, Locale::De), Locale::En);
-        assert_eq!(Locale::effective(LanguageSetting::De, Locale::En), Locale::De);
+        assert_eq!(
+            Locale::effective(LanguageSetting::System, Locale::De),
+            Locale::De
+        );
+        assert_eq!(
+            Locale::effective(LanguageSetting::En, Locale::De),
+            Locale::En
+        );
+        assert_eq!(
+            Locale::effective(LanguageSetting::De, Locale::En),
+            Locale::De
+        );
     }
 }

@@ -56,11 +56,8 @@ pub fn run() {
                 picker,
                 Generators::system(),
             ))?;
-            let menu = services::ui::menu::build(
-                app.handle(),
-                state.ui.locale(),
-                &state.ui.menu_state(),
-            )?;
+            let menu =
+                services::ui::menu::build(app.handle(), state.ui.locale(), &state.ui.menu_state())?;
             if let Some(window) = app.get_webview_window("main") {
                 window.set_menu(menu.menu.clone())?;
                 services::ui::window::apply_zoom(&window, state.ui.state().settings.zoom);
@@ -92,7 +89,9 @@ pub fn run() {
                 // autosave "beim Schließen") and then confirms.
                 match state.ui.close_requested() {
                     services::ui::CloseDecision::Wait => api.prevent_close(),
-                    services::ui::CloseDecision::Close => remember_window_state(window.app_handle()),
+                    services::ui::CloseDecision::Close => {
+                        remember_window_state(window.app_handle())
+                    }
                 }
             }
         })
