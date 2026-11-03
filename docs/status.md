@@ -4,28 +4,30 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 3 – Oberfläche** (Abschnitt 11): freigegeben am 3. November 2026, in Arbeit.
+**Phase 3 – Oberfläche** (Abschnitt 11): abgeschlossen am 3. November 2026, Bericht in `docs/bericht-phase-3.md`. **Wartet auf die Freigabe von Phase 4.**
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Umfangsentscheidungen (ADR 0011, Begründung: Abschnitt 2 „Funktionen späterer Phasen bleiben unsichtbar“):
 
-- Activity Bar: Explorer und Editor. Suche (Phase 9) und Mesh (Phase 11) erscheinen mit ihren Phasen.
-- Erster Start: Sprache und Bibliotheksort, danach sofort ein leeres Dokument. Die Frage nach der Autokorrektur (D5) kommt mit der Autokorrektur (Phase 12), Beispiel-Subnetze mit den Subnetzen (Phase 7).
-- Tabs, Explorer und Drag & Drop brauchen Dokumente: Phase 3 bringt eine Reintext-Schreibfläche für Bibliotheksdokumente (TXT, MD als Quelltext) mit Autosave nach Abschnitt 9. Tiptap ersetzt sie in Phase 4; Kopieren, Papierkorb, Favoriten und externe Dateien folgen in Phase 5.
-- Drag & Drop aus dem System bedeutet Import in die Bibliothek (Abschnitt 9): TXT und MD in UTF-8, Duplikat-Rückfrage, Originalname als Metadatum (Migration 0003 statt wie geplant in Phase 5).
+- Activity Bar: Explorer und Schreibfläche. Suche (Phase 9) und Mesh (Phase 11) erscheinen mit ihren Phasen.
+- Erster Start: Bibliotheksort und Sprache, danach ein leeres Dokument. Die Frage nach der Autokorrektur (D5) kommt mit der Autokorrektur (Phase 12), Beispiel-Subnetze mit den Subnetzen (Phase 7).
+- Reintext-Schreibfläche für Bibliotheksdokumente (TXT, MD als Quelltext) mit Autosave nach Abschnitt 9; Tiptap ersetzt sie in Phase 4. Kopieren, Papierkorb, Favoriten und externe Dateien folgen in Phase 5.
+- Drag & Drop aus dem System bedeutet Import in die Bibliothek: TXT und MD in UTF-8, Duplikat-Rückfrage, Originalname (Migration 0003, vorgezogen aus Phase 5).
 
-Plan Phase 3 (Reihenfolge):
+## Stand Phase 3
 
-1. Rust: Oberflächeneinstellungen in `settings.json` (Sprache, Design, Zoom, Seitenleiste, Zeilenbreite, Tastenkürzel, Fensterzustand), Spracherkennung, Fensterzustand wiederherstellen, Zoom.
-2. Rust: natives Menü (de/en), Ereigniskanal zur Oberfläche, Fokusmodus, Schließen mit Speichern vorab.
-3. Rust: Dokumentbefehle (Liste, anlegen, lesen, speichern, umbenennen), Migration 0003, Import mit Typprüfung und Duplikat-Rückfrage.
-4. Rust: Themes importieren und entfernen, Kontrastprüfung.
-5. Frontend: Befehlsregister, Tastenkürzel mit Konflikterkennung, Command Palette, Kontextmenüs.
-6. Frontend: Hauptlayout (Toolbar, Activity Bar, Explorer, Tabs, Schreibfläche mit Autosave, Statusleiste), Seitenleiste, Fokusmodus, Zoom, erster Start, Einstellungen.
-7. Frontend: Drag & Drop (Import, Tabs verschieben).
-8. E2E-Tests (Windows, Linux), Tests der Phasen 1 und 2 anpassen.
-9. Doku, CI, Bericht.
+| Schritt | Inhalt                                                                                             | Stand                                          |
+| ------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1       | Oberflächeneinstellungen in `settings.json`, Spracherkennung, Fensterzustand, Zoom                 | erledigt                                       |
+| 2       | Natives Menü (de/en), Ereigniskanal, Fokusmodus, Schließen mit Speichern vorab                     | erledigt                                       |
+| 3       | Dokumentbefehle, Migration 0003, Import mit Typprüfung und Duplikat-Rückfrage                      | erledigt                                       |
+| 4       | Designs importieren und entfernen, Kontrastprüfung                                                 | erledigt                                       |
+| 5       | Befehlsregister, Tastenkürzel mit Konflikterkennung, Command Palette, Kontextmenüs                 | erledigt                                       |
+| 6       | Hauptlayout, Explorer, Tabs, Schreibfläche mit Autosave, Statusleiste, erster Start, Einstellungen | erledigt                                       |
+| 7       | Drag & Drop (Import, Tabs verschieben)                                                             | erledigt                                       |
+| 8       | E2E-Tests (26), Tests der Phasen 1 und 2 angepasst                                                 | erledigt                                       |
+| 9       | Doku, CI, Bericht                                                                                  | erledigt; CI-Ergebnis zum letzten Commit folgt |
 
 ## Stand Phase 2
 
@@ -59,24 +61,31 @@ Plan Phase 3 (Reihenfolge):
 
 ## Behobene Fehler
 
-| Nr. | Beschreibung                                                                                                                                                                                                                       | Ursache und Lösung                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F-1 | E2E meldete nach einem Theme-Wechsel zur Laufzeit veraltete Textfarben (macOS, Windows)                                                                                                                                            | Kein Fehler der App. Die CI-Fenster unter macOS und Windows rendern nicht von selbst; `getComputedStyle` lieferte dort Werte von vor der Änderung (CI-Lauf 15), unter macOS teils auch nach einem erzwungenen Frame (CI-Lauf 17). Die gerenderten Pixel stimmten jedes Mal. Die E2E-Tests messen Farben jetzt an Screenshot-Pixeln (ADR 0003)                                                                          |
-| F-2 | E2E meldete den Fokusring als Weiß auf Weiß (macOS, Windows)                                                                                                                                                                       | Dieselbe Ursache. Der Fokusring wird jetzt an Pixeln geprüft (≥ 2 px Akzentfarbe, ≥ 3:1 gegen die Umgebung). Windows war damit in CI-Lauf 16 vollständig grün, macOS in Lauf 17 beim Fokusring                                                                                                                                                                                                                         |
-| F-3 | `cargo test --manifest-path src-tauri/Cargo.toml` (README, CI) schrieb die erzeugten TypeScript-Typen nach `src-tauri/bindings/`; die CI-Prüfung „Generated TypeScript types are up to date“ verglich deshalb unveränderte Dateien | Cargo sucht Konfiguration ab dem aktuellen Ordner, nicht ab dem Manifest; `src-tauri/.cargo/config.toml` wurde vom Projektstamm aus nicht gelesen. Konfiguration liegt jetzt in `.cargo/config.toml` im Projektstamm; CI löscht `src/types/generated` vor den Rust-Tests, sodass die Prüfung nur besteht, wenn die Typen neu geschrieben wurden. Die bisher eingecheckten Typen waren aktuell (neu erzeugt, identisch) |
-| F-4 | Windows: Umbenennen beim atomaren Speichern scheiterte mit Fehler 123 (ungültiger Name), wenn der Pfad `/` enthielt                                                                                                                | Pfade mit `\\?\`-Präfix werden von Windows nicht normalisiert. Pfade werden vor dem Präfix mit `std::path::absolute` normalisiert; abgedeckt durch die Rust-Tests unter Windows in CI                                                                                                                                                                                                                                  |
-| F-5 | E2E: `library.e2e.ts` wurde in CI-Lauf 42 (Windows, Linux) als fehlgeschlagen gemeldet, obwohl die Datei ihre Tests ausführte                                                                                                      | Kein Fehler der App. Der letzte Test schließt das Fenster; die App endet und mit ihr der eingebettete WebDriver-Server. Der Testläufer schickte danach noch `DELETE /session`, bekam `ECONNREFUSED` und brach die Datei ab. Der Test ersetzt `deleteSession` nach dem Schließen durch eine leere Operation (Commit `1047c4c`)                                                                                          |
+| Nr.  | Beschreibung                                                                                                                                                                                                                       | Ursache und Lösung                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-1  | E2E meldete nach einem Theme-Wechsel zur Laufzeit veraltete Textfarben (macOS, Windows)                                                                                                                                            | Kein Fehler der App. Die CI-Fenster unter macOS und Windows rendern nicht von selbst; `getComputedStyle` lieferte dort Werte von vor der Änderung (CI-Lauf 15), unter macOS teils auch nach einem erzwungenen Frame (CI-Lauf 17). Die gerenderten Pixel stimmten jedes Mal. Die E2E-Tests messen Farben jetzt an Screenshot-Pixeln (ADR 0003)                                                                          |
+| F-2  | E2E meldete den Fokusring als Weiß auf Weiß (macOS, Windows)                                                                                                                                                                       | Dieselbe Ursache. Der Fokusring wird jetzt an Pixeln geprüft (≥ 2 px Akzentfarbe, ≥ 3:1 gegen die Umgebung). Windows war damit in CI-Lauf 16 vollständig grün, macOS in Lauf 17 beim Fokusring                                                                                                                                                                                                                         |
+| F-3  | `cargo test --manifest-path src-tauri/Cargo.toml` (README, CI) schrieb die erzeugten TypeScript-Typen nach `src-tauri/bindings/`; die CI-Prüfung „Generated TypeScript types are up to date“ verglich deshalb unveränderte Dateien | Cargo sucht Konfiguration ab dem aktuellen Ordner, nicht ab dem Manifest; `src-tauri/.cargo/config.toml` wurde vom Projektstamm aus nicht gelesen. Konfiguration liegt jetzt in `.cargo/config.toml` im Projektstamm; CI löscht `src/types/generated` vor den Rust-Tests, sodass die Prüfung nur besteht, wenn die Typen neu geschrieben wurden. Die bisher eingecheckten Typen waren aktuell (neu erzeugt, identisch) |
+| F-4  | Windows: Umbenennen beim atomaren Speichern scheiterte mit Fehler 123 (ungültiger Name), wenn der Pfad `/` enthielt                                                                                                                | Pfade mit `\\?\`-Präfix werden von Windows nicht normalisiert. Pfade werden vor dem Präfix mit `std::path::absolute` normalisiert; abgedeckt durch die Rust-Tests unter Windows in CI                                                                                                                                                                                                                                  |
+| F-5  | E2E: `library.e2e.ts` wurde in CI-Lauf 42 (Windows, Linux) als fehlgeschlagen gemeldet, obwohl die Datei ihre Tests ausführte                                                                                                      | Kein Fehler der App. Der letzte Test schließt das Fenster; die App endet und mit ihr der eingebettete WebDriver-Server. Der Testläufer schickte danach noch `DELETE /session`, bekam `ECONNREFUSED` und brach die Datei ab. Der Test ersetzt `deleteSession` nach dem Schließen durch eine leere Operation (Commit `1047c4c`)                                                                                          |
+| F-6  | CI-Lauf 56 scheiterte an `rustfmt`                                                                                                                                                                                                 | Der Rust-Code der Phase 3 war nicht formatiert; lokal liefen Clippy und Tests, aber nicht `cargo fmt --check`. Formatiert; die lokale Prüfung umfasst jetzt `cargo fmt --check`                                                                                                                                                                                                                                        |
+| F-7  | Windows: Die Spracherkennung kompilierte nicht (`filesystem::windows` war privat)                                                                                                                                                  | Lokal mit `cargo clippy --target x86_64-pc-windows-gnu` gefunden, bevor CI den Windows-Build erreichte. Modul innerhalb der Crate sichtbar                                                                                                                                                                                                                                                                             |
+| F-8  | Escape schloss den Einstellungsdialog nicht, wenn der Fokus nach einer Aktion auf die Seite gefallen war                                                                                                                           | Vom E2E-Test gefunden. Dialoge bilden einen Stapel: Der innerste reagiert auf Escape, wo auch immer der Fokus ist, und holt einen verlorenen Fokus zurück                                                                                                                                                                                                                                                              |
+| F-9  | Der Fokusring der Tabs war unsichtbar (`outline-none` hob die globale Fokusregel auf)                                                                                                                                              | Von der Pixelmessung im E2E-Test gefunden. Tabs nutzen den globalen Fokusring, innen gezeichnet                                                                                                                                                                                                                                                                                                                        |
+| F-10 | CI-Lauf 59: Die Prüfung der Referenzbibliothek scheiterte, weil der Rust-Cache einen unvollständigen Ordner `reference-check-a` wiederherstellte                                                                                   | Das Skript überschrieb ihn zu Recht nicht. `--check` baut jetzt in frische Ordner des eigenen Laufs und entfernt nur diese                                                                                                                                                                                                                                                                                             |
 
 ## Offene Aufgaben
 
-### In Phase 3
+### In Phase 4
 
-- Fensterzustand, Sprache und Tastenkürzel in `settings.json` (ADR 0009).
-- Erster Start: Bibliotheksort (Anlegen und Öffnen gibt es seit Phase 2), Sprache, Autokorrektur.
-- Echte Tastaturnavigation (Tab) testen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); eine native Eingabeprüfung einplanen.
+- Tiptap ersetzt die Schreibfläche; Bearbeiten-Menü und Editor-Kürzel (Rückgängig, Suchen, Ersetzen, Quelltextansicht) als Befehle; die heute unterdrückten Browser-Kürzel werden dann echte Befehle (ADR 0012).
 
 ### Später
 
+- Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
+- Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
+- Phase 5: Löschen (Papierkorb mit Wiederherstellen), Kopieren, Favoriten, Zuletzt verwendet, externe Dateien, weitere Kodierungen beim Import (ADR 0011).
+- Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
 - Referenzbibliothek ergänzen: Medien, Subnetze, Tags und Verbindungen mit ihren Tabellen (Phasen 7, 8, 11), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).
 - Echte Sync-Clients (OneDrive, Dropbox) und Netzlaufwerke auf einem Testgerät prüfen; CI hat keine.
@@ -99,4 +108,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Phase 3, Schritt 1: Oberflächeneinstellungen in `settings.json`.
+Nach Freigabe: Phase 4 (Editor, Abschnitte 10 und 12).
