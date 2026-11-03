@@ -146,5 +146,6 @@
   "category.app": "App",
   "palette.title": "Command palette",
   "palette.placeholder": "Type a command…",
-  "palette.empty": "No matching command."
+  "palette.empty": "No matching command.",
+  "notice.settingsNotSaved": "The setting could not be saved."
 }

@@ -138,8 +138,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     set((state) => {
       const index = state.tabs.indexOf(id);
       const tabs = state.tabs.filter((tab) => tab !== id);
-      const open = { ...state.open };
-      delete open[id];
+      const open = Object.fromEntries(Object.entries(state.open).filter(([key]) => key !== id));
       let active = state.active;
       if (active === id) {
         active = tabs[Math.min(index, tabs.length - 1)] ?? null;
@@ -360,8 +359,8 @@ export function freeTitle(base: string, documents: readonly DocumentSummary[]): 
     return base;
   }
   let number = 2;
-  while (titles.has(`${base} ${number}`)) {
+  while (titles.has(`${base} ${String(number)}`)) {
     number += 1;
   }
-  return `${base} ${number}`;
+  return `${base} ${String(number)}`;
 }

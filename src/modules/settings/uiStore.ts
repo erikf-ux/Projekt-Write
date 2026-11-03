@@ -13,6 +13,8 @@ import type { UiState } from '@/types/generated/UiState';
 
 /** Zoom steps of the interface (section 11: "Oberflächenzoom"). */
 export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
 
 export type SettingsSection = 'general' | 'shortcuts' | 'library';
 
@@ -67,9 +69,9 @@ export function applyThemeSetting(theme: string, customThemes: readonly CustomTh
 
 export function nextZoom(current: number, direction: 1 | -1): number {
   if (direction === 1) {
-    return ZOOM_STEPS.find((step) => step > current + 1e-9) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    return ZOOM_STEPS.find((step) => step > current + 1e-9) ?? MAX_ZOOM;
   }
-  return [...ZOOM_STEPS].reverse().find((step) => step < current - 1e-9) ?? ZOOM_STEPS[0];
+  return [...ZOOM_STEPS].reverse().find((step) => step < current - 1e-9) ?? MIN_ZOOM;
 }
 
 export const useUi = create<UiStore>((set, get) => ({

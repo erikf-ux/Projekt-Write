@@ -146,5 +146,6 @@
   "category.app": "Programm",
   "palette.title": "Befehlspalette",
   "palette.placeholder": "Befehl eingeben…",
-  "palette.empty": "Kein passender Befehl."
+  "palette.empty": "Kein passender Befehl.",
+  "notice.settingsNotSaved": "Die Einstellung konnte nicht gespeichert werden."
 }
