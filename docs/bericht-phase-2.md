@@ -47,13 +47,13 @@ Lokal (Linux-Container, Xvfb, D-Bus-Sitzung), alle ausgeführt und bestanden:
 
 ## Abnahmekriterien Phase 2
 
-| Kriterium                                                                                                | Stand    |
-| -------------------------------------------------------------------------------------------------------- | -------- |
-| 100 harte Prozessabbrüche während des Speicherns: keine beschädigte Datei, `integrity_check` meldet `ok` | siehe CI |
-| Eine zweite Instanz kann dieselbe Bibliothek nicht öffnen                                                | siehe CI |
-| Sync-Ordner lösen die Warnung aus; wird trotzdem dort gespeichert, läuft die Datenbank im Rollback-Modus | siehe CI |
-| Pfadangriffe wie `..` und symbolische Links werden abgelehnt                                             | siehe CI |
-| Die Referenzbibliothek entsteht reproduzierbar                                                           | siehe CI |
+| Kriterium                                                                                                | Stand                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 100 harte Prozessabbrüche während des Speicherns: keine beschädigte Datei, `integrity_check` meldet `ok` | **erfüllt.** `tests/crash_safety.rs`: Ein Hilfsprozess speichert ohne Pause und wird 100-mal hart beendet. Nach jedem Abbruch meldet `integrity_check` `ok`, jede Datei ist vollständig (alte oder neue Fassung mit passender Prüfsumme), keine Temporärdatei bleibt liegen, kein Dokument verliert seine Datei. Lokal trafen 100 von 100 Abbrüchen ein laufendes Speichern; der Test verlangt mindestens 75. Bestanden lokal und in CI unter Windows und Linux                                       |
+| Eine zweite Instanz kann dieselbe Bibliothek nicht öffnen                                                | **erfüllt.** `tests/library_lock.rs`: Ein zweiter Prozess erhält „gesperrt“, nach geordnetem Ende und nach hartem Abbruch des ersten bleibt keine veraltete Sperre. `tests/library.rs`: Ein zweites Öffnen im selben Prozess wird abgelehnt. E2E `restart.e2e.ts`: Ein zweiter Programmstart übergibt an die laufende Instanz und endet mit Exit-Code 0                                                                                                                                               |
+| Sync-Ordner lösen die Warnung aus; wird trotzdem dort gespeichert, läuft die Datenbank im Rollback-Modus | **erfüllt.** `tests/library.rs`: Rollback-Journal im Sync-Ordner, Wechsel von WAL auf Rollback nach dem Umzug in einen Sync-Ordner. E2E `library.e2e.ts`: Der Vorschlag `Dokumente/ProjectWrite` im Sync-Ordner zeigt die Warnung; nach dem bestätigten Umzug dorthin läuft die Datenbank im Rollback-Modus. Erkannt über Ordnernamen; echte Sync-Clients fehlen in CI (siehe unten)                                                                                                                  |
+| Pfadangriffe wie `..` und symbolische Links werden abgelehnt                                             | **erfüllt.** `tests/path_security.rs`: `..`, absolute Pfade, fremde Laufwerke, reservierte Namen, symbolische Links auf Ordner und Dateien, unter Windows Junctions; nichts entsteht außerhalb der Bibliothek. `tests/library.rs`: Verknüpfungen an festen Pfaden und in `tmp/` werden abgelehnt bzw. nicht verfolgt. `tests/ipc.rs`: Ordner kommen nur aus dem Dialog und werden über Tokens angesprochen; E2E `smoke.e2e.ts`: Das Frontend hat keinen Zugriff auf Dateisystem, Shell, SQL und Pfade |
+| Die Referenzbibliothek entsteht reproduzierbar                                                           | **erfüllt für den Umfang von Phase 2** (10.000 Dokumente; Medien, Subnetze, Tags und Verbindungen folgen mit ihren Tabellen, ADR 0010). CI baut sie zweimal und vergleicht den Fingerabdruck (Linux 10.000, Windows 1.000 Dokumente); `tests/reference_library.rs` prüft eine kleine Bibliothek                                                                                                                                                                                                       |
 
 ## Was konnte nicht getestet werden und warum?
 
@@ -67,6 +67,13 @@ Lokal (Linux-Container, Xvfb, D-Bus-Sitzung), alle ausgeführt und bestanden:
 
 Keine bekannten.
 
+## Behobene Fehler
+
+- **F-4** Windows: Umbenennen beim atomaren Speichern scheiterte mit Fehler 123, wenn der Pfad `/` enthielt (Pfade mit `\\?\`-Präfix normalisiert Windows nicht). Pfade werden jetzt vorher mit `std::path::absolute` normalisiert.
+- **F-5** E2E: CI-Lauf 42 meldete `library.e2e.ts` unter Windows und Linux als fehlgeschlagen. Kein Fehler der App: Der letzte Test schließt das Fenster, die App endet und mit ihr der eingebettete WebDriver-Server; der Testläufer schickte danach noch `DELETE /session` und brach mit `ECONNREFUSED` ab. Der Test ersetzt `deleteSession` nach dem Schließen durch eine leere Operation (Commit `1047c4c`).
+
+Einzelheiten in `docs/status.md`.
+
 ## Gefundene Widersprüche und Abweichungen
 
 1. **Referenzbibliothek** (Abschnitt 6 vs. Abschnitt 18): Das Skript soll 5.000 Medien, 500 Subnetze, 1.000 Tags und 30.000 Verbindungen erzeugen; diese Tabellen entstehen aber erst in den Phasen 7, 8 und 11. Phase 2 erzeugt die 10.000 Dokumente; die übrigen Elemente ergänzt das Skript mit ihren Tabellen (ADR 0010).
@@ -79,7 +86,7 @@ Keine bekannten.
 
 ## CI
 
-(wird nach dem CI-Lauf ergänzt)
+Der CI-Lauf zum letzten Commit läuft noch; das Ergebnis wird hier eingetragen.
 
 ## Nächster Schritt
 
