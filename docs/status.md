@@ -17,17 +17,17 @@ Umfangsentscheidungen (ADR 0011, Begründung: Abschnitt 2 „Funktionen spätere
 
 ## Stand Phase 3
 
-| Schritt | Inhalt                                                                                             | Stand                                          |
-| ------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1       | Oberflächeneinstellungen in `settings.json`, Spracherkennung, Fensterzustand, Zoom                 | erledigt                                       |
-| 2       | Natives Menü (de/en), Ereigniskanal, Fokusmodus, Schließen mit Speichern vorab                     | erledigt                                       |
-| 3       | Dokumentbefehle, Migration 0003, Import mit Typprüfung und Duplikat-Rückfrage                      | erledigt                                       |
-| 4       | Designs importieren und entfernen, Kontrastprüfung                                                 | erledigt                                       |
-| 5       | Befehlsregister, Tastenkürzel mit Konflikterkennung, Command Palette, Kontextmenüs                 | erledigt                                       |
-| 6       | Hauptlayout, Explorer, Tabs, Schreibfläche mit Autosave, Statusleiste, erster Start, Einstellungen | erledigt                                       |
-| 7       | Drag & Drop (Import, Tabs verschieben)                                                             | erledigt                                       |
-| 8       | E2E-Tests (26), Tests der Phasen 1 und 2 angepasst                                                 | erledigt                                       |
-| 9       | Doku, CI, Bericht                                                                                  | erledigt; CI-Ergebnis zum letzten Commit folgt |
+| Schritt | Inhalt                                                                                             | Stand                                      |
+| ------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1       | Oberflächeneinstellungen in `settings.json`, Spracherkennung, Fensterzustand, Zoom                 | erledigt                                   |
+| 2       | Natives Menü (de/en), Ereigniskanal, Fokusmodus, Schließen mit Speichern vorab                     | erledigt                                   |
+| 3       | Dokumentbefehle, Migration 0003, Import mit Typprüfung und Duplikat-Rückfrage                      | erledigt                                   |
+| 4       | Designs importieren und entfernen, Kontrastprüfung                                                 | erledigt                                   |
+| 5       | Befehlsregister, Tastenkürzel mit Konflikterkennung, Command Palette, Kontextmenüs                 | erledigt                                   |
+| 6       | Hauptlayout, Explorer, Tabs, Schreibfläche mit Autosave, Statusleiste, erster Start, Einstellungen | erledigt                                   |
+| 7       | Drag & Drop (Import, Tabs verschieben)                                                             | erledigt                                   |
+| 8       | E2E-Tests (26), Tests der Phasen 1 und 2 angepasst                                                 | erledigt                                   |
+| 9       | Doku, CI, Bericht                                                                                  | erledigt, CI-Lauf 62 grün (Windows, Linux) |
 
 ## Stand Phase 2
 

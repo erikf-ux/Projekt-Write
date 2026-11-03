@@ -95,7 +95,16 @@ F-6 bis F-11 in `docs/status.md`. F-7 (Windows-Build) und F-8/F-9 (Escape im Dia
 
 ## CI
 
-Der CI-Lauf zum letzten Commit läuft noch; das Ergebnis wird hier eingetragen.
+**CI-Lauf 62** (Commit `5b8440d`): alle vier Jobs grün. Der Commit enthält den endgültigen Code; spätere Commits ändern nur diesen Bericht und `docs/status.md`.
+
+| Job                             | Ergebnis                                                                                                                                                                                                                                                         |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows (`windows-latest`)      | grün: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy, Rust-Tests (1:49 min, mit den 100 harten Abbrüchen), Referenzbibliothek zweimal gleich (1.000 Dokumente), Typen und Lizenzliste aktuell, E2E 4 von 4 Dateien (26 Tests, davon 12 der Arbeitsfläche) |
+| Linux (`ubuntu-24.04`)          | grün: dieselben Prüfungen, Rust-Tests 1:02 min, Referenzbibliothek zweimal gleich (10.000 Dokumente), E2E 4 von 4 Dateien                                                                                                                                        |
+| Abhängigkeitsprüfung            | grün: `cargo audit`, `cargo deny`, `npm audit`                                                                                                                                                                                                                   |
+| Release-Build ohne Test-Plugins | grün                                                                                                                                                                                                                                                             |
+
+Davor: Lauf 56 scheiterte an `rustfmt` (F-6), Lauf 59 an der Referenzbibliothek im CI-Cache (F-10), Lauf 61 an drei Tests der Arbeitsfläche unter Windows (F-11). Die Läufe 55, 57, 58 und 60 wurden durch neuere Pushes abgebrochen.
 
 ## Nächster Schritt
 
