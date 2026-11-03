@@ -52,6 +52,14 @@ tauri = { version = "2.12.5", features = ["test"] }
 tempfile = "3.27.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
+# Debug builds (tests, E2E) hash and query noticeably faster with optimised
+# SHA-256 and SQLite; behaviour is unchanged.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true
