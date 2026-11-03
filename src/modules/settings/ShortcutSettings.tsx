@@ -24,6 +24,7 @@ const SMALL_BUTTON =
 
 const categoryKeys: Record<CommandCategory, MessageKey> = {
   document: 'category.document',
+  edit: 'category.edit',
   tab: 'category.tab',
   view: 'category.view',
   app: 'category.app',

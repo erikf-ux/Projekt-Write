@@ -26,6 +26,10 @@ export type CommandId =
   | 'editor.focus'
   | 'editor.toggleSource'
   | 'statistics.show'
+  | 'find.show'
+  | 'replace.show'
+  | 'find.next'
+  | 'find.previous'
   | 'focus.toggle'
   | 'zoom.in'
   | 'zoom.out'
@@ -39,7 +43,7 @@ export type CommandId =
 export type MenuCommandIsCommand = MenuCommand extends CommandId ? true : never;
 export const MENU_COMMANDS_ARE_COMMANDS: MenuCommandIsCommand = true;
 
-export type CommandCategory = 'document' | 'tab' | 'view' | 'app';
+export type CommandCategory = 'document' | 'edit' | 'tab' | 'view' | 'app';
 
 export interface CommandDefinition {
   id: CommandId;

@@ -212,6 +212,17 @@
   outline: 2px solid var(--pw-color-accent);
 }
 
+/* Results of find and replace: a tint of the accent, the current one framed. */
+.pw-surface .find-and-replace-result {
+  background: color-mix(in srgb, var(--pw-color-accent) 22%, transparent);
+  border-radius: 2px;
+}
+
+.pw-surface .find-and-replace-result-current {
+  background: color-mix(in srgb, var(--pw-color-accent) 35%, transparent);
+  outline: 2px solid var(--pw-color-accent);
+}
+
 /* ProseMirror needs these for its gap cursor and hidden fields. */
 .ProseMirror .ProseMirror-gapcursor {
   display: none;

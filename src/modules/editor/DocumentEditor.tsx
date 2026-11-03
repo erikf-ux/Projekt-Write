@@ -14,6 +14,8 @@ import { useT, type MessageKey } from '@/i18n';
 import { useWorkspace, setDocumentSource, type OpenDocument } from '@/modules/documents/workspaceStore';
 import type { Loss } from './markdown/losses';
 import type { ProbeIssue } from './markdown/probe';
+import { FindBar } from './find/FindBar';
+import { useFind } from './find/findStore';
 import { getSession, openSession } from './session';
 import './editor.css';
 
@@ -109,6 +111,7 @@ function DocumentPanel({
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
   const { id, loaded } = document;
+  const find = useFind((state) => state.bars[document.id]);
   const label = t('editor.label', { title: document.title });
 
   // The session is created once per tab, from the values of that moment;
@@ -184,6 +187,7 @@ function DocumentPanel({
           }}
         />
       ) : null}
+      {find && loaded ? <FindBar id={id} state={find} view={document.view} readOnly={readOnly} /> : null}
       {loaded ? (
         <div
           ref={host}

@@ -7,6 +7,8 @@
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
 import { activeDocument, freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
+import { useFind } from '@/modules/editor/find/findStore';
+import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
@@ -28,6 +30,29 @@ async function newDocument(): Promise<void> {
   if (await workspace().createDocument(title)) {
     focusEditor();
   }
+}
+
+const activeSession = () => {
+  const id = workspace().active;
+  return id ? getSession(id) : undefined;
+};
+
+const findOpen = () => {
+  const id = workspace().active;
+  return id !== null && useFind.getState().bars[id] !== undefined;
+};
+
+/** Opens the find bar; a short selection on one line becomes the search term. */
+function openFind(replace: boolean): void {
+  const id = workspace().active;
+  const session = activeSession();
+  if (!id || !session) {
+    return;
+  }
+  const { from, to, empty } = session.editor.state.selection;
+  const selected = empty ? '' : session.editor.state.doc.textBetween(from, to, '\n');
+  const term = selected !== '' && selected.length <= 200 && !selected.includes('\n') ? selected : undefined;
+  useFind.getState().open(id, replace, term);
 }
 
 function switchTab(step: 1 | -1): void {
@@ -238,6 +263,42 @@ export function createAppCommands(): CommandDefinition[] {
           workspace().toggleView(id);
           focusEditor();
         }
+      },
+    },
+    {
+      id: 'find.show',
+      category: 'edit',
+      titleKey: 'command.find.show',
+      isAvailable: () => activeDocument(workspace())?.loaded === true,
+      run: () => {
+        openFind(false);
+      },
+    },
+    {
+      id: 'replace.show',
+      category: 'edit',
+      titleKey: 'command.replace.show',
+      isAvailable: () => activeDocument(workspace())?.loaded === true && libraryOpen(),
+      run: () => {
+        openFind(true);
+      },
+    },
+    {
+      id: 'find.next',
+      category: 'edit',
+      titleKey: 'command.find.next',
+      isAvailable: () => findOpen(),
+      run: () => {
+        activeSession()?.findNext();
+      },
+    },
+    {
+      id: 'find.previous',
+      category: 'edit',
+      titleKey: 'command.find.previous',
+      isAvailable: () => findOpen(),
+      run: () => {
+        activeSession()?.findPrevious();
       },
     },
     {

@@ -13,6 +13,7 @@
  * runs first, block by block, for changed blocks only (ADR 0014).
  */
 import { Editor, type JSONContent } from '@tiptap/core';
+import FindAndReplace from '@tiptap/extension-find-and-replace';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import { parseMarkdown, serializeMarkdown } from './markdown/adapter';
@@ -22,6 +23,21 @@ import { plainClipboardText, plainDocument, plainExtensions, plainText } from '.
 import { markdownExtensions } from './schema/extensions';
 import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
 import { useStatistics } from './statisticsStore';
+
+/** Search options of the find bar (`find/findStore.ts`). */
+export interface SearchRequest {
+  term: string;
+  replacement: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
+export interface SearchResults {
+  count: number;
+  /** 0-based index of the current result, or null. */
+  current: number | null;
+}
 
 /** Statistics follow the text after this pause (counting is per block). */
 const STATISTICS_DELAY_MS = 150;
@@ -211,6 +227,43 @@ export class EditorSession {
     return { ok: true, issues: [] };
   }
 
+  /** Runs a search in the current view (highlights all results). */
+  search(request: SearchRequest): void {
+    const commands = this.editor.commands;
+    commands.setCaseSensitive(request.caseSensitive);
+    commands.setWholeWord(request.wholeWord);
+    commands.setUseRegex(request.regex);
+    commands.setReplaceTerm(request.replacement);
+    commands.setSearchTerm(request.term);
+  }
+
+  clearSearch(): void {
+    for (const editor of [this.rich, this.plain]) {
+      editor?.commands.clearSearch();
+    }
+  }
+
+  searchResults(): SearchResults {
+    const storage = this.editor.storage.findAndReplace;
+    return { count: storage.results.length, current: storage.currentIndex };
+  }
+
+  findNext(): void {
+    this.editor.commands.goToNextResult();
+  }
+
+  findPrevious(): void {
+    this.editor.commands.goToPreviousResult();
+  }
+
+  replaceCurrent(): void {
+    this.editor.commands.replace();
+  }
+
+  replaceAll(): void {
+    this.editor.commands.replaceAll();
+  }
+
   setEditable(editable: boolean): void {
     this.options.editable = editable;
     this.rich?.setEditable(editable, false);
@@ -269,7 +322,7 @@ export class EditorSession {
 
   /** A rich editor for content the probe has checked: its blocks need no check. */
   private createRich(content: JSONContent): Editor {
-    const editor = this.createEditor(markdownExtensions(), content, 'pw-rich');
+    const editor = this.createEditor([...markdownExtensions(), findExtension()], content, 'pw-rich');
     this.trust(editor);
     return editor;
   }
@@ -282,7 +335,7 @@ export class EditorSession {
 
   private createPlain(text: string): Editor {
     return this.createEditor(
-      plainExtensions(),
+      [...plainExtensions(), findExtension()],
       plainDocument(text),
       this.isMarkdown ? 'pw-source' : 'pw-plain',
     );
@@ -342,6 +395,11 @@ export class EditorSession {
       },
     });
   }
+}
+
+/** Find and replace (section 12); highlights styled in `editor.css` (no inline style, CSP). */
+function findExtension() {
+  return FindAndReplace.configure({ injectCSS: false, searchDebounceMs: 0 });
 }
 
 /**

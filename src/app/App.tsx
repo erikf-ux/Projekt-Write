@@ -55,6 +55,7 @@ const MENU_COMMANDS: Record<MenuCommand, true> = {
 const categoryKeys = {
   document: 'category.document',
   tab: 'category.tab',
+  edit: 'category.edit',
   view: 'category.view',
   app: 'category.app',
 } as const satisfies Record<CommandCategory, string>;
