@@ -1,6 +1,6 @@
 # ADR 0004 – Datenbank vor der Bibliothek: In-Memory in Phase 1, erste Migration
 
-- Status: angenommen
+- Status: angenommen; der Laufzeit-Teil (In-Memory statt Bibliotheksdatenbank) ist seit Phase 2 durch [ADR 0006](0006-bibliothek-sperre-und-speicherort.md) abgelöst
 - Datum: 2026-11-02
 - Phase: 1
 

@@ -3,10 +3,15 @@
 Kurze Entscheidungsnotizen nach dem Muster Kontext → Optionen → Entscheidung → Folgen.
 Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung, entsteht eine neue ADR, die die alte ablöst.
 
-| Nr.                                           | Titel                                                                        | Status     |
-| --------------------------------------------- | ---------------------------------------------------------------------------- | ---------- |
-| [0001](0001-versionen-und-kompatibilitaet.md) | Versionen und Kompatibilität des Technologiestacks                           | angenommen |
-| [0002](0002-ipc-vertrag.md)                   | IPC-Vertrag: validierte Eingaben, einheitliches Fehlerformat, erzeugte Typen | angenommen |
-| [0003](0003-e2e-tests-ohne-global-tauri.md)   | E2E-Tests mit eingebettetem WebDriver, ohne `withGlobalTauri`                | angenommen |
-| [0004](0004-datenbank-vor-der-bibliothek.md)  | Datenbank vor der Bibliothek: In-Memory in Phase 1, erste Migration          | angenommen |
-| [0005](0005-isolation-pattern.md)             | Isolation Pattern                                                            | angenommen |
+| Nr.                                               | Titel                                                                        | Status                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
+| [0001](0001-versionen-und-kompatibilitaet.md)     | Versionen und Kompatibilität des Technologiestacks                           | angenommen                                    |
+| [0002](0002-ipc-vertrag.md)                       | IPC-Vertrag: validierte Eingaben, einheitliches Fehlerformat, erzeugte Typen | angenommen                                    |
+| [0003](0003-e2e-tests-ohne-global-tauri.md)       | E2E-Tests mit eingebettetem WebDriver, ohne `withGlobalTauri`                | angenommen                                    |
+| [0004](0004-datenbank-vor-der-bibliothek.md)      | Datenbank vor der Bibliothek: In-Memory in Phase 1, erste Migration          | angenommen, Laufzeit-Teil abgelöst durch 0006 |
+| [0005](0005-isolation-pattern.md)                 | Isolation Pattern                                                            | angenommen                                    |
+| [0006](0006-bibliothek-sperre-und-speicherort.md) | Bibliothek: Sperre, Speicherort und Rollback-Modus                           | angenommen                                    |
+| [0007](0007-atomares-speichern.md)                | Atomares Speichern und Dokument-Repository                                   | angenommen                                    |
+| [0008](0008-ordnerwahl-in-rust.md)                | Ordnerwahl in Rust, Tokens statt Pfaden                                      | angenommen                                    |
+| [0009](0009-einstellungen-und-logging.md)         | App- und Bibliothekseinstellungen, Logging                                   | angenommen                                    |
+| [0010](0010-referenzbibliothek.md)                | Referenzbibliothek                                                           | angenommen                                    |

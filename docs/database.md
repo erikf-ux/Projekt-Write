@@ -1,59 +1,291 @@
 # Datenbank – Project Write
 
-Stand: Phase 1. Das **vollständige Schema** wird in Phase 2 geplant und hier dokumentiert (Abschnitt 18). Diese Fassung beschreibt Konventionen, Verbindungsaufbau, Migrationsmechanik und die Tabellen, die bereits existieren.
+Stand: Phase 2 (3. November 2026). Diese Datei enthält das **vollständige geplante Schema** (Abschnitt 18) und kennzeichnet, was bereits per Migration existiert. Tabellen entstehen in der Phase, die sie braucht; Spalten, die eine spätere Phase braucht, kommen mit einer eigenen Migration hinzu.
 
-## Konventionen (Abschnitt 18)
+## 1. Konventionen (Abschnitt 18)
 
 - SQLite, mit der App gebaut (`libsqlite3-sys` 0.37.0 über SQLx 0.9.0, Feature `sqlite-bundled`). Kein zweites Crate auf `libsqlite3-sys`.
 - Alle Tabellen `STRICT`. Ausnahme: die interne Tabelle `_sqlx_migrations` von SQLx.
-- IDs als UUID-Text, Zeiten in UTC nach ISO 8601 mit `Z` (`2026-11-02T10:00:00Z`, optional mit Sekundenbruchteilen).
-- Weiches Löschen über `deleted_at` und `archived_at` (ab Phase 6).
-- Fremdschlüssel für jede Verbindung, sinnvolle Indizes, eindeutige Constraints, `CHECK`-Bedingungen für Formate.
-- SQL steht nur in `src-tauri/src/database/` und den späteren Repositories. SQLx 0.9 akzeptiert nur statisches SQL; dynamisches SQL braucht `AssertSqlSafe` (nur in Tests).
+- IDs als UUID-Text in Kleinbuchstaben (`CHECK` auf Länge, Bindestriche und Hex-Zeichen). Zeiten in UTC nach ISO 8601, immer mit Millisekunden: `2026-11-03T10:00:00.000Z` (feste Breite, die lexikalische Ordnung entspricht der zeitlichen).
+- Weiches Löschen: `deleted_at` (Papierkorb) und `archived_at` (Archiv) statt `DELETE`. Endgültig gelöscht wird nur beim Leeren des Papierkorbs (Phase 6); dann greifen die `ON DELETE CASCADE` der Zuordnungstabellen.
+- Fremdschlüssel für jede Verbindung, `PRAGMA foreign_keys=ON` auf jeder Verbindung.
+- Dateipfade werden **nie gespeichert**, sondern aus ID und Typ abgeleitet (`documents/markdown/<id>.md`). Eine manipulierte Datenbank kann so keinen Pfad außerhalb der Bibliothek ins Spiel bringen.
+- SQL steht nur in `src-tauri/src/database/` (Repositories `documents.rs`, `settings.rs`). SQLx 0.9 akzeptiert nur statisches SQL; dynamisches SQL braucht `AssertSqlSafe` (nur in Tests).
+- Werte von Einstellungen sind JSON (`json_valid`), damit jede Einstellung ihren eigenen Typ behält.
 
-## Verbindungen
+## 2. Verbindungen
 
-|                | Dateidatenbank                                                           | In-Memory (Phase 1, Tests)           |
-| -------------- | ------------------------------------------------------------------------ | ------------------------------------ |
-| Schreiben      | 1 Verbindung (`max_connections = 1`)                                     | 1 Verbindung für alles, nie erneuert |
-| Lesen          | Pool mit 4 Verbindungen, `read_only`                                     | dieselbe Verbindung                  |
-| `journal_mode` | `WAL` lokal, `DELETE` für Sync-Ordner/Netzlaufwerke (Auswahl ab Phase 2) | `MEMORY`                             |
-| `synchronous`  | `FULL`                                                                   | `FULL`                               |
-| `foreign_keys` | `ON`                                                                     | `ON`                                 |
-| `busy_timeout` | 5000 ms                                                                  | 5000 ms                              |
+|                | Bibliotheksdatenbank                                                                                 | In-Memory (Systemprüfung ohne Bibliothek, Tests) |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Ort            | `<Bibliothek>/database/projectwrite.db`                                                              | –                                                |
+| Schreiben      | 1 Verbindung (`max_connections = 1`); alle Schreiber einer Bibliothek zusätzlich hinter einer Sperre | 1 Verbindung für alles, nie erneuert             |
+| Lesen          | Pool mit 4 Verbindungen, `read_only`                                                                 | dieselbe Verbindung                              |
+| `journal_mode` | `WAL` auf lokalen Datenträgern, `DELETE` in Sync-Ordnern und auf Netzlaufwerken (ADR 0006)           | `MEMORY`                                         |
+| `synchronous`  | `FULL`                                                                                               | `FULL`                                           |
+| `foreign_keys` | `ON`                                                                                                 | `ON`                                             |
+| `busy_timeout` | 5000 ms                                                                                              | 5000 ms                                          |
 
-## Migrationen
+Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Bibliothek, die der Nutzer von Hand in einen Sync-Ordner verschiebt, wechselt beim nächsten Öffnen von WAL in den Rollback-Modus (Test `a_library_moved_into_a_sync_folder_switches_from_wal_to_rollback`).
+
+## 3. Migrationen
 
 - Ort: `src-tauri/migrations/NNNN_beschreibung.sql`, eingebettet zur Übersetzungszeit (`sqlx::migrate!`).
-- Nur vorwärts. Jede Migration läuft in einer eigenen Transaktion.
-- Ausgelieferte Migrationen werden nie geändert. SQLx speichert eine Prüfsumme je Migration und bricht bei Abweichung ab.
-- `Database::migrate()` prüft vor jeder Änderung, ob die Datenbank eine höhere Version kennt als die App. Dann meldet es `SchemaTooNew` (Fehlercode `SCHEMA_TOO_NEW`) und ändert nichts.
-- Ein zweiter Lauf ändert nichts (Test vergleicht Schema und Migrationstabelle).
-- Ab Phase 2: Sicherung vor jeder Migration, Tests ab jeder früheren Schemaversion.
+- Nur vorwärts, jede Migration in einer eigenen Transaktion (Test: keine Migration schaltet die Transaktion ab; eine fehlerhafte Migration hinterlässt nichts).
+- **Ausgelieferte Migrationen werden nie geändert.** SQLx prüft eine SHA-384-Prüfsumme je Migration; zusätzlich sind die Prüfsummen in `tests/migrations.rs` festgeschrieben.
+- Vor jeder Änderung: Ist die Datenbank neuer als die App, meldet das Öffnen `SCHEMA_TOO_NEW` und ändert nichts – auch keine Sicherung.
+- **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), kopiert die App sie mit `VACUUM INTO` nach `backups/pre-migration/projectwrite-schema-<alt>-<Zeit>.db`, prüft die Kopie mit `PRAGMA integrity_check` und migriert erst dann. Scheitert die Sicherung, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten Kopien bleiben, ältere entfernt die App (nur eigene Dateien nach diesem Namensmuster). Ab Phase 10 ersetzt ein vollständiges `.pwbackup` diese Kopie (Abschnitt 21).
+- **Tests ab jeder früheren Version:** `tests/migrations.rs` legt für jede Version 0 … n−1 eine Datenbank an, füllt die Tabellen dieser Version mit Testdaten, migriert auf die aktuelle Version und prüft: Schema identisch zu einer frisch migrierten Datenbank, Daten erhalten, `integrity_check` = ok, `foreign_key_check` leer. Jede neue Migration bringt eine Testzeile für ihre Tabellen mit.
 
 | Version | Datei                           | Inhalt                         | Phase |
 | ------- | ------------------------------- | ------------------------------ | ----- |
 | 1       | `0001_application_settings.sql` | Tabelle `application_settings` | 1     |
+| 2       | `0002_documents.sql`            | Tabelle `documents`            | 2     |
 
-## Tabellen
+Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
-### `application_settings` (Version 1)
+| Phase | Inhalt                                                                                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 5     | `documents`: `favorited_at`, `last_opened_at`, `original_name`, `import_folder`; Tabelle `document_links`                                  |
+| 6     | `document_history`                                                                                                                         |
+| 7     | `subnets`, `subnet_memberships`, `tags`, `document_tags`                                                                                   |
+| 8     | `media`, `media_tags`, `document_media`                                                                                                    |
+| 9     | `search_entries`, `search_words`, `search_parts`                                                                                           |
+| 11    | `mesh_nodes` (mit Triggern und Nachtrag für bestehende Elemente), `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions` |
+| 12    | `dictionaries`, `dictionary_words`, `document_dictionaries`, `subnet_dictionaries`, `language_profiles`, `autocorrect_rejections`          |
 
-Bibliotheksweite Einstellungen (Abschnitt 9). Appweite Einstellungen liegen dagegen im Konfigurationsordner des Systems.
+## 4. Gesamtschema
 
-| Spalte       | Typ                   | Regeln                       |
-| ------------ | --------------------- | ---------------------------- |
-| `key`        | TEXT, Primärschlüssel | 1–128 Zeichen                |
-| `value`      | TEXT                  | gültiges JSON (`json_valid`) |
-| `updated_at` | TEXT                  | ISO 8601 UTC mit `Z`         |
+Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf, wird in Phase n angelegt und bei Bedarf dort präzisiert (Änderungen am Plan werden hier nachgetragen, nicht still geändert).
 
-`STRICT, WITHOUT ROWID`.
+### Übersicht
 
-## Volltextsuche (geplant für Phase 9)
+| Tabelle                        | Zweck                                            | Stand              |
+| ------------------------------ | ------------------------------------------------ | ------------------ |
+| `application_settings`         | Bibliotheksweite Einstellungen                   | vorhanden (v1)     |
+| `documents`                    | Dokumente (TXT, MD, `.pwrite`)                   | vorhanden (v2)     |
+| `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | geplant (Phase 5)  |
+| `document_history`             | Versionen eines Dokuments                        | geplant (Phase 6)  |
+| `subnets`                      | Hierarchische Gruppen                            | geplant (Phase 7)  |
+| `subnet_memberships`           | Zuordnung Element → Subnetz                      | geplant (Phase 7)  |
+| `tags`                         | Stichwörter                                      | geplant (Phase 7)  |
+| `document_tags`                | Tags eines Dokuments                             | geplant (Phase 7)  |
+| `media`                        | Bilder, PDF, Anhänge                             | geplant (Phase 8)  |
+| `media_tags`                   | Tags eines Mediums                               | geplant (Phase 8)  |
+| `document_media`               | Medien, die ein Dokument einbindet oder verweist | geplant (Phase 8)  |
+| `search_entries`               | Zuordnung FTS-Zeile → Element                    | geplant (Phase 9)  |
+| `search_words`, `search_parts` | FTS5-Index (Abschnitt 19)                        | geplant (Phase 9)  |
+| `mesh_nodes`                   | Knoten des Mesh (ein Eintrag je Element/Subnetz) | geplant (Phase 11) |
+| `mesh_connections`             | Bestätigte Verbindungen                          | geplant (Phase 11) |
+| `mesh_suggestions`             | Vorschläge mit Wert, Begründung und Status       | geplant (Phase 11) |
+| `mesh_layouts`                 | Layout je Ansicht                                | geplant (Phase 11) |
+| `mesh_positions`               | Knotenpositionen je Layout                       | geplant (Phase 11) |
+| `dictionaries`                 | Eigene und Hunspell-Wörterbücher                 | geplant (Phase 12) |
+| `dictionary_words`             | Einträge eigener Wörterbücher                    | geplant (Phase 12) |
+| `document_dictionaries`        | Wörterbücher eines Dokuments                     | geplant (Phase 12) |
+| `subnet_dictionaries`          | Wörterbücher eines Subnetzes                     | geplant (Phase 12) |
+| `language_profiles`            | Sprachprofil je Dokument                         | geplant (Phase 12) |
+| `autocorrect_rejections`       | Abgelehnte Autokorrekturen                       | geplant (Phase 12) |
 
-Phase 1 belegt, dass FTS5 aktiv ist: `pragma_compile_options` nennt `ENABLE_FTS5`, beide Tabellen aus Abschnitt 19 lassen sich mit genau dieser Definition anlegen, `"C++"` und ein einzelnes `"` funktionieren, `Muller` findet `Müller`, `haus` findet `Krankenhaus`. Die Definitionen stehen in `src-tauri/src/database/fts.rs` und werden in Phase 9 per Migration angelegt.
+Abgeleitete Verbindungen (Referenz, Tag, Enthalten-in, Abschnitt 15) werden **nicht** gespeichert, sondern aus `document_links`, `document_media`, `document_tags`/`media_tags` und `subnet_memberships` berechnet.
 
-## Integritätsprüfungen
+### `application_settings` – vorhanden (Version 1)
 
-- `PRAGMA quick_check` – Systemprüfung „Datenspeicher“ (in Phase 2 beim Öffnen der Bibliothek).
-- `PRAGMA integrity_check` – nach Backup und Wiederherstellung (Phase 10), in Tests nach Migrationen.
+| Spalte       | Typ                   | Regeln                        |
+| ------------ | --------------------- | ----------------------------- |
+| `key`        | TEXT, Primärschlüssel | 1–128 Zeichen, `bereich.name` |
+| `value`      | TEXT                  | gültiges JSON (`json_valid`)  |
+| `updated_at` | TEXT                  | ISO 8601 UTC                  |
+
+`STRICT, WITHOUT ROWID`. Jeder Schlüssel ist in Rust ein Typ mit Standardwert und Prüfung (`services/settings/library.rs`). Eine Zeile, deren Wert nicht (mehr) passt, ergibt den Standardwert und bleibt unverändert; Schlüssel neuerer Versionen werden nie angefasst.
+
+| Schlüssel                   | Wert                                                     | Phase |
+| --------------------------- | -------------------------------------------------------- | ----- |
+| `storage.acceptedLocation`  | bestätigter Sync-Ordner/Netzlaufwerk (`StorageLocation`) | 2     |
+| `trash.retentionDays`       | Aufbewahrung im Papierkorb, Standard 30                  | 6     |
+| `history.*`                 | Aufbewahrungsregeln der Versionen (Abschnitt 13)         | 6     |
+| `statistics.wordsPerMinute` | Lesezeit, Standard 200                                   | 4     |
+| `backup.*`                  | Ziel, Automatik, Anzahl (Abschnitt 21)                   | 10    |
+| `suggestions.threshold`     | Schwellenwert der Vorschläge, Standard 0,35              | 11    |
+
+Appweite Einstellungen (Bibliothekspfad, später Fensterzustand, Sprache, Tastenkürzel) liegen **nicht** hier, sondern in `settings.json` im Konfigurationsordner des Systems (ADR 0009).
+
+### `documents` – vorhanden (Version 2)
+
+| Spalte           | Typ                   | Regeln                                            | Phase |
+| ---------------- | --------------------- | ------------------------------------------------- | ----- |
+| `id`             | TEXT, Primärschlüssel | UUID in Kleinbuchstaben                           | 2     |
+| `title`          | TEXT                  | 1–300 Zeichen; Rust: getrimmt, ohne Steuerzeichen | 2     |
+| `format`         | TEXT                  | `txt`, `md` oder `pwrite`                         | 2     |
+| `size_bytes`     | INTEGER               | ≥ 0                                               | 2     |
+| `content_sha256` | TEXT                  | 64 Hex-Zeichen                                    | 2     |
+| `created_at`     | TEXT                  | ISO 8601 UTC                                      | 2     |
+| `updated_at`     | TEXT                  | ISO 8601 UTC                                      | 2     |
+| `archived_at`    | TEXT NULL             | ISO 8601 UTC                                      | 2     |
+| `deleted_at`     | TEXT NULL             | ISO 8601 UTC (Papierkorb)                         | 2     |
+| `favorited_at`   | TEXT NULL             | Favorit seit                                      | 5     |
+| `last_opened_at` | TEXT NULL             | für „Zuletzt verwendet“                           | 5     |
+| `original_name`  | TEXT NULL             | Dateiname beim Import (Abschnitt 9)               | 5     |
+| `import_folder`  | TEXT NULL             | Importordner als Anzeigetext (Metadatum)          | 5     |
+
+Index: `ix_documents_active_updated_at (updated_at) WHERE deleted_at IS NULL`. Datei: `documents/text/<id>.txt`, `documents/markdown/<id>.md`, `documents/richtext/<id>.pwrite`.
+
+Bewusst **ohne** `updated_at >= created_at`: Eine Zeitkorrektur der Systemuhr darf ein Speichern nie scheitern lassen. Sprache und Autokorrektur je Dokument stehen in `language_profiles`.
+
+Schreibreihenfolge und Absturzverhalten: Abschnitt 6 und ADR 0007.
+
+### `document_links` – geplant (Phase 5)
+
+| Spalte      | Typ     | Regeln                              |
+| ----------- | ------- | ----------------------------------- |
+| `source_id` | TEXT    | → `documents(id)` ON DELETE CASCADE |
+| `target_id` | TEXT    | → `documents(id)` ON DELETE CASCADE |
+| `count`     | INTEGER | ≥ 1, Anzahl der Links im Quelltext  |
+
+Primärschlüssel `(source_id, target_id)`, Index auf `target_id` (Rückverweise, Seitenleiste „Verbindungen“). Wird beim Speichern aus dem Inhalt abgeleitet, in derselben Transaktion wie die Metadaten.
+
+### `document_history` – geplant (Phase 6)
+
+| Spalte           | Typ                   | Regeln                                                                        |
+| ---------------- | --------------------- | ----------------------------------------------------------------------------- |
+| `id`             | TEXT, Primärschlüssel | UUID                                                                          |
+| `document_id`    | TEXT                  | → `documents(id)` ON DELETE CASCADE                                           |
+| `kind`           | TEXT                  | `auto`, `close`, `beforeConversion`, `beforeRestore`, `named`                 |
+| `name`           | TEXT NULL             | Pflicht bei `named` (`CHECK`)                                                 |
+| `format`         | TEXT                  | wie `documents.format`                                                        |
+| `content`        | BLOB                  | komprimiert (Abschnitt 13)                                                    |
+| `compression`    | TEXT                  | Verfahren, z. B. `deflate`                                                    |
+| `size_bytes`     | INTEGER               | unkomprimierte Größe                                                          |
+| `content_sha256` | TEXT                  | Prüfsumme des Inhalts; inhaltsgleiche Folgeversionen werden nicht gespeichert |
+| `created_at`     | TEXT                  | ISO 8601 UTC                                                                  |
+
+Index `(document_id, created_at)`. Aufbewahrungsregeln (Abschnitt 13) in Rust; benannte Versionen bleiben.
+
+### `subnets` – geplant (Phase 7)
+
+| Spalte                      | Typ                   | Regeln                                                        |
+| --------------------------- | --------------------- | ------------------------------------------------------------- |
+| `id`                        | TEXT, Primärschlüssel | UUID                                                          |
+| `name`                      | TEXT                  | 1–200 Zeichen                                                 |
+| `description`               | TEXT                  | kann leer sein                                                |
+| `color`                     | TEXT                  | `#RRGGBB` oder Name eines Cluster-Tokens                      |
+| `parent_id`                 | TEXT NULL             | → `subnets(id)` ON DELETE RESTRICT; `CHECK (parent_id <> id)` |
+| `sort_key`                  | TEXT                  | Reihenfolge unter Geschwistern                                |
+| `created_at`, `updated_at`  | TEXT                  | ISO 8601 UTC                                                  |
+| `archived_at`, `deleted_at` | TEXT NULL             | ISO 8601 UTC                                                  |
+
+Zyklen verhindert ein Trigger (`BEFORE UPDATE OF parent_id`, rekursive Vorfahrenprüfung, `RAISE(ABORT)`), zusätzlich prüft Rust. Löschen eines Subnetzes: Untersubnetze rücken in derselben Transaktion eine Ebene hoch (Abschnitt 16), Elemente werden nie gelöscht.
+
+### `subnet_memberships` – geplant (Phase 7)
+
+Das geprüfte Muster aus Abschnitt 18, ergänzt um `created_at` (für „die älteste verbleibende rückt nach“):
+
+```sql
+CREATE TABLE subnet_memberships (
+  subnet_id   TEXT NOT NULL REFERENCES subnets(id) ON DELETE CASCADE,
+  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
+  media_id    TEXT REFERENCES media(id) ON DELETE CASCADE,
+  is_primary  INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+  created_at  TEXT NOT NULL,
+  CHECK ((document_id IS NULL) <> (media_id IS NULL))
+) STRICT;
+
+CREATE UNIQUE INDEX uq_member_doc     ON subnet_memberships(subnet_id, document_id) WHERE document_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_member_media   ON subnet_memberships(subnet_id, media_id)    WHERE media_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_primary_doc    ON subnet_memberships(document_id) WHERE is_primary = 1 AND document_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_primary_media  ON subnet_memberships(media_id)    WHERE is_primary = 1 AND media_id IS NOT NULL;
+```
+
+Da `media` erst in Phase 8 entsteht, legt Phase 7 die Tabelle mit `document_id` an; Phase 8 baut sie mit `media_id` neu auf (SQLite kann einer bestehenden Spalte keinen Fremdschlüssel hinzufügen; Neuaufbau per Migration: neue Tabelle, Daten kopieren, alte entfernen, umbenennen – getestet wie jede Migration).
+
+### `tags`, `document_tags`, `media_tags` – geplant (Phasen 7 und 8)
+
+`tags`: `id` (UUID), `name` (1–100 Zeichen, Anzeige), `name_key` (eindeutig; Unicode-Kleinschreibung in Rust, damit `Äpfel` und `äpfel` dasselbe Tag sind – `COLLATE NOCASE` faltet nur ASCII), `created_at`, `updated_at`.
+
+`document_tags (document_id, tag_id)` und `media_tags (media_id, tag_id)`: Primärschlüssel über beide Spalten, Fremdschlüssel mit `ON DELETE CASCADE`, Index auf `tag_id`, `created_at`. Zusammenführen von Tags ist eine Transaktion (Zuordnungen umhängen, Duplikate verwerfen, altes Tag löschen).
+
+### `media` – geplant (Phase 8)
+
+| Spalte                                      | Typ                   | Regeln                                                         |
+| ------------------------------------------- | --------------------- | -------------------------------------------------------------- |
+| `id`                                        | TEXT, Primärschlüssel | UUID                                                           |
+| `kind`                                      | TEXT                  | `image`, `pdf`, `attachment`                                   |
+| `mime_type`                                 | TEXT                  | aus dem Inhalt erkannt (Positivliste, Abschnitt 20)            |
+| `extension`                                 | TEXT                  | aus der Positivliste                                           |
+| `original_name`                             | TEXT                  | Dateiname beim Import                                          |
+| `import_folder`                             | TEXT NULL             | Importordner (Metadatum)                                       |
+| `size_bytes`                                | INTEGER               | ≥ 0                                                            |
+| `sha256`                                    | TEXT                  | Prüfsumme; Index, **nicht** eindeutig („trotzdem importieren“) |
+| `width`, `height`                           | INTEGER NULL          | Bilder                                                         |
+| `page_count`                                | INTEGER NULL          | PDF                                                            |
+| `caption`                                   | TEXT NULL             | Bildunterschrift                                               |
+| `created_at`, `updated_at`                  | TEXT                  | ISO 8601 UTC                                                   |
+| `favorited_at`, `archived_at`, `deleted_at` | TEXT NULL             | ISO 8601 UTC                                                   |
+
+Datei: `media/images/<id>.<ext>`, `media/pdf/<id>.pdf`, `media/attachments/<id>.<ext>`; Vorschaubilder in `thumbnails/` (abgeleitet, nicht in der Datenbank).
+
+### `document_media` – geplant (Phase 8)
+
+`document_id` → `documents` (CASCADE), `media_id` → `media` (CASCADE), `page` INTEGER NOT NULL DEFAULT 0 (0 = ganzes Medium, sonst PDF-Seite). Primärschlüssel `(document_id, media_id, page)`, Index auf `media_id`. Beim Speichern aus dem Inhalt abgeleitet.
+
+### `search_entries`, `search_words`, `search_parts` – geplant (Phase 9)
+
+`search_entries (rowid INTEGER PRIMARY KEY, element_kind TEXT, element_id TEXT UNIQUE)` verbindet die FTS-Zeilen mit Elementen. Die beiden FTS5-Tabellen entstehen exakt mit den Definitionen aus Abschnitt 19 (in Phase 1 bereits als Probe geprüft, `src-tauri/src/database/fts.rs`). Der Index wird in derselben Transaktion wie die Daten aktualisiert; „Suchindex neu aufbauen“ leert und füllt ihn neu.
+
+### `mesh_nodes` – geplant (Phase 11)
+
+| Spalte        | Typ                   | Regeln                                    |
+| ------------- | --------------------- | ----------------------------------------- |
+| `id`          | TEXT, Primärschlüssel | gleich der ID des Elements oder Subnetzes |
+| `kind`        | TEXT                  | `document`, `media`, `subnet`             |
+| `document_id` | TEXT NULL UNIQUE      | → `documents(id)` ON DELETE CASCADE       |
+| `media_id`    | TEXT NULL UNIQUE      | → `media(id)` ON DELETE CASCADE           |
+| `subnet_id`   | TEXT NULL UNIQUE      | → `subnets(id)` ON DELETE CASCADE         |
+
+`CHECK`: genau eine der drei Spalten ist gesetzt, passend zu `kind`, und gleich `id`. Trigger legen den Knoten beim Anlegen eines Elements an; die Migration trägt Knoten für bestehende Elemente nach.
+
+### `mesh_connections` – geplant (Phase 11)
+
+`id` (UUID), `node_a`, `node_b` (→ `mesh_nodes`, CASCADE), `kind` (`manual` oder `similarity` – angenommener Vorschlag), `note` TEXT NULL, `created_at`. Regeln aus Abschnitt 18: `CHECK (node_a < node_b)` (keine Selbstverbindung, Endpunkte sortiert), `UNIQUE (node_a, node_b, kind)`, Index auf `node_b`. Enthält nur Bestätigtes.
+
+### `mesh_suggestions` – geplant (Phase 11)
+
+`id`, `node_a`, `node_b` (sortiert, `CHECK (node_a < node_b)`), `score` REAL (`0 … 1`), `reason` TEXT (JSON mit den Anteilen, z. B. gemeinsame Tags, Inhaltsähnlichkeit), `status` (`open`, `accepted`, `rejected`), `created_at`, `decided_at` NULL. `UNIQUE (node_a, node_b)`: Abgelehnte Vorschläge bleiben als Zeile stehen und kommen deshalb nicht wieder; „Später“ lässt den Status `open`. Getrennt von `mesh_connections` (Abschnitt 15).
+
+### `mesh_layouts`, `mesh_positions` – geplant (Phase 11)
+
+`mesh_layouts`: `id`, `view` (`global`, `subnet`, `focus`), `scope_id` TEXT NOT NULL DEFAULT `''` (Subnetz bzw. Knoten; leer für die Global View), `algorithm`, `options` (JSON), `updated_at`; `UNIQUE (view, scope_id)`.
+
+`mesh_positions`: `layout_id` → `mesh_layouts` (CASCADE), `node_id` → `mesh_nodes` (CASCADE), `x`, `y` REAL, `pinned` INTEGER (0/1; manuell verschobene Knoten bleiben fixiert), Primärschlüssel `(layout_id, node_id)`.
+
+### Sprachprüfung – geplant (Phase 12)
+
+- `dictionaries`: `id`, `name`, `kind` (`custom`, `hunspell`), `language` (BCP 47, NULL = sprachunabhängig), `is_global` (0/1, „gesamte Anwendung“), `package` (Name des Wörterbuch-Datenpakets bei Hunspell), `created_at`, `updated_at`.
+- `dictionary_words`: `dictionary_id` → `dictionaries` (CASCADE), `word`, `word_key` (normalisiert), `category` (`word`, `term`, `name`, `abbreviation`), `created_at`; Primärschlüssel `(dictionary_id, word_key)`.
+- `document_dictionaries (document_id, dictionary_id)`, `subnet_dictionaries (subnet_id, dictionary_id)`: Primärschlüssel über beide, CASCADE. Für ein Dokument gilt die Vereinigung aus globalen, eigenen und den Wörterbüchern aller Subnetze samt Eltern (Abschnitt 14).
+- `language_profiles`: `document_id` (Primärschlüssel, → `documents`, CASCADE), `language`, `detect_paragraphs` (0/1), `autocorrect` (NULL = globale Einstellung, sonst 0/1), `updated_at`.
+- `autocorrect_rejections`: `original`, `replacement`, `language`, `created_at`; Primärschlüssel `(original, replacement, language)` (Bedingung 7 der Eindeutigkeitsregel).
+
+Hunspell-Wörterbücher selbst liegen als getrennte Datenpakete vor, nicht in der Datenbank (Abschnitt 7, Lizenzen).
+
+## 5. Papierkorb und Archiv
+
+- Archivieren setzt `archived_at`, Löschen setzt `deleted_at`. Zeile, Datei, Zuordnungen und Verbindungen bleiben (Abschnitt 13); Wiederherstellen setzt die Spalte zurück.
+- Erst das endgültige Entfernen (Papierkorb leeren, nach `trash.retentionDays`) löscht die Zeile; `ON DELETE CASCADE` entfernt Zuordnungen, Links, Knoten und Positionen. Die Datei wird gelöscht, wenn keine Zeile mehr auf sie verweist (Abschnitt 9).
+- Standardlisten und Suche blenden archivierte und gelöschte Elemente aus (Indizes mit `WHERE deleted_at IS NULL`).
+
+## 6. Dateien und Datenbank
+
+| Vorgang   | Reihenfolge                                                                      | Nach einem Absturz dazwischen                                                     |
+| --------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Anlegen   | Datei atomar schreiben → Zeile einfügen                                          | Datei ohne Zeile: beim Öffnen gemeldet, nicht gelöscht                            |
+| Speichern | Datei atomar ersetzen → `size_bytes`/`content_sha256`/`updated_at` aktualisieren | Neue Datei, alte Prüfsumme: das nächste Lesen erkennt es und korrigiert die Zeile |
+| Abbruch   | Temporärdatei `.<name>.<zufall>.pwtmp` bleibt liegen                             | Beim Öffnen entfernt; das Ziel ist unversehrt                                     |
+
+Beim Öffnen vergleicht die App die Dokumentordner mit der Tabelle: Temporärdateien werden entfernt, Dateien ohne Zeile und Zeilen ohne Datei gemeldet (Bibliotheksansicht), nie still gelöscht.
+
+## 7. Integritätsprüfungen
+
+- `PRAGMA quick_check` bei jedem Öffnen einer Bibliothek. Schlägt sie fehl oder ist die Datei keine SQLite-Datenbank, wird nichts verändert (`LIBRARY_DATABASE_DAMAGED`).
+- `PRAGMA integrity_check` für jede Kopie: Sicherung vor einer Migration, Datenbankkopie beim Umzug (dort zusätzlich Schemaversion und Dokumentanzahl), ab Phase 10 nach Backup und Wiederherstellung.
+- Systemprüfung des Startbildschirms: Datenspeicher (`quick_check`), Schema, Fremdschlüssel, FTS5 – gegen die geöffnete Bibliothek, ohne Bibliothek gegen eine In-Memory-Datenbank.
+- Absturztest (Abschnitt 6): 100 harte Prozessabbrüche während des Speicherns, danach `integrity_check` = ok und jede Datei vollständig (`tests/crash_safety.rs`).
