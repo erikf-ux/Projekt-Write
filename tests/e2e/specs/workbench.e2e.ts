@@ -90,6 +90,14 @@ describe('Project Write – Phase 3 workbench', () => {
     await closeSettings();
   });
 
+  // A failed test must not leave a dialog open for the next one.
+  afterEach(async () => {
+    if (await $('[data-testid="command-palette"]').isExisting()) {
+      await browser.keys('Escape');
+    }
+    await closeSettings();
+  });
+
   it('shows the main layout of section 11 with the functions of this phase only', async () => {
     await expect($('[data-testid="toolbar"]')).toBeDisplayed();
     await expect($('[data-testid="activity-bar"]')).toBeDisplayed();
@@ -196,7 +204,10 @@ describe('Project Write – Phase 3 workbench', () => {
     );
     await $('[data-shortcut-row="palette.show"]').$('button=Standard').click();
     await expect($('[data-testid="shortcut-conflicts"]')).not.toBeExisting();
-    expect(readSettings()['keybindings']).toEqual({});
+    // The interface resets at once; Rust writes the file right after.
+    await browser.waitUntil(() => JSON.stringify(readSettings()['keybindings']) === '{}', {
+      timeoutMsg: 'the reset shortcut was not saved',
+    });
     await closeSettings();
   });
 

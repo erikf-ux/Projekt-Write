@@ -72,7 +72,7 @@ Keine bekannten.
 
 ## Behobene Fehler
 
-F-6 bis F-10 in `docs/status.md`. F-7 (Windows-Build) und F-8/F-9 (Escape im Dialog, unsichtbarer Tab-Fokusring) waren echte Fehler, gefunden von Windows-Clippy und den E2E-Tests vor der Weitergabe. F-6 und F-10 betrafen nur die CI.
+F-6 bis F-11 in `docs/status.md`. F-7 (Windows-Build) und F-8/F-9 (Escape im Dialog, unsichtbarer Tab-Fokusring) waren echte Fehler, gefunden von Windows-Clippy und den E2E-Tests vor der Weitergabe. F-6, F-10 und der Wettlauf in F-11 betrafen nur Test und CI; F-11 brachte außerdem den Tab-Stopp der Einstellungs-Tabs ans Licht (behoben).
 
 ## Gefundene Widersprüche und Abweichungen
 

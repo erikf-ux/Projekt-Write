@@ -63,6 +63,7 @@ export function SettingsDialog() {
             id={`settings-tab-${entry.id}`}
             aria-selected={section === entry.id}
             aria-controls={`settings-panel-${entry.id}`}
+            tabIndex={section === entry.id ? 0 : -1}
             data-testid={`settings-tab-${entry.id}`}
             className={`text-ui -mb-px border-b-2 px-3 py-1.5 ${
               section === entry.id ? 'border-accent text-fg' : 'border-transparent text-muted hover:text-fg'
