@@ -83,7 +83,7 @@ export function PlainTextEditor({
             role="tabpanel"
             aria-labelledby={tabElementId(id)}
             hidden={id !== active}
-            className="absolute inset-0 flex justify-center bg-surface"
+            className="absolute inset-0 bg-surface"
           >
             {document.loaded ? (
               <textarea
@@ -91,8 +91,12 @@ export function PlainTextEditor({
                 data-testid="editor"
                 aria-label={t('editor.label', { title: document.title })}
                 className={`text-body block h-full w-full resize-none bg-surface text-fg outline-none focus:shadow-[inset_2px_0_0_0_var(--color-accent)] ${
-                  focusMode ? 'px-8 py-12' : 'px-6 py-6'
-                } ${limitLineWidth ? 'max-w-[calc(72ch+3rem)]' : ''}`}
+                  focusMode ? 'py-12' : 'py-6'
+                } ${
+                  // The field fills the panel (focus bar and scroll bar at the
+                  // edges); the padding keeps lines at most 72 characters.
+                  limitLineWidth ? 'px-[max(1.5rem,calc((100%-72ch)/2))]' : focusMode ? 'px-8' : 'px-6'
+                }`}
                 value={document.text}
                 readOnly={readOnly}
                 spellCheck={false}

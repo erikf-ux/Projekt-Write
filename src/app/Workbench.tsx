@@ -4,7 +4,16 @@
  * menu bar sits above it. Focus mode hides everything except the writing
  * surface.
  */
-import { Command, Files, FilePlus, FileText, Maximize2, PanelLeft, Save, Settings } from 'lucide-react';
+import {
+  Files,
+  FilePlus,
+  FileText,
+  Maximize2,
+  PanelLeft,
+  Save,
+  Settings,
+  SquareTerminal,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityBar } from '@/components/navigation/ActivityBar';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -115,7 +124,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               item('sidebar.toggle', PanelLeft, { pressed: settings.sidebar.visible }),
               item('document.new', FilePlus),
               item('document.save', Save),
-              item('palette.show', Command),
+              item('palette.show', SquareTerminal),
               item('focus.toggle', Maximize2),
               item('settings.open', Settings),
             ]}
