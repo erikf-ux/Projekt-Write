@@ -36,11 +36,17 @@ async function type(text: string) {
   await browser.keys(text.split(''));
 }
 
+/** The visible writing surface (Tiptap; a tab may also hold the hidden other view). */
 async function activeEditor() {
   const panels = await $$('[role="tabpanel"]').getElements();
   for (const panel of panels) {
-    if (!(await panel.getAttribute('hidden'))) {
-      return panel.$('textarea');
+    if (await panel.getAttribute('hidden')) {
+      continue;
+    }
+    for (const surface of await panel.$$('[data-testid="editor"]').getElements()) {
+      if (await surface.isDisplayed()) {
+        return surface;
+      }
     }
   }
   throw new Error('no visible writing surface');
@@ -130,7 +136,8 @@ describe('Project Write – Phase 3 workbench', () => {
       timeoutMsg: 'the text was not saved',
     });
     await expect($('[data-testid="status-save"]')).toHaveText('Gespeichert');
-    expect(fs.readFileSync(documentFile(id), 'utf8')).toBe('Hallo Welt');
+    // A new document is Markdown; the file ends with a line feed.
+    expect(fs.readFileSync(documentFile(id), 'utf8')).toBe('Hallo Welt\n');
   });
 
   it('shows only working commands in the command palette and runs them', async () => {
@@ -242,7 +249,7 @@ describe('Project Write – Phase 3 workbench', () => {
       '#pw-explorer-list',
       '[data-testid="sidebar-resize"]',
       '[data-testid="tabs"] [role="tab"][tabindex="0"]',
-      '[role="tabpanel"]:not([hidden]) textarea',
+      '[role="tabpanel"]:not([hidden]) [data-testid="editor"]',
     ];
     const problems: string[] = [];
     for (const selector of regions) {

@@ -609,6 +609,7 @@ fn default_ui_settings() -> Value {
         "zoom": 1.0,
         "sidebar": { "visible": true, "width": 260 },
         "limitLineWidth": true,
+        "readingTime": { "visible": false, "wordsPerMinute": 200 },
         "keybindings": {}
     })
 }
@@ -646,6 +647,7 @@ fn ui_settings_are_saved_and_used_after_a_restart() {
     settings["zoom"] = json!(1.25);
     settings["sidebar"] = json!({ "visible": false, "width": 320 });
     settings["limitLineWidth"] = json!(false);
+    settings["readingTime"] = json!({ "visible": true, "wordsPerMinute": 250 });
     settings["keybindings"] = json!({ "palette.show": ["Ctrl+K"], "focus.toggle": [] });
     let state = call(
         &app,
@@ -694,6 +696,13 @@ fn ui_update_rejects_invalid_settings_uniformly() {
         (with("zoom", json!(3.0)), "zoom"),
         (with("zoom", json!(0.1)), "zoom"),
         (with("theme", json!("neon")), "theme"),
+        (
+            with(
+                "readingTime",
+                json!({ "visible": true, "wordsPerMinute": 5 }),
+            ),
+            "readingTime",
+        ),
         (with("theme", json!("custom:../../evil")), "theme"),
         (
             with("sidebar", json!({ "visible": true, "width": 20 })),

@@ -131,9 +131,11 @@ export function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const ui = useUi.getState();
+      // ProseMirror cancels every Escape in the writing surface without using it.
+      const fromEditor = event.target instanceof Element && event.target.closest('.ProseMirror') !== null;
       if (
         event.key === 'Escape' &&
-        !event.defaultPrevented &&
+        (!event.defaultPrevented || fromEditor) &&
         ui.focusMode &&
         !ui.paletteOpen &&
         ui.settingsSection === null

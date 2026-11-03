@@ -25,6 +25,7 @@ export type CommandId =
   | 'explorer.focus'
   | 'editor.focus'
   | 'editor.toggleSource'
+  | 'statistics.show'
   | 'focus.toggle'
   | 'zoom.in'
   | 'zoom.out'

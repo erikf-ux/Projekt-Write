@@ -3,7 +3,7 @@
  * "Speichert …" or "Fehler beim Speichern" (section 9).
  */
 import { CircleAlert, Keyboard, Library, TriangleAlert } from 'lucide-react';
-import { useT } from '@/i18n';
+import { useLocale, useT } from '@/i18n';
 import type { DocumentView, SaveState } from '@/modules/documents/workspaceStore';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import type { LibraryInfo } from '@/types/generated/LibraryInfo';
@@ -16,6 +16,9 @@ interface StatusBarProps {
   view: DocumentView | null;
   zoom: number;
   conflicts: number;
+  /** Words of the document and the selection; reading time if switched on. */
+  statistics: { words: number; selectedWords: number | null; minutes: number | null } | null;
+  onShowStatistics: () => void;
   onRetrySave: () => void;
   onResetZoom: () => void;
   onShowConflicts: () => void;
@@ -31,11 +34,15 @@ export function StatusBar({
   view,
   zoom,
   conflicts,
+  statistics,
+  onShowStatistics,
   onRetrySave,
   onResetZoom,
   onShowConflicts,
 }: StatusBarProps) {
   const t = useT();
+  const locale = useLocale((state) => state.locale);
+  const number = new Intl.NumberFormat(locale);
   const formatLabel =
     format === 'md'
       ? t(view === 'source' ? 'status.formatMarkdown' : 'status.formatMarkdownRich')
@@ -93,6 +100,25 @@ export function StatusBar({
           >
             <Keyboard aria-hidden="true" className="size-3.5" />
             {t('status.conflicts', { count: conflicts })}
+          </button>
+        ) : null}
+        {statistics ? (
+          <button
+            type="button"
+            className={BUTTON}
+            data-testid="status-words"
+            title={t('statistics.title')}
+            onClick={onShowStatistics}
+          >
+            {statistics.selectedWords !== null
+              ? t('status.wordsSelected', {
+                  selected: number.format(statistics.selectedWords),
+                  count: number.format(statistics.words),
+                })
+              : t('status.words', { count: number.format(statistics.words) })}
+            {statistics.minutes !== null
+              ? ` · ${t('statistics.minutes', { count: number.format(statistics.minutes) })}`
+              : ''}
           </button>
         ) : null}
         {formatLabel ? <span className={ITEM}>{formatLabel}</span> : null}

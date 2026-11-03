@@ -20,6 +20,7 @@ const uiState: UiState = {
     zoom: 1,
     sidebar: { visible: true, width: 260 },
     limitLineWidth: true,
+    readingTime: { visible: false, wordsPerMinute: 200 },
     keybindings: {},
   },
   locale: 'de',

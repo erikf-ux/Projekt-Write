@@ -27,6 +27,9 @@ import type { CommandId } from '@/modules/commands/types';
 import { Explorer } from '@/modules/documents/Explorer';
 import { activeDocument, useWorkspace } from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
+import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
+import { readingMinutes } from '@/modules/editor/statistics';
+import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { useBindings, useShortcutLabel } from './bindings';
@@ -48,6 +51,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const openSettings = useUi((state) => state.openSettings);
   const workspace = useWorkspace();
   const current = activeDocument(workspace);
+  const statistics = useStatistics((state) => (current ? state.byDocument[current.id] : undefined));
+  const statisticsOpen = useStatistics((state) => state.dialogOpen);
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
   const conflicts = useMemo(() => findConflicts(bindings).length, [bindings]);
   const created = useRef(false);
@@ -210,6 +215,23 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           view={current?.loaded ? current.view : null}
           zoom={settings.zoom}
           conflicts={conflicts}
+          statistics={
+            current?.loaded && statistics
+              ? {
+                  words: statistics.document.words,
+                  selectedWords: statistics.selection?.words ?? null,
+                  minutes: settings.readingTime.visible
+                    ? readingMinutes(
+                        statistics.selection?.words ?? statistics.document.words,
+                        settings.readingTime.wordsPerMinute,
+                      )
+                    : null,
+                }
+              : null
+          }
+          onShowStatistics={() => {
+            useStatistics.getState().showDialog(true);
+          }}
           onRetrySave={() => {
             if (current) {
               void workspace.save(current.id);
@@ -225,6 +247,15 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           {t('focus.hint', { shortcut: shortcut('focus.toggle') ?? 'F11' })}
         </p>
       )}
+      {statisticsOpen && statistics ? (
+        <StatisticsDialog
+          statistics={statistics}
+          wordsPerMinute={settings.readingTime.visible ? settings.readingTime.wordsPerMinute : null}
+          onClose={() => {
+            useStatistics.getState().showDialog(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

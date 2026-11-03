@@ -165,6 +165,29 @@ export function GeneralSettings() {
       </fieldset>
 
       <fieldset className={FIELDSET}>
+        <legend className={LEGEND}>{t('settings.statistics')}</legend>
+        <label className="text-ui flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.readingTime.visible}
+            data-testid="reading-time"
+            onChange={(event) =>
+              void update({ readingTime: { ...settings.readingTime, visible: event.target.checked } })
+            }
+          />
+          {t('settings.readingTime')}
+        </label>
+        <WordsPerMinute
+          key={settings.readingTime.wordsPerMinute}
+          value={settings.readingTime.wordsPerMinute}
+          label={t('settings.wordsPerMinute')}
+          onChange={(wordsPerMinute) =>
+            void update({ readingTime: { ...settings.readingTime, wordsPerMinute } })
+          }
+        />
+      </fieldset>
+
+      <fieldset className={FIELDSET}>
         <legend className={LEGEND}>{t('settings.zoom')}</legend>
         <div className="flex items-center gap-2">
           <button
@@ -197,5 +220,54 @@ export function GeneralSettings() {
         </div>
       </fieldset>
     </div>
+  );
+}
+
+const MIN_WORDS_PER_MINUTE = 50;
+const MAX_WORDS_PER_MINUTE = 1000;
+
+/** The reading speed: a draft while typing, saved once it is a valid number. */
+function WordsPerMinute({
+  value,
+  label,
+  onChange,
+}: {
+  value: number;
+  label: string;
+  onChange: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const commit = () => {
+    const parsed = Number(draft);
+    if (Number.isInteger(parsed) && parsed >= MIN_WORDS_PER_MINUTE && parsed <= MAX_WORDS_PER_MINUTE) {
+      if (parsed !== value) {
+        onChange(parsed);
+      }
+    } else {
+      setDraft(String(value));
+    }
+  };
+  return (
+    <label className="text-ui mt-2 flex items-center gap-2">
+      <input
+        type="number"
+        min={MIN_WORDS_PER_MINUTE}
+        max={MAX_WORDS_PER_MINUTE}
+        step={10}
+        value={draft}
+        data-testid="words-per-minute"
+        className="w-20 rounded-pw border border-muted bg-surface px-2 py-0.5 text-fg"
+        onChange={(event) => {
+          setDraft(event.target.value);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+          }
+        }}
+      />
+      {label}
+    </label>
   );
 }

@@ -20,6 +20,11 @@ pub const MAX_ZOOM: f64 = 2.0;
 pub const MIN_SIDEBAR_WIDTH: u32 = 160;
 pub const MAX_SIDEBAR_WIDTH: u32 = 640;
 pub const DEFAULT_SIDEBAR_WIDTH: u32 = 260;
+/// Reading speed for the reading time (section 12: "200 Wörter pro Minute
+/// (einstellbar)").
+pub const DEFAULT_WORDS_PER_MINUTE: u32 = 200;
+pub const MIN_WORDS_PER_MINUTE: u32 = 50;
+pub const MAX_WORDS_PER_MINUTE: u32 = 1000;
 /// Commands with their own shortcuts at most.
 const MAX_BOUND_COMMANDS: usize = 300;
 /// Shortcuts per command at most.
@@ -84,6 +89,26 @@ impl Default for SidebarSettings {
     }
 }
 
+/// The reading time of the writing statistics (section 12: "Lesezeit als
+/// optionale Anzeige").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ReadingTimeSettings {
+    /// Shown in the status bar and the statistics.
+    pub visible: bool,
+    pub words_per_minute: u32,
+}
+
+impl Default for ReadingTimeSettings {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            words_per_minute: DEFAULT_WORDS_PER_MINUTE,
+        }
+    }
+}
+
 /// The interface settings the frontend reads and changes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -97,6 +122,7 @@ pub struct UiSettings {
     pub sidebar: SidebarSettings,
     /// Lines of the writing surface at most 72 characters wide (section 11).
     pub limit_line_width: bool,
+    pub reading_time: ReadingTimeSettings,
     /// Shortcuts that differ from the defaults: command id → chords such as
     /// `Ctrl+Shift+P`. An empty list removes every shortcut of the command.
     pub keybindings: BTreeMap<String, Vec<String>>,
@@ -110,6 +136,7 @@ impl Default for UiSettings {
             zoom: 1.0,
             sidebar: SidebarSettings::default(),
             limit_line_width: true,
+            reading_time: ReadingTimeSettings::default(),
             keybindings: BTreeMap::new(),
         }
     }
@@ -122,6 +149,7 @@ const KEY_THEME: &str = "theme";
 const KEY_ZOOM: &str = "zoom";
 const KEY_SIDEBAR: &str = "sidebar";
 const KEY_LIMIT_LINE_WIDTH: &str = "limitLineWidth";
+const KEY_READING_TIME: &str = "readingTime";
 const KEY_KEYBINDINGS: &str = "keybindings";
 const KEY_WINDOW: &str = "window";
 
@@ -133,6 +161,8 @@ impl UiSettings {
         validate_zoom(self.zoom).map_err(|reason| CommandError::invalid_input("zoom", reason))?;
         validate_sidebar(&self.sidebar)
             .map_err(|reason| CommandError::invalid_input("sidebar", reason))?;
+        validate_reading_time(&self.reading_time)
+            .map_err(|reason| CommandError::invalid_input("readingTime", reason))?;
         validate_keybindings(&self.keybindings)
             .map_err(|reason| CommandError::invalid_input("keybindings", reason))?;
         Ok(())
@@ -151,6 +181,8 @@ impl UiSettings {
             sidebar: take(object, KEY_SIDEBAR, validate_sidebar).unwrap_or(defaults.sidebar),
             limit_line_width: take(object, KEY_LIMIT_LINE_WIDTH, |_| Ok(()))
                 .unwrap_or(defaults.limit_line_width),
+            reading_time: take(object, KEY_READING_TIME, validate_reading_time)
+                .unwrap_or(defaults.reading_time),
             keybindings: take(object, KEY_KEYBINDINGS, validate_keybindings)
                 .unwrap_or(defaults.keybindings),
         }
@@ -267,6 +299,14 @@ fn validate_sidebar(sidebar: &SidebarSettings) -> Result<(), &'static str> {
         Ok(())
     } else {
         Err("width range")
+    }
+}
+
+fn validate_reading_time(reading_time: &ReadingTimeSettings) -> Result<(), &'static str> {
+    if (MIN_WORDS_PER_MINUTE..=MAX_WORDS_PER_MINUTE).contains(&reading_time.words_per_minute) {
+        Ok(())
+    } else {
+        Err("words per minute range")
     }
 }
 
@@ -499,6 +539,7 @@ mod tests {
             "zoom": 1.25,
             "sidebar": { "visible": false, "width": 9000 },
             "limitLineWidth": "yes",
+            "readingTime": { "visible": true, "wordsPerMinute": 20 },
             "keybindings": { "palette.show": ["Ctrl+K"] },
             "window": { "x": 10, "y": 20, "width": 900, "height": 700, "maximized": true },
             "future": 1
@@ -512,6 +553,8 @@ mod tests {
         assert_eq!(settings.zoom, 1.25);
         assert_eq!(settings.sidebar, SidebarSettings::default());
         assert!(settings.limit_line_width);
+        // 20 words per minute is below the range: the default.
+        assert_eq!(settings.reading_time, ReadingTimeSettings::default());
         assert_eq!(settings.keybindings["palette.show"], vec!["Ctrl+K"]);
         let window = WindowState::take_from(&mut object).unwrap();
         assert_eq!(window.width, 900);
@@ -545,6 +588,10 @@ mod tests {
                 width: 300,
             },
             limit_line_width: false,
+            reading_time: ReadingTimeSettings {
+                visible: true,
+                words_per_minute: 250,
+            },
             keybindings: BTreeMap::new(),
         };
         settings
@@ -553,6 +600,10 @@ mod tests {
         let mut object = Map::new();
         settings.put_into(&mut object);
         assert_eq!(object["limitLineWidth"], json!(false));
+        assert_eq!(
+            object["readingTime"],
+            json!({ "visible": true, "wordsPerMinute": 250 })
+        );
         assert_eq!(UiSettings::take_from(&mut object), settings);
         assert!(object.is_empty());
     }

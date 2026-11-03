@@ -7,6 +7,7 @@
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
 import { activeDocument, freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
+import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import type { UiSettings } from '@/types/generated/UiSettings';
@@ -237,6 +238,15 @@ export function createAppCommands(): CommandDefinition[] {
           workspace().toggleView(id);
           focusEditor();
         }
+      },
+    },
+    {
+      id: 'statistics.show',
+      category: 'view',
+      titleKey: 'command.statistics.show',
+      isAvailable: () => activeDocument(workspace())?.loaded === true,
+      run: () => {
+        useStatistics.getState().showDialog(true);
       },
     },
     {

@@ -20,6 +20,11 @@ import { excerpt, findLosses, type Loss } from './markdown/losses';
 import { firstDifference, markdownSchema, probeMarkdown, type ProbeIssue } from './markdown/probe';
 import { plainClipboardText, plainDocument, plainExtensions, plainText } from './plain/schema';
 import { markdownExtensions } from './schema/extensions';
+import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
+import { useStatistics } from './statisticsStore';
+
+/** Statistics follow the text after this pause (counting is per block). */
+const STATISTICS_DELAY_MS = 150;
 
 export type EditorView = 'rich' | 'source';
 
@@ -64,6 +69,9 @@ export class EditorSession {
   /** Loss check of top-level blocks; blocks keep their identity until changed. */
   private readonly checked = new WeakMap<ProseMirrorNode, Loss[]>();
   private silent = false;
+  /** Counts of blocks and lines; nodes keep their identity until they change. */
+  private readonly counted = new WeakMap<ProseMirrorNode, TextStatistics>();
+  private statisticsTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: SessionOptions) {
     this.options = options;
@@ -87,6 +95,31 @@ export class EditorSession {
       this.view = 'source';
       this.plain = this.createPlain(options.text);
     }
+    this.updateStatistics();
+  }
+
+  /** Writes the statistics of the current view and selection to the store. */
+  updateStatistics(): void {
+    if (this.statisticsTimer !== null) {
+      clearTimeout(this.statisticsTimer);
+      this.statisticsTimer = null;
+    }
+    const editor = this.editor;
+    const plain = editor === this.plain;
+    const { doc, selection } = editor.state;
+    const document = plain ? plainStatistics(doc, this.counted) : richStatistics(doc, this.counted);
+    const selected = selection.empty ? null : selectionStatistics(doc, selection.from, selection.to, plain);
+    useStatistics.getState().set(this.id, { document, selection: selected });
+  }
+
+  private scheduleStatistics(): void {
+    if (this.statisticsTimer !== null) {
+      clearTimeout(this.statisticsTimer);
+    }
+    this.statisticsTimer = setTimeout(() => {
+      this.statisticsTimer = null;
+      this.updateStatistics();
+    }, STATISTICS_DELAY_MS);
   }
 
   get isMarkdown(): boolean {
@@ -197,6 +230,10 @@ export class EditorSession {
   }
 
   destroy(): void {
+    if (this.statisticsTimer !== null) {
+      clearTimeout(this.statisticsTimer);
+    }
+    useStatistics.getState().remove(this.id);
     this.rich?.destroy();
     this.plain?.destroy();
     this.root.remove();
@@ -210,6 +247,7 @@ export class EditorSession {
         host.hidden = editor !== this.editor;
       }
     }
+    this.updateStatistics();
   }
 
   /** New content as one undo step, without counting as a change. */
@@ -292,6 +330,11 @@ export class EditorSession {
       onUpdate: () => {
         if (!this.silent) {
           this.options.onChange();
+        }
+      },
+      onTransaction: ({ transaction }) => {
+        if (transaction.docChanged || transaction.selectionSet) {
+          this.scheduleStatistics();
         }
       },
       onBlur: () => {
