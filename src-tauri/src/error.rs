@@ -75,11 +75,15 @@ pub enum ErrorCode {
     MoveVerificationFailed,
     /// The moved library could not be opened; the old one stays in use.
     MoveSwitchFailed,
+    /// `settings.json` comes from a newer version and is not changed.
+    SettingsReadOnly,
+    /// `settings.json` could not be written.
+    SettingsNotSaved,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 27] = [
+    pub const ALL: [ErrorCode; 29] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -107,6 +111,8 @@ impl ErrorCode {
         ErrorCode::MoveTargetInvalid,
         ErrorCode::MoveVerificationFailed,
         ErrorCode::MoveSwitchFailed,
+        ErrorCode::SettingsReadOnly,
+        ErrorCode::SettingsNotSaved,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -139,6 +145,8 @@ impl ErrorCode {
             ErrorCode::MoveTargetInvalid => "error.moveTargetInvalid",
             ErrorCode::MoveVerificationFailed => "error.moveVerificationFailed",
             ErrorCode::MoveSwitchFailed => "error.moveSwitchFailed",
+            ErrorCode::SettingsReadOnly => "error.settingsReadOnly",
+            ErrorCode::SettingsNotSaved => "error.settingsNotSaved",
         }
     }
 }

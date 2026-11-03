@@ -11,6 +11,7 @@ use std::io;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 
+use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
 use windows_sys::Win32::Storage::CloudFilters::{
     CF_SYNC_ROOT_INFO_PROVIDER, CF_SYNC_ROOT_PROVIDER_INFO, CfGetSyncRootInfoByPath,
 };
@@ -130,4 +131,12 @@ pub fn cloud_sync_provider(path: &Path) -> Option<String> {
     } else {
         provider
     })
+}
+
+/// Primary language of the Windows display language (`LANG_GERMAN` is
+/// `0x07`), for the interface language "System" (section 11).
+pub fn user_ui_primary_language() -> u16 {
+    // SAFETY: no arguments, returns a LANGID.
+    let language_id = unsafe { GetUserDefaultUILanguage() };
+    language_id & 0x3ff
 }

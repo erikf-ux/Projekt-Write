@@ -101,5 +101,7 @@
   "error.moveCancelled": "Der Umzug wurde abgebrochen. Die Bibliothek ist unverändert.",
   "error.moveTargetInvalid": "Das Ziel liegt innerhalb der Bibliothek oder enthält sie.",
   "error.moveVerificationFailed": "Eine kopierte Datei weicht vom Original ab. Der Umzug wurde nicht abgeschlossen; die Bibliothek ist unverändert.",
-  "error.moveSwitchFailed": "Die umgezogene Bibliothek ließ sich nicht öffnen. Die bisherige Bibliothek bleibt in Gebrauch."
+  "error.moveSwitchFailed": "Die umgezogene Bibliothek ließ sich nicht öffnen. Die bisherige Bibliothek bleibt in Gebrauch.",
+  "error.settingsReadOnly": "Die Einstellungen stammen aus einer neueren Version von Project Write und werden nicht verändert.",
+  "error.settingsNotSaved": "Die Einstellungen konnten nicht gespeichert werden."
 }

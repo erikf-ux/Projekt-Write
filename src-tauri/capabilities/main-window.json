@@ -13,6 +13,8 @@
     "allow-library-reopen",
     "allow-library-move",
     "allow-library-cancel-move",
-    "allow-library-accept-location"
+    "allow-library-accept-location",
+    "allow-ui-state",
+    "allow-ui-update-settings"
   ]
 }

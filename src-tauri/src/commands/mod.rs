@@ -9,6 +9,7 @@
 pub mod input;
 pub mod library;
 pub mod system;
+pub mod ui;
 
 use tauri::Runtime;
 use tauri::ipc::Invoke;
@@ -25,6 +26,8 @@ pub const COMMAND_NAMES: &[&str] = &[
     "library_move",
     "library_cancel_move",
     "library_accept_location",
+    "ui_state",
+    "ui_update_settings",
 ];
 
 /// The invoke handler with every app command.
@@ -40,5 +43,7 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         library::library_move,
         library::library_cancel_move,
         library::library_accept_location,
+        ui::ui_state,
+        ui::ui_update_settings,
     ]
 }

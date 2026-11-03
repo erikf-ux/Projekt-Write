@@ -218,7 +218,8 @@ struct Chosen {
 pub struct LibrarySession {
     dirs: AppDirs,
     generators: Generators,
-    settings: Mutex<AppSettingsStore>,
+    /// Shared with the interface settings ([`crate::services::ui`]).
+    settings: Arc<Mutex<AppSettingsStore>>,
     settings_notice: Mutex<Option<SettingsNotice>>,
     slot: tokio::sync::Mutex<Slot>,
     tokens: Mutex<VecDeque<Chosen>>,
@@ -229,7 +230,7 @@ impl LibrarySession {
     pub fn new(
         dirs: AppDirs,
         generators: Generators,
-        settings: AppSettingsStore,
+        settings: Arc<Mutex<AppSettingsStore>>,
         outcome: &LoadOutcome,
     ) -> Self {
         let notice = match outcome {
@@ -240,7 +241,7 @@ impl LibrarySession {
         Self {
             dirs,
             generators,
-            settings: Mutex::new(settings),
+            settings,
             settings_notice: Mutex::new(notice),
             slot: tokio::sync::Mutex::new(Slot::Closed { error: None }),
             tokens: Mutex::new(VecDeque::new()),
@@ -628,7 +629,8 @@ impl LibrarySession {
     }
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+/// Locks `mutex`; a panic in another thread does not make the data unusable.
+pub(crate) fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)

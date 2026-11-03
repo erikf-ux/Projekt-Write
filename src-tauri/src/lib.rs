@@ -56,8 +56,17 @@ pub fn run() {
                 picker,
                 Generators::system(),
             ))?;
+            if let Some(window) = app.get_webview_window("main") {
+                services::ui::window::apply_zoom(&window, state.ui.state().settings.zoom);
+                services::ui::window::restore(&window, state.ui.window_state());
+            }
             app.manage(state);
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                remember_window_state(window.app_handle());
+            }
         })
         .invoke_handler(commands::handler())
         .build(tauri::generate_context!())
@@ -72,6 +81,17 @@ pub fn run() {
             log::info!("Project Write stopped");
         }
     });
+}
+
+/// Saves size, position and maximized state of the main window.
+fn remember_window_state<R: Runtime>(app: &AppHandle<R>) {
+    let (Some(window), Some(state)) = (app.get_webview_window("main"), app.try_state::<AppState>())
+    else {
+        return;
+    };
+    if let Some(current) = services::ui::window::capture(&window, state.ui.window_state()) {
+        state.ui.save_window_state(current);
+    }
 }
 
 /// Brings the window to the front (second start of the app).

@@ -598,3 +598,154 @@ fn the_library_moves_through_the_command_with_progress() {
     // The old folder stays.
     assert!(app.path("Dokumente/ProjectWrite/library.json").is_file());
 }
+
+// ---------------------------------------------------------------------------
+// Interface settings (Phase 3)
+
+fn default_ui_settings() -> Value {
+    json!({
+        "language": "system",
+        "theme": "system",
+        "zoom": 1.0,
+        "sidebar": { "visible": true, "width": 260 },
+        "limitLineWidth": true,
+        "keybindings": {}
+    })
+}
+
+#[test]
+fn ui_state_returns_the_settings_language_and_platform() {
+    let app = app();
+    let state = call(&app, "ui_state", json!({})).unwrap();
+    assert_eq!(state["settings"], default_ui_settings());
+    assert!(["de", "en"].contains(&state["locale"].as_str().unwrap()));
+    let platform = if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
+    assert_eq!(state["platform"], platform);
+    assert_eq!(state["readOnly"], false);
+    assert!(
+        !app.path("config/settings.json").exists(),
+        "reading must not write"
+    );
+    app.shut_down();
+}
+
+#[test]
+fn ui_settings_are_saved_and_used_after_a_restart() {
+    let dir = common::temp_dir("pw-ipc-");
+    let base = dir.path().to_path_buf();
+    let app = app_at(&base, None);
+    let mut settings = default_ui_settings();
+    settings["language"] = json!("de");
+    settings["theme"] = json!("dark");
+    settings["zoom"] = json!(1.25);
+    settings["sidebar"] = json!({ "visible": false, "width": 320 });
+    settings["limitLineWidth"] = json!(false);
+    settings["keybindings"] = json!({ "palette.show": ["Ctrl+K"], "focus.toggle": [] });
+    let state = call(
+        &app,
+        "ui_update_settings",
+        json!({ "settings": settings.clone() }),
+    )
+    .unwrap();
+    assert_eq!(state["settings"], settings);
+    assert_eq!(state["locale"], "de", "the setting overrides the system");
+
+    let file: Value =
+        serde_json::from_slice(&std::fs::read(app.path("config/settings.json")).unwrap()).unwrap();
+    assert_eq!(file["zoom"], 1.25);
+    assert_eq!(file["keybindings"]["palette.show"], json!(["Ctrl+K"]));
+    app.shut_down();
+
+    let again = app_at(&base, Some(dir));
+    let state = call(&again, "ui_state", json!({})).unwrap();
+    assert_eq!(state["settings"], settings);
+    let mut english = settings.clone();
+    english["language"] = json!("en");
+    let state = call(&again, "ui_update_settings", json!({ "settings": english })).unwrap();
+    assert_eq!(state["locale"], "en");
+    again.shut_down();
+}
+
+#[test]
+fn ui_update_rejects_invalid_settings_uniformly() {
+    let app = app();
+    let with = |key: &str, value: Value| {
+        let mut settings = default_ui_settings();
+        settings[key] = value;
+        json!({ "settings": settings })
+    };
+    let mut missing = default_ui_settings();
+    missing.as_object_mut().unwrap().remove("zoom");
+    let mut unknown = default_ui_settings();
+    unknown["fontUrl"] = json!("https://example.com/font.woff");
+    let cases = [
+        (json!({}), "request"),
+        (json!({ "settings": missing }), "request"),
+        (json!({ "settings": unknown }), "request"),
+        (with("language", json!("fr")), "request"),
+        (with("zoom", json!("big")), "request"),
+        (with("sidebar", json!({ "visible": true })), "request"),
+        (with("zoom", json!(3.0)), "zoom"),
+        (with("zoom", json!(0.1)), "zoom"),
+        (with("theme", json!("neon")), "theme"),
+        (with("theme", json!("custom:../../evil")), "theme"),
+        (
+            with("sidebar", json!({ "visible": true, "width": 20 })),
+            "sidebar",
+        ),
+        (
+            with("keybindings", json!({ "palette.show": ["P"] })),
+            "keybindings",
+        ),
+        (
+            with("keybindings", json!({ "palette.show": ["Ctrl+K", "Ctrl+K"] })),
+            "keybindings",
+        ),
+        (
+            with("keybindings", json!({ "../evil": ["Ctrl+K"] })),
+            "keybindings",
+        ),
+    ];
+    for (request, field) in cases {
+        let error = call(&app, "ui_update_settings", request.clone())
+            .expect_err(&format!("must fail: {request}"));
+        assert_uniform_error(&error, field);
+    }
+    assert!(
+        !app.path("config/settings.json").exists(),
+        "nothing invalid was written"
+    );
+    app.shut_down();
+}
+
+#[test]
+fn ui_settings_of_a_newer_version_are_used_but_not_changed() {
+    let dir = common::temp_dir("pw-ipc-");
+    let base = dir.path().to_path_buf();
+    std::fs::create_dir_all(base.join("config")).unwrap();
+    let content = r#"{"formatVersion": 9, "language": "de", "zoom": 1.5}"#;
+    std::fs::write(base.join("config/settings.json"), content).unwrap();
+    let app = app_at(&base, Some(dir));
+    let state = call(&app, "ui_state", json!({})).unwrap();
+    assert_eq!(state["readOnly"], true);
+    assert_eq!(state["locale"], "de");
+    assert_eq!(state["settings"]["zoom"], 1.5);
+    let error = call(
+        &app,
+        "ui_update_settings",
+        json!({ "settings": default_ui_settings() }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "SETTINGS_READ_ONLY");
+    assert_eq!(
+        std::fs::read_to_string(base.join("config/settings.json")).unwrap(),
+        content
+    );
+    app.shut_down();
+}

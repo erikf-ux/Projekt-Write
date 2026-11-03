@@ -13,31 +13,34 @@
 //! * A damaged file is kept under a new name (`settings.json.damaged-…`) and
 //!   the defaults are used; nothing is lost silently.
 //!
-//! Phase 2 stores the library path. Window state, language and shortcuts
-//! follow with the interface (Phase 3).
+//! Phase 2 stores the library path; Phase 3 adds the interface settings and
+//! the window state ([`super::ui`]). Interface values are checked one by one
+//! when loading: an invalid value gets its default instead of marking the
+//! whole file as damaged.
 
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::clock::Timestamp;
 use crate::filesystem::atomic;
+use crate::services::settings::ui::{UiSettings, WindowState};
 
 pub const APP_SETTINGS_FILE: &str = "settings.json";
 pub const APP_SETTINGS_FORMAT_VERSION: u32 = 1;
 const MAX_SETTINGS_BYTES: u64 = 256 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AppSettings {
     pub format_version: u32,
     /// Folder of the library that is opened at start.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub library_path: Option<String>,
+    /// Language, design, zoom, side bar, line width, shortcuts.
+    pub ui: UiSettings,
+    /// Size and position of the main window.
+    pub window: Option<WindowState>,
     /// Fields of newer versions, kept unchanged.
-    #[serde(flatten)]
     pub other: Map<String, Value>,
 }
 
@@ -46,8 +49,56 @@ impl Default for AppSettings {
         Self {
             format_version: APP_SETTINGS_FORMAT_VERSION,
             library_path: None,
+            ui: UiSettings::default(),
+            window: None,
             other: Map::new(),
         }
+    }
+}
+
+const KEY_FORMAT_VERSION: &str = "formatVersion";
+const KEY_LIBRARY_PATH: &str = "libraryPath";
+
+impl AppSettings {
+    /// Reads the settings from the top-level object of the file.
+    /// `formatVersion` and `libraryPath` must be valid; interface values that
+    /// are not get their defaults.
+    fn from_object(mut object: Map<String, Value>, format_version: u32) -> Result<Self, String> {
+        object.remove(KEY_FORMAT_VERSION);
+        let library_path = match object.remove(KEY_LIBRARY_PATH) {
+            None | Some(Value::Null) => None,
+            Some(Value::String(path)) => Some(path),
+            Some(_) => return Err("libraryPath is not a string".to_owned()),
+        };
+        let ui = UiSettings::take_from(&mut object);
+        let window = WindowState::take_from(&mut object);
+        Ok(Self {
+            format_version,
+            library_path,
+            ui,
+            window,
+            other: object,
+        })
+    }
+
+    /// The JSON written to `settings.json`.
+    fn to_json(&self) -> Value {
+        let mut object = self.other.clone();
+        object.insert(
+            KEY_FORMAT_VERSION.to_owned(),
+            Value::from(self.format_version),
+        );
+        match &self.library_path {
+            Some(path) => {
+                object.insert(KEY_LIBRARY_PATH.to_owned(), Value::from(path.as_str()));
+            }
+            None => {
+                object.remove(KEY_LIBRARY_PATH);
+            }
+        }
+        self.ui.put_into(&mut object);
+        WindowState::put_into(self.window.as_ref(), &mut object);
+        Value::Object(object)
     }
 }
 
@@ -106,13 +157,10 @@ impl AppSettingsStore {
                 },
                 LoadOutcome::Loaded,
             ),
-            Ok(Parsed::Newer {
-                version,
-                library_path,
-            }) => {
+            Ok(Parsed::Newer { version, settings }) => {
                 log::warn!("app settings from a newer version ({version}); used read-only");
                 let mut store = Self::fresh(dir, true);
-                store.current.library_path = library_path;
+                store.current = settings;
                 (store, LoadOutcome::Newer { version })
             }
             Err(reason) => {
@@ -162,7 +210,7 @@ impl AppSettingsStore {
         let mut next = self.current.clone();
         change(&mut next);
         std::fs::create_dir_all(&self.dir)?;
-        let mut json = serde_json::to_vec_pretty(&next).map_err(io::Error::other)?;
+        let mut json = serde_json::to_vec_pretty(&next.to_json()).map_err(io::Error::other)?;
         json.push(b'\n');
         atomic::write_atomic(&self.dir.join(APP_SETTINGS_FILE), &json)?;
         self.current = next;
@@ -172,35 +220,36 @@ impl AppSettingsStore {
 
 enum Parsed {
     Current(AppSettings),
-    Newer {
-        version: u64,
-        library_path: Option<String>,
-    },
+    /// A file of a newer version: what this build understands of it.
+    Newer { version: u64, settings: AppSettings },
 }
 
 fn parse(data: &[u8]) -> Result<Parsed, String> {
     let value: Value = serde_json::from_slice(data).map_err(|e| format!("not JSON: {e}"))?;
-    let object = value.as_object().ok_or("not a JSON object")?;
+    let Value::Object(object) = value else {
+        return Err("not a JSON object".to_owned());
+    };
     let version = object
-        .get("formatVersion")
+        .get(KEY_FORMAT_VERSION)
         .and_then(Value::as_u64)
         .ok_or("formatVersion missing")?;
     if version > u64::from(APP_SETTINGS_FORMAT_VERSION) {
-        let library_path = object
-            .get("libraryPath")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        return Ok(Parsed::Newer {
-            version,
-            library_path,
-        });
+        // Read leniently; the store is read-only and never writes it back.
+        let mut settings = AppSettings::from_object(object.clone(), APP_SETTINGS_FORMAT_VERSION)
+            .unwrap_or_default();
+        if settings.library_path.is_none() {
+            settings.library_path = object
+                .get(KEY_LIBRARY_PATH)
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+        }
+        return Ok(Parsed::Newer { version, settings });
     }
     if version == 0 {
         return Err("formatVersion 0".to_owned());
     }
-    serde_json::from_value(value)
-        .map(Parsed::Current)
-        .map_err(|e| e.to_string())
+    let version = u32::try_from(version).map_err(|e| e.to_string())?;
+    AppSettings::from_object(object, version).map(Parsed::Current)
 }
 
 #[cfg(test)]
@@ -256,6 +305,32 @@ mod tests {
                 .unwrap();
         assert_eq!(written["libraryPath"], "/b");
         assert_eq!(written["windowState"]["width"], 900);
+    }
+
+    #[test]
+    fn an_invalid_interface_value_does_not_damage_the_file() {
+        let dir = dir();
+        let path = dir.path().join(APP_SETTINGS_FILE);
+        std::fs::write(
+            &path,
+            r#"{"formatVersion": 1, "libraryPath": "/a", "zoom": 9, "language": "en"}"#,
+        )
+        .unwrap();
+        let (mut store, outcome) = AppSettingsStore::load(dir.path(), now());
+        assert_eq!(outcome, LoadOutcome::Loaded);
+        assert_eq!(store.get().library_path.as_deref(), Some("/a"));
+        assert_eq!(store.get().ui.zoom, 1.0);
+        assert_eq!(
+            store.get().ui.language,
+            crate::services::settings::ui::LanguageSetting::En
+        );
+
+        store.update(|s| s.ui.zoom = 1.5).unwrap();
+        let written: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(written["zoom"], 1.5);
+        assert_eq!(written["language"], "en");
+        assert_eq!(written["libraryPath"], "/a");
+        assert_eq!(written["formatVersion"], 1);
     }
 
     #[test]

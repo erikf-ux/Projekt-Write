@@ -13,6 +13,8 @@ fn main() {
         "library_move",
         "library_cancel_move",
         "library_accept_location",
+        "ui_state",
+        "ui_update_settings",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

@@ -101,5 +101,7 @@
   "error.moveCancelled": "The move was cancelled. The library is unchanged.",
   "error.moveTargetInvalid": "The target lies inside the library or contains it.",
   "error.moveVerificationFailed": "A copied file differs from the original. The move was not completed; the library is unchanged.",
-  "error.moveSwitchFailed": "The moved library could not be opened. The previous library stays in use."
+  "error.moveSwitchFailed": "The moved library could not be opened. The previous library stays in use.",
+  "error.settingsReadOnly": "The settings come from a newer version of Project Write and are not changed.",
+  "error.settingsNotSaved": "The settings could not be saved."
 }

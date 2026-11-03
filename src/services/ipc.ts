@@ -21,6 +21,8 @@ import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
+import type { UiState } from '@/types/generated/UiState';
+import type { UpdateUiSettingsRequest } from '@/types/generated/UpdateUiSettingsRequest';
 
 /** Every app command with its request and response type. */
 export interface Commands {
@@ -34,6 +36,8 @@ export interface Commands {
   library_move: { request: MoveLibraryRequest; response: LibraryStatus };
   library_cancel_move: { request: EmptyRequest; response: boolean };
   library_accept_location: { request: EmptyRequest; response: LibraryStatus };
+  ui_state: { request: EmptyRequest; response: UiState };
+  ui_update_settings: { request: UpdateUiSettingsRequest; response: UiState };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -73,6 +77,8 @@ const errorCodes: Record<ErrorCode, true> = {
   MOVE_TARGET_INVALID: true,
   MOVE_VERIFICATION_FAILED: true,
   MOVE_SWITCH_FAILED: true,
+  SETTINGS_READ_ONLY: true,
+  SETTINGS_NOT_SAVED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };
