@@ -4,7 +4,22 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 1 – Grundgerüst** (Zweig `claude/project-write-phase-1-6sh7n2`): umgesetzt, **wartet auf Freigabe** für Phase 2.
+**Phase 2 – Speicherkern**: freigegeben am 3. November 2026, in Arbeit. Abschnitte 9 und 18.
+
+Zweig: weiterhin `claude/project-write-phase-1-6sh7n2`. Abschnitt 24 sieht einen Zweig je Phase vor; die Sitzung erlaubt aber nur Pushes auf diesen Zweig. Ein eigener Phase-2-Zweig entsteht, sobald der Auftraggeber ihn freigibt.
+
+Plan Phase 2 (Reihenfolge):
+
+1. Grundlagen: Pfadprüfung (`security/`), atomares Schreiben (`filesystem/`), Windows-Systemaufrufe.
+2. Erkennung von Sync-Ordnern und Netzlaufwerken.
+3. Bibliothek: anlegen, öffnen, sperren (`library.lock`), Rollback-Modus, Migrationen mit Sicherung vorab, Migration 0002 `documents`.
+4. Dokument-Repository und Absturztest (100 harte Abbrüche).
+5. Einstellungen (App und Bibliothek), Logging.
+6. Bibliothek umziehen (kopieren, prüfen, umschalten).
+7. Befehle, Einzelinstanz, Ordnerdialog.
+8. Bibliotheksansicht im Frontend, E2E-Tests.
+9. Skript für die Referenzbibliothek.
+10. Doku, CI, Bericht.
 
 ## Stand Phase 1
 
@@ -62,4 +77,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Freigabe für Phase 2 abwarten. Danach: Zweig für Phase 2 anlegen, Abschnitte 9 und 18 lesen, Schema planen.
+Phase 2, Schritt 1: Pfadprüfung und atomares Schreiben.
