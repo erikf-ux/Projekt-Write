@@ -12,6 +12,7 @@ import { formatChord } from '@/modules/commands/keymap';
 import { availableCommands, findCommand, registerCommands, runCommand } from '@/modules/commands/registry';
 import { installShortcuts } from '@/modules/commands/shortcuts';
 import type { CommandCategory } from '@/modules/commands/types';
+import { DropZone } from '@/modules/documents/DropZone';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { SettingsDialog } from '@/modules/settings/SettingsDialog';
@@ -217,7 +218,13 @@ export function App() {
 
   return (
     <>
-      {libraryOpen ? <Workbench openEmptyDocument={sawFirstStart} /> : <StartScreen />}
+      {libraryOpen ? (
+        <DropZone>
+          <Workbench openEmptyDocument={sawFirstStart} />
+        </DropZone>
+      ) : (
+        <StartScreen />
+      )}
       {paletteOpen ? (
         <CommandPalette entries={paletteEntries} onRun={(id) => void runCommand(id)} onClose={closePalette} />
       ) : null}

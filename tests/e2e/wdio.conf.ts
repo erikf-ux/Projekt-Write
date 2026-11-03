@@ -37,12 +37,14 @@ const specs = path.join(root, 'tests', 'e2e', 'specs');
 
 export const config: WebdriverIO.Config = {
   runner: 'local',
-  // Fixed order: every file starts the app anew and builds on the library
-  // the previous one left.
+  // Fixed order: each file builds on the library the previous one left. The
+  // Phase 1 smoke test needs the start screen, so it runs before a library
+  // exists; library.e2e.ts ends the app, restart.e2e.ts gets a new process.
   specs: [
+    path.join(specs, 'smoke.e2e.ts'),
     path.join(specs, 'library.e2e.ts'),
     path.join(specs, 'restart.e2e.ts'),
-    path.join(specs, 'smoke.e2e.ts'),
+    path.join(specs, 'workbench.e2e.ts'),
   ],
   maxInstances: 1,
   capabilities: [

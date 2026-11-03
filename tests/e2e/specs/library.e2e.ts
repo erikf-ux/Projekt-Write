@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { $, browser, expect } from '@wdio/globals';
 import { appDirs, pickedFolders } from '../sandbox';
-import { pinMainWindow } from '../session';
+import { closeSettings, openSettings, pinMainWindow } from '../session';
 
 async function libraryState() {
   return $('[data-testid="library"]').getAttribute('data-state');
@@ -35,6 +35,14 @@ describe('Project Write – Phase 2 library', () => {
   });
 
   it('offers Dokumente/ProjectWrite and warns because it lies in a sync folder', async () => {
+    // First start (Phase 3): library location and language. The test system
+    // may run in English; German applies at once and is remembered.
+    await expect($('[data-testid="first-start-language"]')).toBeDisplayed();
+    await $('[data-testid="first-start-language-de"]').click();
+    await expect($('[data-testid="first-start-language"] h2')).toHaveText(
+      expect.stringMatching(/^Sprache$/i),
+    );
+    expect(readJson(path.join(appDirs, 'config', 'settings.json'))['language']).toBe('de');
     const location = $('[data-testid="library-default-location"]');
     await expect(location).toHaveText(
       expect.stringContaining(path.join('OneDrive', 'documents', 'ProjectWrite')),
@@ -51,6 +59,14 @@ describe('Project Write – Phase 2 library', () => {
 
   it('creates the library at another, local location instead', async () => {
     await $('[data-testid="library-prompt-other"]').click();
+    // Phase 3: the workbench opens with an empty document (section 11).
+    await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+    const tab = $('[data-testid="tabs"] [role="tab"]');
+    await tab.waitForExist({ timeout: 20_000 });
+    await expect(tab).toHaveText(expect.stringContaining('Unbenannt'));
+    await expect($('[data-testid="editor"]')).toBeDisplayed();
+    // The library details live in the settings since Phase 3.
+    await openSettings('library');
     await waitForState('open');
     await expect($('[data-testid="library-name"]')).toHaveText('Bibliothek');
     await expect($('[data-testid="library-path"]')).toHaveText(
@@ -91,6 +107,10 @@ describe('Project Write – Phase 2 library', () => {
     expect((old['movedTo'] as { path: string }).path).toContain('Umzug');
     const settings = readJson(path.join(appDirs, 'config', 'settings.json'));
     expect(String(settings['libraryPath'])).toContain('Umzug');
+
+    // The status bar names the rollback mode.
+    await closeSettings();
+    await expect($('[data-testid="status-rollback"]')).toBeDisplayed();
   });
 
   it('closes the library cleanly when the window is closed', async () => {

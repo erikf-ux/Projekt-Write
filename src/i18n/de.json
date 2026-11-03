@@ -223,5 +223,15 @@
   "close.stay": "Weiterarbeiten",
   "close.quit": "Trotzdem beenden",
   "app.loading": "Project Write wird gestartet …",
-  "notice.actionFailed": "Die Aktion ist fehlgeschlagen."
+  "notice.actionFailed": "Die Aktion ist fehlgeschlagen.",
+  "import.noFolders": "Ordner können nicht abgelegt werden. Bitte legen Sie die Dateien selbst ab.",
+  "import.failed": "Nicht importiert: {names} ({reason}). Importiert: {count}.",
+  "import.done": "Importiert: {count}.",
+  "import.dropHint": "Dateien hier ablegen, um sie in die Bibliothek zu importieren (Text und Markdown).",
+  "import.running": "Dateien werden importiert …",
+  "import.duplicateTitle": "Dokument schon vorhanden",
+  "import.duplicateText": "„{file}“ hat denselben Inhalt wie das Dokument „{title}“. Das vorhandene Dokument verwenden oder trotzdem importieren?",
+  "import.useExisting": "Vorhandenes verwenden",
+  "import.importAnyway": "Trotzdem importieren",
+  "import.skip": "Überspringen"
 }

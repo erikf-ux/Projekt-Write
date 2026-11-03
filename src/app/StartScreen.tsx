@@ -75,8 +75,8 @@ export function StartScreen() {
           </div>
         </header>
 
-        <LanguageChoice />
         <LibraryPanel />
+        <LanguageChoice />
 
         <section
           aria-labelledby="checks-title"
@@ -148,8 +148,8 @@ export function StartScreen() {
 }
 
 /**
- * First start (section 11): the language, before the library. Applies at
- * once and is saved in settings.json.
+ * First start (section 11: "Bibliotheksort, Sprache …"): the language,
+ * after the library. Applies at once and is saved in settings.json.
  */
 function LanguageChoice() {
   const t = useT();

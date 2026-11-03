@@ -90,7 +90,7 @@ export function PlainTextEditor({
                 id={editorElementId(id)}
                 data-testid="editor"
                 aria-label={t('editor.label', { title: document.title })}
-                className={`text-body block h-full w-full resize-none bg-surface text-fg outline-none ${
+                className={`text-body block h-full w-full resize-none bg-surface text-fg outline-none focus:shadow-[inset_2px_0_0_0_var(--color-accent)] ${
                   focusMode ? 'px-8 py-12' : 'px-6 py-6'
                 } ${limitLineWidth ? 'max-w-[calc(72ch+3rem)]' : ''}`}
                 value={document.text}

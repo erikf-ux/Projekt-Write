@@ -16,6 +16,9 @@ interface DialogProps {
   width?: string;
 }
 
+/** Open dialogs, innermost last: only it handles Escape and the focus. */
+const openDialogs: HTMLElement[] = [];
+
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -33,22 +36,60 @@ export function Dialog({
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const first =
-      panel.current?.querySelector<HTMLElement>('[data-autofocus]') ??
-      panel.current?.querySelector<HTMLElement>(FOCUSABLE);
-    first?.focus();
+    const element = panel.current;
+    const focusFirst = () => {
+      const first =
+        element?.querySelector<HTMLElement>('[data-autofocus]') ??
+        element?.querySelector<HTMLElement>(FOCUSABLE);
+      (first ?? element)?.focus();
+    };
+    focusFirst();
+    if (element) {
+      openDialogs.push(element);
+    }
+    const isTop = () => element !== null && openDialogs[openDialogs.length - 1] === element;
+    // The dialog is modal: focus that leaves it (or falls back to the page
+    // because the focused control disappeared) comes back.
+    const onFocusIn = (event: FocusEvent) => {
+      if (isTop() && element && event.target instanceof Node && !element.contains(event.target)) {
+        focusFirst();
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
     return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      const index = element ? openDialogs.indexOf(element) : -1;
+      if (index !== -1) {
+        openDialogs.splice(index, 1);
+      }
       previous?.focus();
     };
   }, []);
 
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && !escapeDisabled) {
+  // Escape closes the innermost dialog wherever the focus is (also on the
+  // page itself after a control inside disappeared).
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      const element = panel.current;
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        escapeDisabled ||
+        !element ||
+        openDialogs[openDialogs.length - 1] !== element
+      ) {
+        return;
+      }
       event.preventDefault();
-      event.stopPropagation();
       onClose();
-      return;
-    }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [escapeDisabled, onClose]);
+
+  const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Tab' || !panel.current) {
       return;
     }
@@ -76,6 +117,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         data-testid={testId}
         className={`${width} rounded-pw border border-muted bg-sidebar text-fg shadow-lg`}
         onKeyDown={onKeyDown}

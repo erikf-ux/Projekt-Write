@@ -223,5 +223,15 @@
   "close.stay": "Keep working",
   "close.quit": "Quit anyway",
   "app.loading": "Starting Project Write …",
-  "notice.actionFailed": "The action failed."
+  "notice.actionFailed": "The action failed.",
+  "import.noFolders": "Folders cannot be dropped. Please drop the files themselves.",
+  "import.failed": "Not imported: {names} ({reason}). Imported: {count}.",
+  "import.done": "Imported: {count}.",
+  "import.dropHint": "Drop files here to import them into the library (text and Markdown).",
+  "import.running": "Importing files …",
+  "import.duplicateTitle": "Document exists already",
+  "import.duplicateText": "“{file}” has the same content as the document “{title}”. Use the existing document or import anyway?",
+  "import.useExisting": "Use the existing one",
+  "import.importAnyway": "Import anyway",
+  "import.skip": "Skip"
 }

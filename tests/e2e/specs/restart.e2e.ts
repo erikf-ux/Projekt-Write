@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { $, $$, expect } from '@wdio/globals';
 import { appDirs, application, pickedFolders } from '../sandbox';
-import { pinMainWindow } from '../session';
+import { closeSettings, openSettings, pinMainWindow } from '../session';
 
 async function waitForOpenLibrary() {
   const panel = $('[data-testid="library"]');
@@ -44,8 +44,14 @@ function startSecondInstance(timeoutMs: number): Promise<number | null> {
 describe('Project Write – Phase 2 restart and second instance', () => {
   before(async () => {
     await pinMainWindow();
-    await $('h1').waitForExist({ timeout: 60_000 });
+    // The remembered library opens at start: the workbench, not the first start.
+    await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+    await openSettings('library');
     await waitForOpenLibrary();
+  });
+
+  after(async () => {
+    await closeSettings();
   });
 
   it('opens the library of the last session at start', async () => {
