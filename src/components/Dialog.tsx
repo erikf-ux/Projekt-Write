@@ -16,8 +16,19 @@ interface DialogProps {
   width?: string;
 }
 
-/** Open dialogs, innermost last: only it handles Escape and the focus. */
+/** Open dialogs in the order they opened. */
 const openDialogs: HTMLElement[] = [];
+
+/**
+ * The dialog that handles Escape and the focus: the last opened one that
+ * contains no other open dialog (nested dialogs mount child first).
+ */
+function topDialog(): HTMLElement | undefined {
+  const innermost = openDialogs.filter(
+    (dialog) => !openDialogs.some((other) => other !== dialog && dialog.contains(other)),
+  );
+  return innermost[innermost.length - 1];
+}
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -47,7 +58,7 @@ export function Dialog({
     if (element) {
       openDialogs.push(element);
     }
-    const isTop = () => element !== null && openDialogs[openDialogs.length - 1] === element;
+    const isTop = () => element !== null && topDialog() === element;
     // The dialog is modal: focus that leaves it (or falls back to the page
     // because the focused control disappeared) comes back.
     const onFocusIn = (event: FocusEvent) => {
@@ -76,7 +87,7 @@ export function Dialog({
         event.defaultPrevented ||
         escapeDisabled ||
         !element ||
-        openDialogs[openDialogs.length - 1] !== element
+        topDialog() !== element
       ) {
         return;
       }
