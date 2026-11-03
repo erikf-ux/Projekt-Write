@@ -4,9 +4,28 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 2 – Speicherkern** (Abschnitte 9 und 18): abgeschlossen am 3. November 2026, Bericht in `docs/bericht-phase-2.md`. **Wartet auf die Freigabe von Phase 3.**
+**Phase 3 – Oberfläche** (Abschnitt 11): freigegeben am 3. November 2026, in Arbeit.
 
-Zweig: weiterhin `claude/project-write-phase-1-6sh7n2`. Abschnitt 24 sieht einen Zweig je Phase vor; die Sitzung erlaubt aber nur Pushes auf diesen Zweig.
+Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
+
+Umfangsentscheidungen (ADR 0011, Begründung: Abschnitt 2 „Funktionen späterer Phasen bleiben unsichtbar“):
+
+- Activity Bar: Explorer und Editor. Suche (Phase 9) und Mesh (Phase 11) erscheinen mit ihren Phasen.
+- Erster Start: Sprache und Bibliotheksort, danach sofort ein leeres Dokument. Die Frage nach der Autokorrektur (D5) kommt mit der Autokorrektur (Phase 12), Beispiel-Subnetze mit den Subnetzen (Phase 7).
+- Tabs, Explorer und Drag & Drop brauchen Dokumente: Phase 3 bringt eine Reintext-Schreibfläche für Bibliotheksdokumente (TXT, MD als Quelltext) mit Autosave nach Abschnitt 9. Tiptap ersetzt sie in Phase 4; Kopieren, Papierkorb, Favoriten und externe Dateien folgen in Phase 5.
+- Drag & Drop aus dem System bedeutet Import in die Bibliothek (Abschnitt 9): TXT und MD in UTF-8, Duplikat-Rückfrage, Originalname als Metadatum (Migration 0003 statt wie geplant in Phase 5).
+
+Plan Phase 3 (Reihenfolge):
+
+1. Rust: Oberflächeneinstellungen in `settings.json` (Sprache, Design, Zoom, Seitenleiste, Zeilenbreite, Tastenkürzel, Fensterzustand), Spracherkennung, Fensterzustand wiederherstellen, Zoom.
+2. Rust: natives Menü (de/en), Ereigniskanal zur Oberfläche, Fokusmodus, Schließen mit Speichern vorab.
+3. Rust: Dokumentbefehle (Liste, anlegen, lesen, speichern, umbenennen), Migration 0003, Import mit Typprüfung und Duplikat-Rückfrage.
+4. Rust: Themes importieren und entfernen, Kontrastprüfung.
+5. Frontend: Befehlsregister, Tastenkürzel mit Konflikterkennung, Command Palette, Kontextmenüs.
+6. Frontend: Hauptlayout (Toolbar, Activity Bar, Explorer, Tabs, Schreibfläche mit Autosave, Statusleiste), Seitenleiste, Fokusmodus, Zoom, erster Start, Einstellungen.
+7. Frontend: Drag & Drop (Import, Tabs verschieben).
+8. E2E-Tests (Windows, Linux), Tests der Phasen 1 und 2 anpassen.
+9. Doku, CI, Bericht.
 
 ## Stand Phase 2
 
@@ -80,4 +99,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 3 (Oberfläche, Abschnitt 11).
+Phase 3, Schritt 1: Oberflächeneinstellungen in `settings.json`.
