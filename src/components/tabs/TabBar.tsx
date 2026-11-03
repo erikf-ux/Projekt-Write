@@ -211,7 +211,7 @@ export function TabBar({
             draggable
             data-tab={tab.id}
             title={tab.title}
-            className={`text-ui group relative flex max-w-56 min-w-24 cursor-default items-center gap-2 border-r border-muted/40 pr-1 pl-3 outline-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
+            className={`text-ui group relative flex max-w-56 min-w-24 cursor-default items-center gap-2 border-r border-muted/40 pr-1 pl-3 focus-visible:outline-offset-[-2px] ${
               selected ? 'bg-surface text-fg' : 'text-muted'
             } ${dropIndex === index ? 'border-l-2 border-l-accent' : ''}`}
             onClick={() => {

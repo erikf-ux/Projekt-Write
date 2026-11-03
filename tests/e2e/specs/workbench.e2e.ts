@@ -55,6 +55,20 @@ async function tabTitles(): Promise<string[]> {
   return titles;
 }
 
+/** Opens documents from the Explorer until at least `count` tabs are open. */
+async function ensureTabs(count: number) {
+  const options = await $$('[data-testid="explorer"] [role="option"]').getElements();
+  for (const option of options) {
+    if ((await tabTitles()).length >= count) {
+      return;
+    }
+    await option.click();
+  }
+  await browser.waitUntil(async () => (await tabTitles()).length >= count, {
+    timeoutMsg: `fewer than ${String(count)} documents to open`,
+  });
+}
+
 async function saveState(): Promise<string | null> {
   return $('[data-testid="status-save"]').getAttribute('data-state');
 }
@@ -187,6 +201,7 @@ describe('Project Write – Phase 3 workbench', () => {
   });
 
   it('reaches every region with the keyboard and shows the focus', async () => {
+    await ensureTabs(2);
     // Composite widgets (toolbar, tabs) have one tab stop and arrow keys;
     // every other control is a tab stop of its own.
     const structure = await browser.execute(() => {
@@ -279,9 +294,15 @@ describe('Project Write – Phase 3 workbench', () => {
     await browser.keys('Escape');
     await expect($('[data-testid="context-menu"]')).not.toBeExisting();
     // Tabs: arrow keys move, Enter activates, Ctrl+Shift+PageUp moves the tab.
+    await ensureTabs(2);
     const before = await tabTitles();
     expect(before.length).toBeGreaterThanOrEqual(2);
-    await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').click();
+    const tabs = await $$('[data-testid="tabs"] [role="tab"]').getElements();
+    const last = tabs[tabs.length - 1];
+    if (!last) {
+      throw new Error('no tab');
+    }
+    await last.click();
     await browser.keys(['Control', 'Shift', 'PageUp']);
     const after = await tabTitles();
     expect(after).not.toEqual(before);
