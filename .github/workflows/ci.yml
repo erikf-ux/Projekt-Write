@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb
+            libayatana-appindicator3-dev librsvg2-dev xvfb dbus
 
       - uses: actions/setup-node@v7
         with:
@@ -97,7 +97,9 @@ jobs:
 
       - name: End-to-end tests (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:e2e
+        # A D-Bus session: tauri-plugin-single-instance finds the running
+        # instance through it (tests/e2e/specs/restart.e2e.ts).
+        run: dbus-run-session -- xvfb-run -a npm run test:e2e
 
       - name: End-to-end tests (Windows, macOS)
         if: runner.os != 'Linux'

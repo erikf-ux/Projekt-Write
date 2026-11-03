@@ -1,12 +1,14 @@
 /**
  * Phase 1 acceptance tests in the running app (section 25):
  * start, CSP, rejected file system access, contrast, keyboard focus.
+ * Runs last; the start screen then shows the library of library.e2e.ts.
  */
 import { createHash } from 'node:crypto';
 import { browser, $, $$, expect } from '@wdio/globals';
 import { contrastRatio, MIN_TEXT_CONTRAST } from '../../../src/modules/themes/contrast';
 import { themes, type ThemeName } from '../../../src/modules/themes/tokens';
 import { decodePng, pixelHex, type Image } from '../png';
+import { pinMainWindow } from '../session';
 
 const READY_TEXTS = ['Alles bereit.', 'Everything is ready.'];
 
@@ -78,6 +80,7 @@ const TEXT_SELECTORS = [
   'h1',
   'header p',
   'h2',
+  '[data-testid="library"] :is(p, dt, dd)',
   '[data-testid="check-summary"]',
   '[data-check] span',
   'button',
@@ -177,6 +180,7 @@ async function expectContrast(theme: ThemeName) {
 
 describe('Project Write – Phase 1 smoke test', () => {
   before(async () => {
+    await pinMainWindow();
     await $('h1').waitForExist({ timeout: 60_000 });
   });
 
@@ -241,6 +245,10 @@ describe('Project Write – Phase 1 smoke test', () => {
         ['plugin:sql|load', { db: 'sqlite:pw-e2e.db' }],
         ['plugin:path|resolve_directory', { directory: 11 }],
         ['plugin:opener|open_path', { path: '/' }],
+        // Folder dialogs are shown by Rust only (no dialog plugin, section 8).
+        ['plugin:dialog|open', { directory: true }],
+        // App commands take tokens, never paths.
+        ['library_open', { request: { location: '/etc', acceptMoved: true } }],
       ];
       const results: Record<string, string> = {};
       for (const [command, args] of attempts) {
@@ -275,7 +283,7 @@ describe('Project Write – Phase 1 smoke test', () => {
     await expectContrast(startTheme as ThemeName);
   });
 
-  it('puts the button first in the tab order and shows a visible focus ring', async () => {
+  it('puts a button first in the tab order and shows a visible focus ring', async () => {
     // The embedded WebDriver sends synthetic key events, and browsers ignore
     // untrusted Tab presses for focus navigation. So the tab order is checked
     // structurally and focus is set programmatically (see ADR 0003).
@@ -295,14 +303,19 @@ describe('Project Write – Phase 1 smoke test', () => {
       first.focus({ focusVisible: true });
       const active = document.activeElement as HTMLElement;
       return {
-        tabbable: tabbable.length,
+        // Every button is reachable: none is taken out of the tab order.
+        allButtonsTabbable: Array.from(document.querySelectorAll('button')).every(
+          (button) => button.disabled || tabbable.includes(button),
+        ),
+        checkButtonTabbable: tabbable.some((element) => element.dataset['testid'] === 'check-retry'),
         tag: active.tagName,
         isFirst: active === first,
         focusVisible: active.matches(':focus-visible'),
       };
     });
     expect(focused).toMatchObject({
-      tabbable: 1,
+      allButtonsTabbable: true,
+      checkButtonTabbable: true,
       tag: 'BUTTON',
       isFirst: true,
       focusVisible: true,
@@ -341,7 +354,7 @@ describe('Project Write – Phase 1 smoke test', () => {
     }
     expect(problems).toEqual([]);
 
-    await $('button').click();
+    await $('[data-testid="check-retry"]').click();
     await waitForChecks();
   });
 

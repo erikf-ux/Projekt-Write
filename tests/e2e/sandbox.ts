@@ -1,0 +1,28 @@
+/**
+ * Paths of the end-to-end tests. Everything the tests and the app write lies
+ * in `tests/e2e/.tmp` inside the project folder (section 2).
+ */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+const binary = process.platform === 'win32' ? 'project-write.exe' : 'project-write';
+/** The app under test; PW_E2E_APP lets experiments (ADR 0005) use another binary. */
+export const application =
+  process.env['PW_E2E_APP'] ?? path.join(root, 'src-tauri', 'target', 'debug', binary);
+
+export const sandbox = path.join(root, 'tests', 'e2e', '.tmp');
+
+/**
+ * App folders of the e2e build (config, logs, documents; `PW_E2E_APP_DIRS`).
+ * Named like a sync client's folder, so the default library location triggers
+ * the sync folder warning (section 9).
+ */
+export const appDirs = path.join(sandbox, 'OneDrive');
+
+/** Answers of the folder dialog, in this order, at every app start. */
+export const pickedFolders = {
+  local: path.join(sandbox, 'Lokal', 'Bibliothek'),
+  moveTarget: path.join(appDirs, 'Umzug'),
+};

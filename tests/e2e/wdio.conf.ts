@@ -6,12 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const binary = process.platform === 'win32' ? 'project-write.exe' : 'project-write';
-// PW_E2E_APP lets experiments (for example ADR 0005) test another binary.
-const application = process.env['PW_E2E_APP'] ?? path.join(root, 'src-tauri', 'target', 'debug', binary);
+import { appDirs, application, pickedFolders, root, sandbox } from './sandbox';
 
 if (!fs.existsSync(application)) {
   throw new Error(`App binary not found at ${application}. Run "npm run build:e2e" first.`);
@@ -19,7 +14,6 @@ if (!fs.existsSync(application)) {
 
 // Keep everything the webview writes (caches, local storage) inside the
 // project folder (section 2: tests never write outside it).
-const sandbox = path.join(root, 'tests', 'e2e', '.tmp');
 // WebdriverIO evaluates this file again in every worker. Only the launcher may
 // clear the folder: by then the app is running and, on Windows, holds locks on
 // its WebView2 data inside it.
@@ -34,9 +28,22 @@ process.env['XDG_CONFIG_HOME'] = path.join(sandbox, 'config');
 process.env['XDG_CACHE_HOME'] = path.join(sandbox, 'cache');
 process.env['WEBVIEW2_USER_DATA_FOLDER'] = path.join(sandbox, 'webview2');
 
+// App folders of the e2e build and the answers of the folder dialog
+// (WebDriver cannot operate native dialogs; see ADR 0006).
+process.env['PW_E2E_APP_DIRS'] = appDirs;
+process.env['PW_E2E_PICK_FOLDERS'] = [pickedFolders.local, pickedFolders.moveTarget].join(path.delimiter);
+
+const specs = path.join(root, 'tests', 'e2e', 'specs');
+
 export const config: WebdriverIO.Config = {
   runner: 'local',
-  specs: [path.join(root, 'tests', 'e2e', 'specs', '**', '*.e2e.ts')],
+  // Fixed order: every file starts the app anew and builds on the library
+  // the previous one left.
+  specs: [
+    path.join(specs, 'library.e2e.ts'),
+    path.join(specs, 'restart.e2e.ts'),
+    path.join(specs, 'smoke.e2e.ts'),
+  ],
   maxInstances: 1,
   capabilities: [
     {
