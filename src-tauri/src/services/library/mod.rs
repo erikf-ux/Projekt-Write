@@ -18,6 +18,7 @@ pub mod layout;
 pub mod lock;
 pub mod maintenance;
 pub mod manifest;
+pub mod relocate;
 
 use std::fs;
 use std::io;
