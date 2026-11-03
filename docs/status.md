@@ -4,16 +4,29 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 3 – Oberfläche** (Abschnitt 11): abgeschlossen am 3. November 2026, Bericht in `docs/bericht-phase-3.md`. **Wartet auf die Freigabe von Phase 4.**
+**Phase 4 – Editor** (Abschnitte 10 und 12): freigegeben am 3. November 2026, in Arbeit.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Umfangsentscheidungen (ADR 0011, Begründung: Abschnitt 2 „Funktionen späterer Phasen bleiben unsichtbar“):
+Umfangsentscheidungen (ADR 0014):
 
-- Activity Bar: Explorer und Schreibfläche. Suche (Phase 9) und Mesh (Phase 11) erscheinen mit ihren Phasen.
-- Erster Start: Bibliotheksort und Sprache, danach ein leeres Dokument. Die Frage nach der Autokorrektur (D5) kommt mit der Autokorrektur (Phase 12), Beispiel-Subnetze mit den Subnetzen (Phase 7).
-- Reintext-Schreibfläche für Bibliotheksdokumente (TXT, MD als Quelltext) mit Autosave nach Abschnitt 9; Tiptap ersetzt sie in Phase 4. Kopieren, Papierkorb, Favoriten und externe Dateien folgen in Phase 5.
-- Drag & Drop aus dem System bedeutet Import in die Bibliothek: TXT und MD in UTF-8, Duplikat-Rückfrage, Originalname (Migration 0003, vorgezogen aus Phase 5).
+- Tiptap 3.32.2 (MIT) mit `@tiptap/markdown` hinter dem Adapter in `modules/editor/markdown/`; Suchen und Ersetzen mit `@tiptap/extension-find-and-replace` (MIT, reguläre Ausdrücke über RE2).
+- Bilder in Markdown bleiben beim Laden und Speichern erhalten und erscheinen als Hinweis mit Adresse, ohne geladen zu werden; Einfügen und Import von Bildern kommt mit den Medien (Phase 8), PDF-Verweise ebenso.
+- Verlustschutz: Das Schema hält nur, was Markdown abbilden kann. Ein Dokument, das der Adapter nicht verlustfrei halten kann, öffnet in der Quelltextansicht und nennt den Grund. Die Option „Als `.pwrite` speichern“ kommt mit dem Format (Phase 5).
+- Interne Links (`[[`) und Rückverweise folgen in Phase 5, Drucken in Phase 10, Wiederherstellung in Phase 6.
+
+Plan Phase 4 (Reihenfolge):
+
+1. Abhängigkeiten, ADR 0014 (Editor-Architektur, Adapter, Normalisierungen, Verlustschutz).
+2. Markdown-Adapter: YAML-Kopf, Fußnoten, HTML-Rohblöcke, erlaubte HTML-Teilmenge, Bild im Link, Bildgröße, Tabellen; Round-Trip-Probe beim Öffnen.
+3. Mindestens 50 Fälle in `tests/fixtures/markdown/` mit Round-Trip-Test (Struktur und Inhalt, nicht nur HTML) und abschließend dokumentierten Normalisierungen.
+4. Editor-Komponente: Rich Text mit Markdown-Kürzeln für MD, Minimal-Schema für TXT und Quelltextansicht (`Ctrl + /`), Laden und Speichern über den Speicherkern, Autosave, Verlustschutz.
+5. Schreibstatistik (Unicode-Wörter, Zeichen, ohne Leerzeichen, Absätze, Lesezeit; für die Markierung).
+6. Suchen und Ersetzen (Treffernavigation, Groß-/Kleinschreibung, ganze Wörter, reguläre Ausdrücke).
+7. Einfügen: HTML durch das Schema, `Ctrl + Shift + V` reiner Text.
+8. Befehle und Menü: Bearbeiten-Menü, Formatierungen, Weblinks mit `Ctrl + Klick` im Systembrowser.
+9. Leistung: Tippverzögerung und Öffnen bei 50.000 Wörtern messen.
+10. Tests (Vitest, Rust, E2E), Doku, CI, Bericht.
 
 ## Stand Phase 3
 
@@ -109,4 +122,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 4 (Editor, Abschnitte 10 und 12).
+Phase 4, Schritt 2: Markdown-Adapter.
