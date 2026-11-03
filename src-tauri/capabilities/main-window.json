@@ -25,6 +25,8 @@
     "allow-document-read",
     "allow-document-save",
     "allow-document-rename",
-    "allow-document-import"
+    "allow-document-import",
+    "allow-theme-import",
+    "allow-theme-remove"
   ]
 }

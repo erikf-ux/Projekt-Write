@@ -121,5 +121,9 @@
   "error.documentTooLarge": "Das Dokument ist zu groß.",
   "error.documentNotText": "Die Datei enthält keinen Text in UTF-8.",
   "error.documentFormatUnsupported": "Dieses Dokumentformat kann noch nicht bearbeitet werden.",
-  "error.importUnsupportedType": "Dieser Dateityp kann nicht importiert werden. Möglich sind Textdateien (.txt) und Markdown (.md)."
+  "error.importUnsupportedType": "Dieser Dateityp kann nicht importiert werden. Möglich sind Textdateien (.txt) und Markdown (.md).",
+  "error.themeInvalid": "Die Design-Datei ist ungültig ({field}).",
+  "error.themeContrast": "Das Design erfüllt den Mindestkontrast nicht: {pair} erreicht {ratio}:1, nötig sind 4,5:1.",
+  "error.themeLimit": "Es sind bereits 50 Designs importiert. Bitte entfernen Sie zuerst eines.",
+  "error.themeNotFound": "Das Design wurde nicht gefunden."
 }

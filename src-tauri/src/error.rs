@@ -89,11 +89,19 @@ pub enum ErrorCode {
     DocumentFormatUnsupported,
     /// The file type is not on the import positive list.
     ImportUnsupportedType,
+    /// A theme file is not valid (`details.field`).
+    ThemeInvalid,
+    /// A theme misses a contrast rule (`details.pair`, `details.ratio`).
+    ThemeContrast,
+    /// Too many imported themes.
+    ThemeLimit,
+    /// No imported theme with this id.
+    ThemeNotFound,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 34] = [
+    pub const ALL: [ErrorCode; 38] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -128,6 +136,10 @@ impl ErrorCode {
         ErrorCode::DocumentNotText,
         ErrorCode::DocumentFormatUnsupported,
         ErrorCode::ImportUnsupportedType,
+        ErrorCode::ThemeInvalid,
+        ErrorCode::ThemeContrast,
+        ErrorCode::ThemeLimit,
+        ErrorCode::ThemeNotFound,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -167,6 +179,10 @@ impl ErrorCode {
             ErrorCode::DocumentNotText => "error.documentNotText",
             ErrorCode::DocumentFormatUnsupported => "error.documentFormatUnsupported",
             ErrorCode::ImportUnsupportedType => "error.importUnsupportedType",
+            ErrorCode::ThemeInvalid => "error.themeInvalid",
+            ErrorCode::ThemeContrast => "error.themeContrast",
+            ErrorCode::ThemeLimit => "error.themeLimit",
+            ErrorCode::ThemeNotFound => "error.themeNotFound",
         }
     }
 }

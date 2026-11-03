@@ -11,7 +11,8 @@ use ts_rs::TS;
 use crate::commands::input::{EmptyRequest, Input, Validate};
 use crate::error::CommandError;
 use crate::services::session::lock;
-use crate::services::settings::ui::UiSettings;
+use crate::services::settings::ui::{UiSettings, is_theme_id};
+use crate::services::themes::MAX_THEME_BYTES;
 use crate::services::ui::menu::{MAX_SHORTCUT_LABEL_CHARS, MenuCommand, MenuItemState, MenuSlot};
 use crate::services::ui::{UiEvent, UiState, window};
 use crate::state::AppState;
@@ -183,4 +184,58 @@ fn refresh_menu<R: Runtime>(app: &AppHandle<R>, state: &AppState) {
     {
         handles.apply(state.ui.locale(), &state.ui.menu_state());
     }
+}
+
+/// Request of `theme_import`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ImportThemeRequest {
+    /// Text of the theme file the user picked.
+    pub content: String,
+}
+
+impl Validate for ImportThemeRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        if self.content.len() > MAX_THEME_BYTES {
+            return Err(CommandError::invalid_input("content", "too large"));
+        }
+        Ok(())
+    }
+}
+
+/// Imports a theme file and makes it the active theme.
+#[tauri::command]
+pub async fn theme_import(
+    state: State<'_, AppState>,
+    request: Input<ImportThemeRequest>,
+) -> Result<UiState, CommandError> {
+    state.ui.import_theme(&request.into_inner().content)
+}
+
+/// Request of `theme_remove`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct RemoveThemeRequest {
+    pub id: String,
+}
+
+impl Validate for RemoveThemeRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        if is_theme_id(&self.id) {
+            Ok(())
+        } else {
+            Err(CommandError::invalid_input("id", "not a theme id"))
+        }
+    }
+}
+
+/// Removes an imported theme (the copy in the configuration folder).
+#[tauri::command]
+pub async fn theme_remove(
+    state: State<'_, AppState>,
+    request: Input<RemoveThemeRequest>,
+) -> Result<UiState, CommandError> {
+    state.ui.remove_theme(&request.into_inner().id)
 }

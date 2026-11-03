@@ -6,6 +6,7 @@ pub mod menu;
 pub mod window;
 
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -19,6 +20,7 @@ use crate::services::locale::Locale;
 use crate::services::session::lock;
 use crate::services::settings::app::{AppSettingsError, AppSettingsStore};
 use crate::services::settings::ui::{UiSettings, WindowState};
+use crate::services::themes::{CustomTheme, ThemeError, ThemeStore};
 
 /// Operating system, for platform conventions in the interface (on macOS
 /// `Cmd` replaces `Ctrl`, section 11).
@@ -54,6 +56,8 @@ pub struct UiState {
     pub platform: Platform,
     /// `settings.json` comes from a newer version; changes are refused.
     pub read_only: bool,
+    /// Imported themes, by name.
+    pub custom_themes: Vec<CustomTheme>,
 }
 
 /// Messages from Rust to the frontend, sent through the channel the
@@ -90,16 +94,22 @@ enum CloseState {
 pub struct UiService {
     settings: Arc<Mutex<AppSettingsStore>>,
     system_locale: Locale,
+    themes: ThemeStore,
     events: Mutex<Option<Channel<UiEvent>>>,
     close: Mutex<CloseState>,
     menu: Mutex<MenuState>,
 }
 
 impl UiService {
-    pub fn new(settings: Arc<Mutex<AppSettingsStore>>, system_locale: Locale) -> Self {
+    pub fn new(
+        settings: Arc<Mutex<AppSettingsStore>>,
+        system_locale: Locale,
+        config_dir: &Path,
+    ) -> Self {
         Self {
             settings,
             system_locale,
+            themes: ThemeStore::new(config_dir),
             events: Mutex::new(None),
             close: Mutex::new(CloseState::Idle),
             menu: Mutex::new(MenuState::default()),
@@ -187,7 +197,34 @@ impl UiService {
             settings,
             platform: Platform::current(),
             read_only: store.is_read_only(),
+            custom_themes: self.themes.list(),
         }
+    }
+
+    /// Imports a theme file (content as the webview read it) and makes it
+    /// the active theme.
+    pub fn import_theme(&self, content: &str) -> Result<UiState, CommandError> {
+        let id = uuid::Uuid::new_v4().simple().to_string();
+        let theme = self.themes.import(content, id).map_err(theme_error)?;
+        log::info!("theme {} imported", theme.id);
+        let mut next = lock(&self.settings).get().ui.clone();
+        next.theme = format!("custom:{}", theme.id);
+        self.update(next).map(|(state, _)| state)
+    }
+
+    /// Removes an imported theme; the active theme falls back to `system`.
+    pub fn remove_theme(&self, id: &str) -> Result<UiState, CommandError> {
+        let mut next = lock(&self.settings).get().ui.clone();
+        let active = next.theme == format!("custom:{id}");
+        if active && lock(&self.settings).is_read_only() {
+            return Err(CommandError::new(ErrorCode::SettingsReadOnly));
+        }
+        self.themes.remove(id).map_err(theme_error)?;
+        if active {
+            next.theme = "system".to_owned();
+            return self.update(next).map(|(state, _)| state);
+        }
+        Ok(self.state())
     }
 
     pub fn locale(&self) -> Locale {
@@ -225,6 +262,23 @@ impl UiService {
     }
 }
 
+fn theme_error(error: ThemeError) -> CommandError {
+    match error {
+        ThemeError::Invalid { field } => {
+            CommandError::new(ErrorCode::ThemeInvalid).with_detail("field", field)
+        }
+        ThemeError::Contrast { pair, ratio } => CommandError::new(ErrorCode::ThemeContrast)
+            .with_detail("pair", pair)
+            .with_detail("ratio", format!("{:.2}", (ratio * 100.0).floor() / 100.0)),
+        ThemeError::TooMany => CommandError::new(ErrorCode::ThemeLimit),
+        ThemeError::NotFound => CommandError::new(ErrorCode::ThemeNotFound),
+        ThemeError::Io(error) => {
+            log::error!("theme file error: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        }
+    }
+}
+
 fn settings_error(error: AppSettingsError) -> CommandError {
     match error {
         AppSettingsError::ReadOnly => CommandError::new(ErrorCode::SettingsReadOnly),
@@ -253,7 +307,7 @@ mod tests {
         let dir = tempfile::tempdir_in(base).unwrap();
         let (store, _) = AppSettingsStore::load(dir.path(), Timestamp::now());
         (
-            UiService::new(Arc::new(Mutex::new(store)), Locale::En),
+            UiService::new(Arc::new(Mutex::new(store)), Locale::En, dir.path()),
             dir,
         )
     }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-theme-remove"
+description = "Enables the theme_remove command without any pre-configured scope."
+commands.allow = ["theme_remove"]
+
+[[permission]]
+identifier = "deny-theme-remove"
+description = "Denies the theme_remove command without any pre-configured scope."
+commands.deny = ["theme_remove"]

@@ -121,5 +121,9 @@
   "error.documentTooLarge": "The document is too large.",
   "error.documentNotText": "The file does not contain UTF-8 text.",
   "error.documentFormatUnsupported": "This document format cannot be edited yet.",
-  "error.importUnsupportedType": "This file type cannot be imported. Text files (.txt) and Markdown (.md) are possible."
+  "error.importUnsupportedType": "This file type cannot be imported. Text files (.txt) and Markdown (.md) are possible.",
+  "error.themeInvalid": "The theme file is not valid ({field}).",
+  "error.themeContrast": "The theme does not reach the minimum contrast: {pair} reaches {ratio}:1, 4.5:1 is required.",
+  "error.themeLimit": "50 themes are imported already. Please remove one first.",
+  "error.themeNotFound": "The theme was not found."
 }

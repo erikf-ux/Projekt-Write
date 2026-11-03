@@ -25,6 +25,8 @@ fn main() {
         "document_save",
         "document_rename",
         "document_import",
+        "theme_import",
+        "theme_remove",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

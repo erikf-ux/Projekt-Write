@@ -22,12 +22,14 @@ import type { ErrorCode } from '@/types/generated/ErrorCode';
 import type { FocusModeRequest } from '@/types/generated/FocusModeRequest';
 import type { ImportDocumentRequest } from '@/types/generated/ImportDocumentRequest';
 import type { ImportResult } from '@/types/generated/ImportResult';
+import type { ImportThemeRequest } from '@/types/generated/ImportThemeRequest';
 import type { LibraryStatus } from '@/types/generated/LibraryStatus';
 import type { LocationChoice } from '@/types/generated/LocationChoice';
 import type { MenuStateRequest } from '@/types/generated/MenuStateRequest';
 import type { MoveLibraryRequest } from '@/types/generated/MoveLibraryRequest';
 import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
+import type { RemoveThemeRequest } from '@/types/generated/RemoveThemeRequest';
 import type { RenameDocumentRequest } from '@/types/generated/RenameDocumentRequest';
 import type { SaveDocumentRequest } from '@/types/generated/SaveDocumentRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
@@ -60,6 +62,8 @@ export interface Commands {
   document_save: { request: SaveDocumentRequest; response: DocumentSummary };
   document_rename: { request: RenameDocumentRequest; response: DocumentSummary };
   document_import: { request: ImportDocumentRequest; response: ImportResult };
+  theme_import: { request: ImportThemeRequest; response: UiState };
+  theme_remove: { request: RemoveThemeRequest; response: UiState };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -106,6 +110,10 @@ const errorCodes: Record<ErrorCode, true> = {
   DOCUMENT_NOT_TEXT: true,
   DOCUMENT_FORMAT_UNSUPPORTED: true,
   IMPORT_UNSUPPORTED_TYPE: true,
+  THEME_INVALID: true,
+  THEME_CONTRAST: true,
+  THEME_LIMIT: true,
+  THEME_NOT_FOUND: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

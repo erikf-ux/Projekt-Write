@@ -1058,3 +1058,89 @@ fn dropped_text_files_are_imported_with_a_duplicate_question() {
     );
     app.shut_down();
 }
+
+// ---------------------------------------------------------------------------
+// Themes (Phase 3)
+
+fn theme_file(text_muted: &str) -> String {
+    json!({
+        "formatVersion": 1,
+        "name": "Nacht",
+        "base": "dark",
+        "colors": {
+            "surface": "#1E1E1E", "sidebar": "#252526", "text": "#D4D4D4",
+            "textMuted": text_muted, "accent": "#6C9BFF", "error": "#F48771",
+            "success": "#4EC97A", "clusterBlue": "#6C9BFF", "clusterGreen": "#4EC97A",
+            "clusterViolet": "#B58CFF", "clusterOrange": "#F0A050", "clusterGrey": "#9AA0A6"
+        }
+    })
+    .to_string()
+}
+
+#[test]
+fn themes_are_imported_activated_and_removed() {
+    let app = app();
+    let state = call(
+        &app,
+        "theme_import",
+        json!({ "content": theme_file("#A0A4AA") }),
+    )
+    .unwrap();
+    let themes = state["customThemes"].as_array().unwrap();
+    assert_eq!(themes.len(), 1);
+    let id = themes[0]["id"].as_str().unwrap().to_owned();
+    assert_eq!(themes[0]["name"], "Nacht");
+    assert_eq!(themes[0]["colors"]["textMuted"], "#A0A4AA");
+    assert_eq!(state["settings"]["theme"], format!("custom:{id}"));
+    assert!(app.path(&format!("config/themes/{id}.json")).is_file());
+
+    let state = call(&app, "theme_remove", json!({ "id": id })).unwrap();
+    assert_eq!(state["settings"]["theme"], "system");
+    assert!(state["customThemes"].as_array().unwrap().is_empty());
+    assert!(!app.path(&format!("config/themes/{id}.json")).exists());
+    app.shut_down();
+}
+
+#[test]
+fn theme_commands_reject_invalid_files_and_input() {
+    let app = app();
+    let error = call(&app, "theme_import", json!({ "content": "{" })).unwrap_err();
+    assert_error_code(&error, "THEME_INVALID");
+    let error = call(
+        &app,
+        "theme_import",
+        json!({ "content": theme_file("#555555") }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "THEME_CONTRAST");
+    assert_eq!(error["details"]["pair"], "textMuted/surface");
+    let error = call(
+        &app,
+        "theme_import",
+        json!({ "content": theme_file("rgb(1,2,3)") }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "THEME_INVALID");
+    assert_eq!(error["details"]["field"], "colors.textMuted");
+
+    for (command, request, field) in [
+        ("theme_import", json!({}), "request"),
+        ("theme_import", json!({ "content": " ".repeat(64 * 1024 + 1) }), "content"),
+        ("theme_import", json!({ "content": "{}", "path": "/x" }), "request"),
+        ("theme_remove", json!({ "id": "../settings" }), "id"),
+        ("theme_remove", json!({ "id": "ABCDEF0123456789ABCDEF0123456789" }), "id"),
+    ] {
+        let error = call(&app, command, request.clone())
+            .expect_err(&format!("{command} must fail: {request}"));
+        assert_uniform_error(&error, field);
+    }
+    let error = call(
+        &app,
+        "theme_remove",
+        json!({ "id": "0123456789abcdef0123456789abcdef" }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "THEME_NOT_FOUND");
+    assert!(!app.path("config/themes").exists(), "nothing was stored");
+    app.shut_down();
+}

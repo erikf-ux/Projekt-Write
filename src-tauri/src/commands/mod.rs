@@ -39,6 +39,8 @@ pub const COMMAND_NAMES: &[&str] = &[
     "document_save",
     "document_rename",
     "document_import",
+    "theme_import",
+    "theme_remove",
 ];
 
 /// The invoke handler with every app command.
@@ -66,5 +68,7 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         documents::document_save,
         documents::document_rename,
         documents::document_import,
+        ui::theme_import,
+        ui::theme_remove,
     ]
 }

@@ -30,7 +30,7 @@ impl AppState {
         probe.migrate().await?;
         let (settings, outcome) = AppSettingsStore::load(&dirs.config, Timestamp::now());
         let settings = Arc::new(Mutex::new(settings));
-        let ui = UiService::new(Arc::clone(&settings), locale::system_locale());
+        let ui = UiService::new(Arc::clone(&settings), locale::system_locale(), &dirs.config);
         let session = LibrarySession::new(dirs, generators, settings, &outcome);
         session.open_configured().await;
         Ok(Self {
