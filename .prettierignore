@@ -8,3 +8,5 @@ src/types/generated/
 package-lock.json
 docs/master-prompt.md
 tests/e2e/.tmp/
+# Test inputs: kept byte for byte (Markdown round trip).
+tests/fixtures/

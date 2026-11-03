@@ -1,0 +1,3 @@
+- [ ] Kapitel planen
+  - [X] Figuren
+  - [ ] Orte

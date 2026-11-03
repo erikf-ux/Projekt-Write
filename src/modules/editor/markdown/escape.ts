@@ -28,12 +28,19 @@ export function escapeText(text: string, inLink: boolean): string {
         // may end up next to the delimiter of a formatting.
         return after === undefined || /\s/.test(after) || ASCII_PUNCTUATION.test(after) ? '\\\\' : '\\';
       case '_':
-        return before !== undefined &&
+        if (
+          before !== undefined &&
           after !== undefined &&
           LETTER_OR_DIGIT.test(before) &&
           LETTER_OR_DIGIT.test(after)
-          ? '_'
-          : '\\_';
+        ) {
+          return '_';
+        }
+        return isLoneDelimiter(text, offset) ? '_' : '\\_';
+      case '*':
+      case '~':
+        // Between spaces (`3 * 4`) it can neither open nor close.
+        return isLoneDelimiter(text, offset) ? character : `\\${character}`;
       case '[':
         // In a link text marked removes the backslash of `\[` before reading
         // it again, so only an entity keeps it literal. `[^1]` would be a
@@ -73,10 +80,28 @@ export function escapeText(text: string, inLink: boolean): string {
         // Visible in the source; a bare U+00A0 looks like a space.
         return '&nbsp;';
       default:
-        // ` * ~ always start inline syntax.
+        // A backtick always starts a code span.
         return `\\${character}`;
     }
   });
+}
+
+/**
+ * A delimiter character between two whitespace characters, with text on both
+ * sides in the same text: no trimming at an edge or formatting boundary can
+ * move it next to something else.
+ */
+function isLoneDelimiter(text: string, offset: number): boolean {
+  const before = text[offset - 1];
+  const after = text[offset + 1];
+  return (
+    before !== undefined &&
+    after !== undefined &&
+    /[ \t\n]/.test(before) &&
+    /[ \t\n]/.test(after) &&
+    /\S/.test(text.slice(0, offset - 1)) &&
+    /\S/.test(text.slice(offset + 2))
+  );
 }
 
 /** Escapes what would start a block at the beginning of a paragraph line. */
@@ -90,7 +115,7 @@ function escapeLineStart(line: string): string {
   const escaped = line
     .replace(/^( {0,3})(#{1,6})(?=[ \t]|$)/, '$1\\$2')
     .replace(/^( {0,3})>/, '$1\\>')
-    .replace(/^( {0,3})([-+])(?=[ \t]|$)/, '$1\\$2')
+    .replace(/^( {0,3})([-+*])(?=[ \t]|$)/, '$1\\$2')
     .replace(/^( {0,3})(\d{1,9})([.)])(?=[ \t]|$)/, '$1$2\\$3')
     // A setext underline (`===`, `--`) or a thematic break (`--- ---`).
     .replace(/^( {0,3})(=+[ \t]*|-[- \t]*)$/, '$1\\$2')

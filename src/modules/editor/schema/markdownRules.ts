@@ -10,7 +10,8 @@
  * * Inline code may carry other formatting (`**\`x\`**`, a link around
  *   code), as in Markdown; Tiptap's code excludes all other marks.
  * * Code block: the fence is longer than any backtick run in the code.
- * * Link: a link whose text is its address is written as `<address>`.
+ * * Link: destination in `<…>` where needed; a link whose text is its
+ *   address is written as `<address>` by the adapter.
  * * List item: every line after the marker is indented to the content
  *   column; paragraphs, thematic breaks, HTML and tables get a blank line.
  * * Lists: adjacent lists get different markers (`-`/`*`, `.`/`)`), or
@@ -21,7 +22,13 @@
  * * HTML entities (`&copy;`) become characters, exactly once; code keeps
  *   them literally.
  */
-import { Extension, type JSONContent, type MarkdownRendererHelpers, type MarkdownToken } from '@tiptap/core';
+import {
+  Extension,
+  type JSONContent,
+  type MarkdownParseHelpers,
+  type MarkdownRendererHelpers,
+  type MarkdownToken,
+} from '@tiptap/core';
 import Code from '@tiptap/extension-code';
 import CodeBlock from '@tiptap/extension-code-block';
 import Document from '@tiptap/extension-document';
@@ -30,7 +37,7 @@ import Heading from '@tiptap/extension-heading';
 import Link from '@tiptap/extension-link';
 import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
 import Paragraph from '@tiptap/extension-paragraph';
-import { escapeLineStarts, escapeText, linkDestination, linkTitle } from '../markdown/escape';
+import { escapeLineStarts, linkDestination, linkTitle } from '../markdown/escape';
 import { tokenString } from './attributes';
 
 /** Written for an empty paragraph; read back as an empty paragraph. */
@@ -160,22 +167,6 @@ export const MarkdownCodeBlock = CodeBlock.extend({
   },
 });
 
-const AUTOLINK_URI = /^[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>\p{Cc}]*$/u;
-const AUTOLINK_EMAIL =
-  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
-
-/** True if `<text>` reads back as a link with this address. */
-function isAutolink(text: string, href: string): boolean {
-  // Inside `<…>` nothing is escaped.
-  if (escapeText(text, true) !== text) {
-    return false;
-  }
-  if (text === href) {
-    return AUTOLINK_URI.test(href);
-  }
-  return href === `mailto:${text}` && AUTOLINK_EMAIL.test(text);
-}
-
 export const MarkdownLink = Link.extend({
   renderMarkdown(node, helpers, context) {
     const href = attribute(node, 'href');
@@ -184,15 +175,17 @@ export const MarkdownLink = Link.extend({
     const titleText = typeof title === 'string' && title !== '' ? title : null;
     const text = helpers.renderChildren(contentOf(node));
     // Marks are rendered around a placeholder; meta.markText is the link text.
+    // Autolinks (`<https://…>`) are written by the adapter as raw text.
     const markText: unknown = context.meta?.['markText'];
-    if (titleText === null && typeof markText === 'string' && isAutolink(markText, destination)) {
-      return `<${text}>`;
-    }
     // `[^x](…)` would start with a footnote reference.
     const caret = typeof markText === 'string' && markText.startsWith('^') ? '\\' : '';
     return `[${caret}${text}](${linkDestination(destination)}${linkTitle(titleText)})`;
   },
 });
+
+function isEmptyParagraphNode(node: JSONContent): boolean {
+  return node.type === 'paragraph' && contentOf(node).length === 0;
+}
 
 /**
  * Blocks that need a blank line before them inside a list item: a paragraph
@@ -211,17 +204,35 @@ function renderListItem(
   helpers: MarkdownRendererHelpers,
   marker: string,
   column: number,
+  task = false,
 ): string {
   const indent = ' '.repeat(column);
+  const children = contentOf(node);
+  // An item that starts with a block (`- # Titel`, `- ```js`): the schema
+  // holds an empty paragraph before it, Markdown writes the block after the
+  // marker. Not for a paragraph (it would fill the empty one), a thematic
+  // break (`- ---` is a thematic break itself) or a task (`- [ ]` needs text).
+  const [first, second] = children;
+  const blockFirst =
+    !task &&
+    first !== undefined &&
+    isEmptyParagraphNode(first) &&
+    second !== undefined &&
+    second.type !== 'paragraph' &&
+    second.type !== 'horizontalRule';
   let output = '';
-  contentOf(node).forEach((child, index) => {
+  children.forEach((child, index) => {
+    if (blockFirst && index === 0) {
+      return;
+    }
     const rendered = (
       helpers.renderChild ? helpers.renderChild(child, index) : helpers.renderChildren([child])
     ).replace(/^\n+|\n+$/g, '');
+    const starts = output === '';
     const lines = rendered
       .split('\n')
-      .map((line, number) => ((index === 0 && number === 0) || line === '' ? line : indent + line));
-    if (index === 0) {
+      .map((line, number) => ((starts && number === 0) || line === '' ? line : indent + line));
+    if (starts) {
       output = marker + lines.join('\n');
     } else {
       output += (BLANK_LINE_BEFORE.has(child.type ?? '') ? '\n\n' : '\n') + lines.join('\n');
@@ -230,7 +241,34 @@ function renderListItem(
   return output === '' ? marker.trimEnd() : output;
 }
 
+/**
+ * The blocks of a list item as CommonMark reads them. Tiptap's own parser
+ * turns a heading at the start into a paragraph, `- 1. x` into text and
+ * keeps text after an HTML block as bare text.
+ */
+function listItemBlocks(tokens: MarkdownToken[], helpers: MarkdownParseHelpers): JSONContent[] {
+  const blocks = tokens.flatMap((token): JSONContent[] => {
+    if (token.type === 'space') {
+      return [];
+    }
+    if (token.type === 'text') {
+      const inline = token.tokens ?? helpers.tokenizeInline?.(token.text ?? '') ?? [];
+      return [helpers.createNode('paragraph', undefined, helpers.parseInline(inline))];
+    }
+    return helpers.parseChildren([token]);
+  });
+  // The schema wants a paragraph first (`paragraph block*`).
+  return blocks[0]?.type === 'paragraph' ? blocks : [{ type: 'paragraph', content: [] }, ...blocks];
+}
+
 export const MarkdownListItem = ListItem.extend({
+  parseMarkdown(token, helpers) {
+    if (token.type !== 'list_item') {
+      return [];
+    }
+    return helpers.createNode('listItem', undefined, listItemBlocks(token.tokens ?? [], helpers));
+  },
+
   renderMarkdown(node, helpers, context) {
     if (context.parentType === 'orderedList') {
       const start = Number(
@@ -262,7 +300,7 @@ export const MarkdownTaskItem = TaskItem.extend({
 
   renderMarkdown(node, helpers) {
     // The content column of `- [ ] text` is that of the bullet `- `.
-    return renderListItem(node, helpers, attribute(node, 'checked') === true ? '- [x] ' : '- [ ] ', 2);
+    return renderListItem(node, helpers, attribute(node, 'checked') === true ? '- [x] ' : '- [ ] ', 2, true);
   },
 });
 

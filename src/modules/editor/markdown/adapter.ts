@@ -42,7 +42,11 @@ export function parseMarkdown(markdown: string): MarkdownDocument {
   const { frontMatter, body } = splitFrontMatter(markdown.replace(/\r\n?/g, '\n'));
   const protectedBody = protectTabs(body);
   const parsed = markdownManager().parse(protectedBody);
-  return { frontMatter, body: normalizeParsed(protectedBody === body ? parsed : restoreTabs(parsed)) };
+  const normalized = normalizeParsed(protectedBody === body ? parsed : restoreTabs(parsed));
+  // An empty file is one empty paragraph (the schema wants a block).
+  const blocks = normalized.content ?? [];
+  const content = blocks.length > 0 ? blocks : [{ type: 'paragraph', content: [] }];
+  return { frontMatter, body: { ...normalized, content } };
 }
 
 /** A paragraph holding only a non-breaking space (`&nbsp;`) is an empty paragraph, outside tables. */
@@ -66,6 +70,9 @@ export function isNbspParagraph(node: JSONContent): boolean {
 /** Stands for a tab while marked reads the text (Unicode private use). */
 const TAB_MARK = '\uE000';
 
+/** A code fence, also after list markers or `>` (`- ```js`). */
+const FENCE_LINE = /^((?:[ \t]*(?:>[ \t]?|(?:[-+*]|\d{1,9}[.)])[ \t]+))*[ \t]*)(`{3,}|~{3,})(.*)$/;
+
 /** Markers at the start of a line whose following tab is structure. */
 const LINE_PREFIX = /^[ \t]*(?:(?:>|[-+*]|\d{1,9}[.)]|#{1,6}|\[[ xX]\])(?:[ \t]+|$))*/;
 
@@ -83,11 +90,15 @@ export function protectTabs(markdown: string): string {
   return markdown
     .split('\n')
     .map((line) => {
-      const opening = /^([ \t]*)(`{3,}|~{3,})/.exec(line);
-      const marker = opening?.[2];
+      const match = FENCE_LINE.exec(line);
+      const marker = match?.[2];
       if (fence === null) {
-        if (opening !== null && marker !== undefined) {
-          fence = { indent: opening[1] ?? '', marker };
+        if (match !== null && marker !== undefined) {
+          // Lines of the code block start at the fence's column.
+          fence = {
+            indent: (match[1] ?? '').replace(/[-+*]|\d{1,9}[.)]/g, (item) => ' '.repeat(item.length)),
+            marker,
+          };
           return line;
         }
         return protectContentTabs(line);
@@ -96,7 +107,7 @@ export function protectTabs(markdown: string): string {
         marker !== undefined &&
         marker.startsWith(fence.marker.charAt(0)) &&
         marker.length >= fence.marker.length &&
-        line.trim() === marker
+        (match?.[3] ?? '').trim() === ''
       ) {
         fence = null;
         return line;
@@ -164,7 +175,7 @@ export function isBlankParagraph(node: JSONContent | undefined): boolean {
 /**
  * A copy of the document as Markdown writes it: without empty paragraphs at
  * the edges, with alternating markers for adjacent lists of the same kind,
- * numbered lists with digits, each code span on its own.
+ * numbered lists with digits, each code span on its own, autolinks raw.
  */
 export function prepareForMarkdown(document: JSONContent): JSONContent {
   const content = prepareContent(document.content ?? [], { codeRuns: 0 });
@@ -203,6 +214,39 @@ function splitCodeEdges(content: JSONContent[]): JSONContent[] {
   });
 }
 
+const AUTOLINK_URI = /^[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>\p{Cc}]*$/u;
+const AUTOLINK_EMAIL =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
+/**
+ * A link whose text is its address, with no other formatting, as `<…>`:
+ * written raw, because nothing inside an autolink is escaped.
+ */
+function asAutolink(
+  node: JSONContent,
+  previous: JSONContent | undefined,
+  next: JSONContent | undefined,
+): JSONContent | null {
+  const [mark, ...others] = node.marks ?? [];
+  if (node.type !== 'text' || mark?.type !== 'link' || others.length > 0) {
+    return null;
+  }
+  const href: unknown = mark.attrs?.['href'];
+  const title: unknown = mark.attrs?.['title'];
+  const text = node.text ?? '';
+  if (typeof href !== 'string' || (typeof title === 'string' && title !== '')) {
+    return null;
+  }
+  const sameLink = (neighbour: JSONContent | undefined): boolean =>
+    (neighbour?.marks ?? []).some((other) => other.type === 'link' && other.attrs?.['href'] === href);
+  if (sameLink(previous) || sameLink(next)) {
+    return null;
+  }
+  const uri = text === href && AUTOLINK_URI.test(href);
+  const email = href === `mailto:${text}` && AUTOLINK_EMAIL.test(text);
+  return uri || email ? { type: 'rawInline', attrs: { raw: `<${text}>`, kind: 'autolink' } } : null;
+}
+
 /** Hard breaks at the edges of a paragraph mean nothing in Markdown. */
 function trimHardBreaks(content: JSONContent[]): JSONContent[] {
   let start = 0;
@@ -215,10 +259,11 @@ function trimHardBreaks(content: JSONContent[]): JSONContent[] {
 function prepareContent(input: JSONContent[], state: PrepareState): JSONContent[] {
   let previous: JSONContent | null = null;
   const content = input.some((child) => child.type === 'text') ? splitCodeEdges(input) : input;
-  return content.map((child) => {
+  return content.map((child, index) => {
     let node: JSONContent = Array.isArray(child.content)
       ? { ...child, content: prepareContent(child.content, state) }
       : child;
+    node = asAutolink(node, content[index - 1], content[index + 1]) ?? node;
     if (node.type === 'paragraph' && Array.isArray(node.content)) {
       node = { ...node, content: trimHardBreaks(node.content) };
     }

@@ -1,0 +1,3 @@
+- [ ] Einkaufen
+- [x] Schreiben
+- [ ] Lesen

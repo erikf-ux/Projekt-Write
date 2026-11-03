@@ -3,3 +3,5 @@
 *.png binary
 *.ico binary
 *.icns binary
+# Markdown round-trip inputs stay byte for byte, CRLF included.
+tests/fixtures/markdown/** -text
