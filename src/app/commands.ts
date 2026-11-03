@@ -1,5 +1,5 @@
 /**
- * The commands of Phase 3 (ADR 0011). `isAvailable` decides what the
+ * The commands of Phase 3 (ADR 0012). `isAvailable` decides what the
  * command palette shows and which menu items are enabled: only what works
  * right now (section 25, Phase 3: "Die Command Palette zeigt nur
  * funktionierende Befehle").

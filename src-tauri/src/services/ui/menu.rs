@@ -7,7 +7,7 @@
 //! * Labels come from the frontend's translation files (`src/i18n/*.json`),
 //!   compiled in, so there is one set of texts.
 //! * Items carry no native accelerators: shortcuts are handled once, in the
-//!   webview, where they are configurable and testable (ADR 0011). On
+//!   webview, where they are configurable and testable (ADR 0012). On
 //!   Windows the shortcut is shown after a tab, as Win32 menus do.
 //! * The frontend reports which commands are available; the others are
 //!   disabled.

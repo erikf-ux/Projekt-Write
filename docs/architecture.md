@@ -67,28 +67,42 @@ Keine Schicht wird übersprungen (Abschnitt 8). ESLint verbietet `@tauri-apps/ap
 | `src/database/documents.rs`, `src/database/settings.rs` | SQL der Tabellen `documents` und `application_settings`                                                                                                                                                   | 2            |
 | `migrations/0002_documents.sql`                         | Tabelle `documents`                                                                                                                                                                                       | 2            |
 | `examples/reference_library/`                           | Erzeugt die Referenzbibliothek (ADR 0010), gestartet von `scripts/reference-library.mjs`                                                                                                                  | 2            |
+| `src/services/settings/ui.rs`                           | Oberflächeneinstellungen und Fensterzustand in `settings.json`, Prüfung der Tastenkürzel (ADR 0013)                                                                                                       | 3            |
+| `src/services/locale.rs`                                | Sprache der Oberfläche: Einstellung oder Systemsprache (Windows-Anzeigesprache, gettext-Variablen)                                                                                                        | 3            |
+| `src/services/ui/`                                      | `UiService`: Einstellungen, Ereigniskanal, Schließen-Ablauf; `menu.rs` natives Menü; `window.rs` Fensterzustand und Zoom (ADR 0012, 0013)                                                                 | 3            |
+| `src/services/themes.rs`                                | Importierte Designs: Prüfung inkl. Kontrast, Ablage in `themes/` (ADR 0013)                                                                                                                               | 3            |
+| `src/services/import.rs`                                | Prüfung importierter Dateien: Positivliste, Inhalt, UTF-8, LF (ADR 0011)                                                                                                                                  | 3            |
+| `src/commands/ui.rs`, `src/commands/documents.rs`       | Befehle der Oberfläche und der Dokumente                                                                                                                                                                  | 3            |
+| `migrations/0003_document_import.sql`                   | `documents.original_name`                                                                                                                                                                                 | 3            |
 | `src/language/`                                         | entsteht in Phase 12                                                                                                                                                                                      | –            |
 
 ## 4. Frontend (`src/`)
 
-| Pfad                                                 | Aufgabe                                                                                             |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `main.tsx`                                           | Einstieg, Theme vor dem ersten Rendern                                                              |
-| `app/App.tsx`, `app/StartScreen.tsx`, `app/Logo.tsx` | App-Hülle und Startbildschirm                                                                       |
-| `app/systemStatusStore.ts`                           | Zustand (Zustand-Store) der Systemprüfung                                                           |
-| `modules/library/`                                   | Bibliotheksansicht (`LibraryPanel`), Store (`libraryStore.ts`), Größenformat; Phase 2               |
-| `services/library.ts`                                | Aufrufe der Bibliotheksbefehle                                                                      |
-| `services/ipc.ts`                                    | Typisierte Befehlsaufrufe, Fehlernormalisierung, Fortschritt über Tauri-Kanäle (`callWithProgress`) |
-| `services/system.ts`                                 | Aufruf `system_check`                                                                               |
-| `i18n/`                                              | Wörterbücher `de.json`, `en.json`, `translate`, `useT`, Spracherkennung                             |
-| `modules/themes/`                                    | Design-Tokens, Kontrastberechnung, Anwenden als CSS-Variablen                                       |
-| `types/generated/`                                   | Aus Rust erzeugte Typen (`ts-rs`), nie von Hand ändern                                              |
-| `test/setup.ts`                                      | Vitest-Setup (jsdom)                                                                                |
-| `index.css`                                          | Tailwind 4, Zuordnung Tokens → Utility-Farben, Basisstile, Fokusring, `prefers-reduced-motion`      |
+| Pfad                                                                     | Aufgabe                                                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `main.tsx`                                                               | Einstieg, Theme vor dem ersten Rendern                                                                  |
+| `app/App.tsx`, `app/StartScreen.tsx`, `app/Logo.tsx`                     | App-Hülle; erster Start (Bibliothek, Sprache, Systemprüfung)                                            |
+| `app/Workbench.tsx`                                                      | Hauptlayout (Phase 3): Toolbar, Activity Bar, Seitenleiste, Tabs, Schreibfläche, Statusleiste           |
+| `app/commands.ts`, `app/bindings.ts`, `app/lifecycle.ts`, `app/focus.ts` | Befehle der Phase 3, wirksame Kürzel, Beenden mit Speichern vorab, Fokus zwischen Bereichen             |
+| `components/`                                                            | Dialog, Kontextmenü, Hinweise, Toolbar, Activity Bar, Seitenleiste, Tabs, Statusleiste                  |
+| `modules/commands/`                                                      | Befehlsregister, Tastenkürzel (kanonische Form, Konflikte), Kürzel-Listener, Command Palette (ADR 0012) |
+| `modules/documents/`                                                     | Explorer, Workspace-Store (Tabs, Autosave), Import per Drag & Drop (ADR 0011)                           |
+| `modules/editor/`                                                        | Schreibfläche der Phase 3 (Textfeld je Tab); Tiptap ab Phase 4                                          |
+| `modules/settings/`                                                      | Oberflächen-Store, Einstellungsdialog (Allgemein, Tastenkürzel, Bibliothek)                             |
+| `app/systemStatusStore.ts`                                               | Zustand (Zustand-Store) der Systemprüfung                                                               |
+| `modules/library/`                                                       | Bibliotheksansicht (`LibraryPanel`), Store (`libraryStore.ts`), Größenformat; Phase 2                   |
+| `services/library.ts`                                                    | Aufrufe der Bibliotheksbefehle                                                                          |
+| `services/ipc.ts`                                                        | Typisierte Befehlsaufrufe, Fehlernormalisierung, Fortschritt über Tauri-Kanäle (`callWithProgress`)     |
+| `services/system.ts`                                                     | Aufruf `system_check`                                                                                   |
+| `i18n/`                                                                  | Wörterbücher `de.json`, `en.json`, `translate`, `useT`, Spracherkennung                                 |
+| `modules/themes/`                                                        | Design-Tokens, Kontrastberechnung, Anwenden als CSS-Variablen                                           |
+| `types/generated/`                                                       | Aus Rust erzeugte Typen (`ts-rs`), nie von Hand ändern                                                  |
+| `test/setup.ts`                                                          | Vitest-Setup (jsdom)                                                                                    |
+| `index.css`                                                              | Tailwind 4, Zuordnung Tokens → Utility-Farben, Basisstile, Fokusring, `prefers-reduced-motion`          |
 
-**Theming:** `modules/themes/tokens.ts` ist die einzige Quelle der Farben. `applyTheme` erzeugt daraus einmal ein `<style>` mit Regeln `[data-theme="dark"|"light"] { --pw-color-*: …; color-scheme: … }` und schaltet nur noch das Attribut `data-theme` an `<html>` um. Tailwind-Klassen wie `bg-surface` oder `text-muted` verweisen per `@theme inline` auf die Variablen. Hintergrund: Das direkte Umschreiben der Variablen als Inline-Stil an `<html>` hinterließ in WebKit unter macOS veraltete berechnete Farben (im E2E-Test belegt); das Umschalten über Selektoren wird von allen Engines zuverlässig neu berechnet. Importierbare Theme-Dateien (Phase 3) liefern andere Werte für dieselben Tokens.
+**Theming:** `modules/themes/tokens.ts` ist die einzige Quelle der Farben. `applyTheme` erzeugt daraus einmal ein `<style>` mit Regeln `[data-theme="dark"|"light"] { --pw-color-*: …; color-scheme: … }` und schaltet nur noch das Attribut `data-theme` an `<html>` um. Tailwind-Klassen wie `bg-surface` oder `text-muted` verweisen per `@theme inline` auf die Variablen. Hintergrund: Das direkte Umschreiben der Variablen als Inline-Stil an `<html>` hinterließ in WebKit unter macOS veraltete berechnete Farben (im E2E-Test belegt); das Umschalten über Selektoren wird von allen Engines zuverlässig neu berechnet. Importierte Designs (Phase 3, ADR 0013) liefern andere Werte für dieselben Tokens und gelten über `[data-theme="custom"]`.
 
-**Sprache:** Deutsch und Englisch, standardmäßig nach `navigator.languages`. Fehlermeldungen kommen als `messageKey` aus Rust und werden im Frontend übersetzt. Ein Rust-Test prüft, dass jeder `messageKey` in beiden Sprachdateien steht.
+**Sprache:** Deutsch und Englisch, standardmäßig passend zum System. Seit Phase 3 entscheidet Rust (für Menü und Webview gleich, `ui_state.locale`). Fehlermeldungen kommen als `messageKey` aus Rust und werden im Frontend übersetzt. Ein Rust-Test prüft, dass jeder `messageKey` in beiden Sprachdateien steht.
 
 ## 5. IPC-Vertrag
 
@@ -113,6 +127,20 @@ Siehe ADR 0002. Kurzfassung:
 | `library_move`             | `{ location: Token, acceptWarning }` + Kanal `onProgress: MoveProgress`      | `LibraryStatus`                                                                         | 2     |
 | `library_cancel_move`      | `{}`                                                                         | `boolean` (lief ein Umzug?)                                                             | 2     |
 | `library_accept_location`  | `{}`                                                                         | `LibraryStatus` (Sync-Ordner/Netzlaufwerk bestätigt)                                    | 2     |
+| `ui_state`                 | `{}`                                                                         | `UiState { settings, locale, platform, readOnly, customThemes }`                        | 3     |
+| `ui_update_settings`       | `{ settings: UiSettings }` (alle Werte geprüft)                              | `UiState`; wendet den Zoom an, beschriftet das Menü bei Sprachwechsel neu               | 3     |
+| `ui_subscribe`             | `{}` + Kanal `onEvent: UiEvent` (`command` oder `closeRequested`)            | `null`                                                                                  | 3     |
+| `ui_menu_state`            | `{ items: { [MenuCommand]: { enabled, shortcut } } }`                        | `null`                                                                                  | 3     |
+| `ui_set_focus_mode`        | `{ enabled }`                                                                | `null` (Vollbild, Menüleiste aus)                                                       | 3     |
+| `ui_close_response`        | `{ close }`                                                                  | `null` (schließt bei `true` das Fenster)                                                | 3     |
+| `documents_list`           | `{}`                                                                         | `DocumentSummary[]`                                                                     | 3     |
+| `document_create`          | `{ title, format: txt \| md }`                                               | `DocumentSummary`                                                                       | 3     |
+| `document_read`            | `{ id }`                                                                     | `DocumentText { document, text }`                                                       | 3     |
+| `document_save`            | `{ id, text }`                                                               | `DocumentSummary` (unveränderter Text wird nicht geschrieben)                           | 3     |
+| `document_rename`          | `{ id, title }`                                                              | `DocumentSummary`                                                                       | 3     |
+| `document_import`          | `{ fileName, contentBase64, allowDuplicate }`                                | `ImportResult` (`imported` oder `duplicate` mit dem vorhandenen Dokument)               | 3     |
+| `theme_import`             | `{ content }` (Text der Design-Datei)                                        | `UiState` (das Design ist aktiv)                                                        | 3     |
+| `theme_remove`             | `{ id }`                                                                     | `UiState`                                                                               | 3     |
 
 ## 6. Sicherheitsmodell (Abschnitt 20)
 

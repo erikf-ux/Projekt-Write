@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 2 – Speicherkern**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 3 – Oberfläche**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -39,6 +39,23 @@ Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Wi
 ## Die Bibliothek
 
 Project Write speichert Dokumente in einer **Bibliothek**: einem Ordner mit Datenbank und Dateien (Standard `Dokumente/ProjectWrite`). Eine Bibliothek ist immer nur in einer Instanz geöffnet. Liegt sie in einem Sync-Ordner (OneDrive, Dropbox, iCloud Drive, Google Drive) oder auf einem Netzlaufwerk, warnt die App und arbeitet dort im Rollback-Modus der Datenbank; empfohlen ist ein lokaler Ort. Ein Umzug kopiert, prüft und schaltet erst dann um; der alte Ordner bleibt, bis Sie ihn entfernen.
+
+## Bedienung
+
+Beim ersten Start wählen Sie den Ort der Bibliothek und die Sprache; danach öffnet sich ein leeres Dokument. Dokumente der Bibliothek speichern von selbst (1 s nach der letzten Eingabe, beim Tab-Wechsel und beim Schließen); die Statusleiste zeigt „Gespeichert“. Text- und Markdown-Dateien, die Sie auf das Fenster ziehen, werden in die Bibliothek importiert; das Original bleibt unverändert.
+
+| Aktion                                 | Kürzel (macOS: `Cmd` statt `Strg`)           |
+| -------------------------------------- | -------------------------------------------- |
+| Befehlspalette                         | `Strg + Umschalt + P`                        |
+| Neues Dokument, Speichern              | `Strg + N`, `Strg + S`                       |
+| Tab schließen, nächster/vorheriger     | `Strg + W`, `Strg + Bild ab/auf`             |
+| Dokument umbenennen                    | `F2`                                         |
+| Explorer, Seitenleiste ein/aus         | `Strg + Umschalt + E`, `Strg + Umschalt + B` |
+| Fokusmodus                             | `F11` (Esc beendet ihn)                      |
+| Vergrößern, Verkleinern, Originalgröße | `Strg + +`, `Strg + -`, `Strg + 0`           |
+| Einstellungen                          | `Strg + ,`                                   |
+
+Alle Kürzel lassen sich unter Einstellungen › Tastenkürzel ändern; Konflikte werden gemeldet. Eigene Designs (JSON-Dateien mit allen Farben, Kontrast mindestens 4,5:1) importieren Sie unter Einstellungen › Allgemein.
 
 ## Datenschutz
 

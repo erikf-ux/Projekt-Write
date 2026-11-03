@@ -10,13 +10,17 @@
  *   lie inside the project folder (section 2); the example refuses anything
  *   else and replaces an existing folder only with --force and only if it is
  *   a reference library itself.
- * * --check builds the library twice (src-tauri/target/reference-check-a and
- *   -b) and fails if the fingerprints differ.
+ * * --check builds the library twice, each time into a new folder below
+ *   src-tauri/target that this run creates (reference-check-XXXXXX/a and /b),
+ *   fails if the fingerprints differ, and removes only that folder again.
+ *   Folders of earlier runs (for example restored from a CI cache) are never
+ *   touched.
  *
  * Phase 2 holds documents only (10,000 by default, one with 50,000 words).
  * Media, subnets, tags and connections follow with their tables.
  */
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,8 +82,16 @@ function generate(out, seed, documents, force) {
 const options = parse(process.argv.slice(2));
 build();
 if (options.check) {
-  const first = generate(path.join(target, 'reference-check-a'), options.seed, options.documents, true);
-  const second = generate(path.join(target, 'reference-check-b'), options.seed, options.documents, true);
+  // A folder of this run only: nothing that existed before is overwritten.
+  const work = fs.mkdtempSync(path.join(target, 'reference-check-'));
+  let first;
+  let second;
+  try {
+    first = generate(path.join(work, 'a'), options.seed, options.documents, false);
+    second = generate(path.join(work, 'b'), options.seed, options.documents, false);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
   if (first !== second) {
     console.error(`not reproducible: ${first} != ${second}`);
     process.exit(1);

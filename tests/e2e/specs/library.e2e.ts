@@ -150,5 +150,10 @@ describe('Project Write – Phase 2 library', () => {
     const stopped = lines.findLastIndex((line) => line.includes('Project Write stopped'));
     expect(closed).toBeGreaterThan(-1);
     expect(closed).toBeLessThan(stopped);
+    // Phase 3: size and position of the window are remembered.
+    const window = readJson(path.join(appDirs, 'config', 'settings.json'))['window'] as
+      { width: number; height: number; maximized: boolean } | undefined;
+    expect(window?.width).toBeGreaterThanOrEqual(400);
+    expect(window?.height).toBeGreaterThanOrEqual(300);
   });
 });

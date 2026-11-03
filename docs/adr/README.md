@@ -15,3 +15,6 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0008](0008-ordnerwahl-in-rust.md)                | Ordnerwahl in Rust, Tokens statt Pfaden                                      | angenommen                                    |
 | [0009](0009-einstellungen-und-logging.md)         | App- und Bibliothekseinstellungen, Logging                                   | angenommen                                    |
 | [0010](0010-referenzbibliothek.md)                | Referenzbibliothek                                                           | angenommen                                    |
+| [0011](0011-umfang-der-oberflaeche-in-phase-3.md) | Umfang der Oberfläche in Phase 3                                             | angenommen                                    |
+| [0012](0012-befehle-tastenkuerzel-und-menue.md)   | Befehle, Tastenkürzel, natives Menü                                          | angenommen                                    |
+| [0013](0013-importierbare-designs.md)             | Importierbare Designs und Oberflächeneinstellungen                           | angenommen                                    |

@@ -4,6 +4,28 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 3 – Oberfläche
+
+#### Hinzugefügt
+
+- Hauptlayout nach Abschnitt 11: natives Menü (Datei, Ansicht), Toolbar, Activity Bar (Explorer, Schreibfläche), Seitenleiste mit Explorer (Breite ändern, ein- und ausblenden), Dokument-Tabs, Statusleiste.
+- Befehlsregister: Menü, Toolbar, Befehlspalette (`Strg + Umschalt + P`, nur funktionierende Befehle), Tastenkürzel und Kontextmenüs führen dieselben Befehle aus.
+- Konfigurierbare Tastenkürzel mit Konflikterkennung: belegte Kürzel werden vor dem Zuweisen gemeldet, Konflikte in `settings.json` in Statusleiste und Einstellungen angezeigt; ein Kürzel mit Konflikt führt nichts aus.
+- Explorer mit virtualisierter Liste (Tastatur, Umbenennen mit `F2`, Kontextmenü); Tabs mit Tastatur, Kontextmenü, Verschieben per Tastatur und Drag & Drop.
+- Schreibfläche der Phase 3 für Text und Markdown-Quelltext mit Autosave nach Abschnitt 9 und Zeilenbreite höchstens 72 Zeichen (abschaltbar).
+- Drag & Drop: abgelegte Text- und Markdown-Dateien werden importiert (Positivliste, Inhaltsprüfung, UTF-8, Duplikat-Rückfrage, Originalname gespeichert).
+- Designs: hell, dunkel, wie das System; importierbare Design-Dateien mit Kontrastprüfung in Rust.
+- Erster Start: Bibliotheksort und Sprache, danach ein leeres Dokument. Sprache, Design, Zoom, Seitenleiste, Zeilenbreite, Tastenkürzel und Fensterzustand in `settings.json`.
+- Fokusmodus (`F11`: Vollbild, nur die Schreibfläche), Oberflächenzoom (50–200 %).
+- Beenden speichert zuerst alles; scheitert das, entscheidet der Nutzer.
+- Migration 0003 (`documents.original_name`); Befehle für Oberfläche, Dokumente und Designs mit Tests für gültige und ungültige Eingaben.
+
+#### Geändert
+
+- Die Sprache bestimmt jetzt Rust (Einstellung oder Systemsprache), für Menü und Webview gleich.
+- Die Bibliotheksansicht liegt nach dem ersten Start in den Einstellungen.
+- E2E: Der Rauchtest von Phase 1 läuft zuerst (Startbildschirm); Pixel-Hilfen in `tests/e2e/pixels.ts`.
+
 ### Phase 2 – Speicherkern
 
 #### Hinzugefügt

@@ -1,6 +1,6 @@
 /**
  * Commands of Phase 3. Menu, toolbar, command palette, shortcuts and context
- * menus all run commands from one registry (ADR 0011), so every way to
+ * menus all run commands from one registry (ADR 0012), so every way to
  * reach a function behaves the same.
  */
 import type { MessageKey } from '@/i18n';

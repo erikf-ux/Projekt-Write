@@ -441,8 +441,13 @@ describe('Project Write – Phase 3 workbench', () => {
 
   it('zooms the interface and changes the side bar, and remembers both', async () => {
     await $('#pw-explorer-list').click();
+    const widthBefore = await browser.execute(() => window.innerWidth);
     await browser.keys(['Control', '=']);
     await expect($('[data-testid="status-zoom"]')).toHaveText(expect.stringContaining('110'));
+    // The webview really zooms: the same window holds fewer CSS pixels.
+    await browser.waitUntil(async () => (await browser.execute(() => window.innerWidth)) < widthBefore, {
+      timeoutMsg: 'the webview did not zoom',
+    });
     await browser.waitUntil(() => readSettings()['zoom'] === 1.1, { timeoutMsg: 'zoom not saved' });
     await browser.keys(['Control', '0']);
     await expect($('[data-testid="status-zoom"]')).not.toBeExisting();
