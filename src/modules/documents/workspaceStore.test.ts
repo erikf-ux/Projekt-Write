@@ -1,6 +1,7 @@
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTOSAVE_DELAY_MS, freeTitle, useWorkspace } from './workspaceStore';
+import type { Loss } from '@/modules/editor/markdown/losses';
+import { AUTOSAVE_DELAY_MS, freeTitle, setDocumentSource, useWorkspace } from './workspaceStore';
 
 const ID_A = '1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c';
 const ID_B = '2f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c';
@@ -57,6 +58,37 @@ function mockBackend(): Backend {
   return backend;
 }
 
+/** Stands in for the editor session of a tab: holds its text, may block saving. */
+interface FakeSource {
+  text: string;
+  losses: Loss[];
+  accepted: Loss[];
+}
+
+const fakeSources = new Map<string, FakeSource>();
+
+function source(id: string, text: string): FakeSource {
+  const fake: FakeSource = { text, losses: [], accepted: [] };
+  fakeSources.set(id, fake);
+  setDocumentSource(id, {
+    saveRequest: () =>
+      fake.losses.length > fake.accepted.length
+        ? { kind: 'blocked', losses: fake.losses }
+        : { kind: 'text', text: fake.text },
+    acceptLosses: (losses) => {
+      fake.accepted = [...losses];
+    },
+  });
+  return fake;
+}
+
+/** Typing in the editor of a tab. */
+function type(id: string, text: string): void {
+  const fake = fakeSources.get(id) ?? source(id, '');
+  fake.text = text;
+  useWorkspace.getState().edit(id);
+}
+
 describe('workspace', () => {
   let backend: Backend;
 
@@ -70,16 +102,18 @@ describe('workspace', () => {
   afterEach(() => {
     vi.useRealTimers();
     clearMocks();
+    fakeSources.clear();
   });
 
   it('autosaves 1 s after the last input, once', async () => {
     const workspace = useWorkspace.getState();
     expect(await workspace.openDocument(ID_A)).toBe(true);
-    expect(useWorkspace.getState().open[ID_A]?.text).toBe('Alpha');
+    expect(useWorkspace.getState().open[ID_A]?.loadedText).toBe('Alpha');
+    source(ID_A, 'Alpha');
 
-    workspace.edit(ID_A, 'Alpha 1');
+    type(ID_A, 'Alpha 1');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS / 2);
-    workspace.edit(ID_A, 'Alpha 12');
+    type(ID_A, 'Alpha 12');
     expect(useWorkspace.getState().open[ID_A]?.state).toBe('pending');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS - 1);
     expect(backend.saves).toEqual([]);
@@ -93,7 +127,7 @@ describe('workspace', () => {
   it('saves the previous tab when switching tabs', async () => {
     const workspace = useWorkspace.getState();
     await workspace.openDocument(ID_A);
-    workspace.edit(ID_A, 'geändert');
+    type(ID_A, 'geändert');
     await workspace.openDocument(ID_B);
     await vi.waitFor(() => {
       expect(backend.saves).toEqual(['geändert']);
@@ -105,11 +139,11 @@ describe('workspace', () => {
     const workspace = useWorkspace.getState();
     await workspace.openDocument(ID_A);
     backend.failSave = true;
-    workspace.edit(ID_A, 'nicht verlieren');
+    type(ID_A, 'nicht verlieren');
     expect(await workspace.closeTab(ID_A)).toBe(false);
     const document = useWorkspace.getState().open[ID_A];
     expect(document?.state).toBe('error');
-    expect(document?.text).toBe('nicht verlieren');
+    expect(document?.savedText).toBe('Alpha');
     expect(useWorkspace.getState().tabs).toEqual([ID_A]);
     expect(useWorkspace.getState().lastError?.code).toBe('FILE_SYSTEM');
 
@@ -122,12 +156,29 @@ describe('workspace', () => {
   it('writes nothing for unchanged text', async () => {
     const workspace = useWorkspace.getState();
     await workspace.openDocument(ID_A);
-    workspace.edit(ID_A, 'Alpha!');
-    workspace.edit(ID_A, 'Alpha');
-    expect(useWorkspace.getState().open[ID_A]?.state).toBe('saved');
+    type(ID_A, 'Alpha!');
+    type(ID_A, 'Alpha');
     expect(await workspace.flushAll()).toBe(true);
+    expect(useWorkspace.getState().open[ID_A]?.state).toBe('saved');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS * 2);
     expect(backend.saves).toEqual([]);
+  });
+
+  it('does not save what Markdown would lose until the user saves anyway', async () => {
+    const workspace = useWorkspace.getState();
+    await workspace.openDocument(ID_A);
+    const fake = source(ID_A, 'Alpha');
+    fake.losses = [{ kind: 'tableMergedCells', block: 2, excerpt: 'A' }];
+    type(ID_A, 'Alpha | B');
+    expect(await workspace.flush(ID_A)).toBe(false);
+    expect(useWorkspace.getState().open[ID_A]?.state).toBe('blocked');
+    expect(useWorkspace.getState().open[ID_A]?.losses).toEqual(fake.losses);
+    expect(backend.saves).toEqual([]);
+
+    expect(await workspace.saveAnyway(ID_A)).toBe(true);
+    expect(fake.accepted).toEqual(fake.losses);
+    expect(backend.saves).toEqual(['Alpha | B']);
+    expect(useWorkspace.getState().open[ID_A]?.state).toBe('saved');
   });
 
   it('moves and closes tabs, activating a neighbour', async () => {

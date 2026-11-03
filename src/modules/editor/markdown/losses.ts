@@ -28,7 +28,9 @@ export type LossKind =
   | 'listNumbering'
   | 'emphasisBoundary'
   | 'codeBackticks'
-  | 'htmlLineStart';
+  | 'htmlLineStart'
+  /** Comes back different, with no rule above to name it (round-trip check). */
+  | 'changed';
 
 export interface Loss {
   kind: LossKind;
@@ -47,7 +49,7 @@ function textOf(node: JSONContent): string {
   return (node.content ?? []).map(textOf).join(node.type === 'paragraph' ? '' : ' ');
 }
 
-function excerpt(node: JSONContent): string {
+export function excerpt(node: JSONContent): string {
   const text = textOf(node).replace(/\s+/g, ' ').trim();
   return text.length > EXCERPT_LENGTH ? `${text.slice(0, EXCERPT_LENGTH - 1)}…` : text;
 }

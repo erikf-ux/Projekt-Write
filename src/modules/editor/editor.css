@@ -1,0 +1,248 @@
+/*
+ * The writing surface (section 11/12). Colours come from the design tokens
+ * only; the contrast of every pair is checked with the tokens (ADR 0013).
+ */
+
+.pw-surface {
+  min-height: 100%;
+  padding: 1.5rem;
+  color: var(--pw-color-text);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.pw-surface:focus {
+  box-shadow: inset 2px 0 0 0 var(--pw-color-accent);
+}
+
+/* Lines of at most 72 characters (section 11), with the bar at the edge. */
+[data-limit-width='true'] > .pw-session .pw-surface {
+  padding-inline: max(1.5rem, calc((100% - 72ch) / 2));
+}
+
+[data-focus-mode='true'] > .pw-session .pw-surface {
+  padding-block: 3rem;
+}
+
+/* Markdown source: every character as typed, in a fixed-width font. */
+.pw-source {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  tab-size: 4;
+}
+
+.pw-plain {
+  tab-size: 4;
+}
+
+/* Rich text */
+.pw-rich > * + * {
+  margin-top: 0.75em;
+}
+
+.pw-rich h1,
+.pw-rich h2,
+.pw-rich h3,
+.pw-rich h4,
+.pw-rich h5,
+.pw-rich h6 {
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.pw-rich h1 {
+  font-size: 1.9em;
+}
+.pw-rich h2 {
+  font-size: 1.5em;
+}
+.pw-rich h3 {
+  font-size: 1.25em;
+}
+.pw-rich h4 {
+  font-size: 1.1em;
+}
+.pw-rich h5,
+.pw-rich h6 {
+  font-size: 1em;
+}
+
+.pw-rich ul,
+.pw-rich ol {
+  padding-left: 1.6em;
+}
+
+.pw-rich ul {
+  list-style: disc;
+}
+
+.pw-rich ol {
+  list-style: decimal;
+}
+
+.pw-rich li > * + * {
+  margin-top: 0.25em;
+}
+
+.pw-rich ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.25em;
+}
+
+.pw-rich li[data-type='taskItem'] {
+  display: flex;
+  gap: 0.5em;
+  align-items: baseline;
+}
+
+.pw-rich li[data-type='taskItem'] > label {
+  flex: none;
+}
+
+.pw-rich li[data-type='taskItem'] > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.pw-rich li[data-type='taskItem'] input {
+  accent-color: var(--pw-color-accent);
+}
+
+.pw-rich blockquote {
+  border-left: 3px solid var(--pw-color-text-muted);
+  padding-left: 1em;
+}
+
+.pw-rich a {
+  color: var(--pw-color-accent);
+  text-decoration: underline;
+}
+
+.pw-rich code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  border: 1px solid var(--pw-color-text-muted);
+  border-radius: var(--radius-pw);
+  padding: 0 0.2em;
+}
+
+.pw-rich pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--pw-color-sidebar);
+  border-radius: var(--radius-pw);
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.pw-rich pre code {
+  border: 0;
+  padding: 0;
+  font-size: 1em;
+}
+
+.pw-rich hr {
+  border: 0;
+  border-top: 1px solid var(--pw-color-text-muted);
+  margin-block: 1.25em;
+}
+
+.pw-rich table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.pw-rich th,
+.pw-rich td {
+  border: 1px solid var(--pw-color-text-muted);
+  padding: 0.3em 0.5em;
+  vertical-align: top;
+}
+
+.pw-rich th {
+  font-weight: 650;
+  background: var(--pw-color-sidebar);
+}
+
+.pw-rich .selectedCell {
+  outline: 2px solid var(--pw-color-accent);
+  outline-offset: -2px;
+}
+
+/* Raw HTML and footnotes: shown as source, never executed (ADR 0014). */
+.pw-rich .pw-raw-block,
+.pw-rich .pw-raw-inline {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--pw-color-text-muted);
+}
+
+.pw-rich .pw-raw-block {
+  border: 1px dashed var(--pw-color-text-muted);
+  border-radius: var(--radius-pw);
+  padding: 0.5em 0.75em;
+  white-space: pre-wrap;
+}
+
+.pw-rich .pw-raw-block code {
+  border: 0;
+  padding: 0;
+  font-size: 1em;
+}
+
+/* Images are never loaded; the note shows what and where (section 12). */
+.pw-rich .pw-image {
+  border: 1px dashed var(--pw-color-text-muted);
+  border-radius: var(--radius-pw);
+  color: var(--pw-color-text-muted);
+  padding: 0 0.3em;
+}
+
+.pw-rich .pw-image::before {
+  content: '🖼 ';
+}
+
+.pw-rich .ProseMirror-selectednode {
+  outline: 2px solid var(--pw-color-accent);
+}
+
+/* ProseMirror needs these for its gap cursor and hidden fields. */
+.ProseMirror .ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+}
+
+.ProseMirror .ProseMirror-gapcursor::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--pw-color-text);
+  animation: pw-gapcursor 1.1s steps(2, start) infinite;
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+@keyframes pw-gapcursor {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ProseMirror [contenteditable='false'] {
+  white-space: normal;
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}

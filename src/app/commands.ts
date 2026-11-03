@@ -6,7 +6,7 @@
  */
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
-import { freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
+import { activeDocument, freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import type { UiSettings } from '@/types/generated/UiSettings';
@@ -222,6 +222,22 @@ export function createAppCommands(): CommandDefinition[] {
       titleKey: 'command.editor.focus',
       isAvailable: () => workspace().active !== null,
       run: focusEditor,
+    },
+    {
+      id: 'editor.toggleSource',
+      category: 'view',
+      titleKey: 'command.editor.toggleSource',
+      isAvailable: () => {
+        const document = activeDocument(workspace());
+        return document?.loaded === true && document.format === 'md' && libraryOpen();
+      },
+      run: () => {
+        const id = workspace().active;
+        if (id) {
+          workspace().toggleView(id);
+          focusEditor();
+        }
+      },
     },
     {
       id: 'focus.toggle',

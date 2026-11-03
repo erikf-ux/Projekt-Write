@@ -33,6 +33,7 @@ export const defaultKeybindings: Readonly<Partial<Record<CommandId, readonly str
   'sidebar.toggle': ['Ctrl+Shift+B'],
   'explorer.focus': ['Ctrl+Shift+E'],
   'focus.toggle': ['F11'],
+  'editor.toggleSource': ['Ctrl+/'],
   'zoom.in': ['Ctrl+Plus', 'Ctrl+='],
   'zoom.out': ['Ctrl+-'],
   'zoom.reset': ['Ctrl+0'],

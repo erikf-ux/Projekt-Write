@@ -1,7 +1,7 @@
 /** Moving the keyboard focus between the main regions. */
 import { EXPLORER_LIST_ID } from '@/modules/documents/Explorer';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
-import { editorElementId } from '@/modules/editor/PlainTextEditor';
+import { getSession } from '@/modules/editor/session';
 
 /** After the next render (the region may just become visible). */
 function later(action: () => void): void {
@@ -18,7 +18,7 @@ export function focusEditor(): void {
   later(() => {
     const id = useWorkspace.getState().active;
     if (id) {
-      document.getElementById(editorElementId(id))?.focus();
+      getSession(id)?.focus();
     }
   });
 }

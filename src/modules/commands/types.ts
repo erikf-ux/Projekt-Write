@@ -1,5 +1,5 @@
 /**
- * Commands of Phase 3. Menu, toolbar, command palette, shortcuts and context
+ * Commands of Phases 3 and 4. Menu, toolbar, command palette, shortcuts and context
  * menus all run commands from one registry (ADR 0012), so every way to
  * reach a function behaves the same.
  */
@@ -24,6 +24,7 @@ export type CommandId =
   | 'sidebar.toggle'
   | 'explorer.focus'
   | 'editor.focus'
+  | 'editor.toggleSource'
   | 'focus.toggle'
   | 'zoom.in'
   | 'zoom.out'

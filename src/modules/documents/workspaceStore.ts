@@ -7,8 +7,16 @@
  * the change in memory, the status bar shows "Fehler beim Speichern", and
  * the tab stays open. Library documents close without a question because
  * nothing is left unsaved.
+ *
+ * The text comes from the editor session of the tab (Phase 4), asked only
+ * when saving. If saving as Markdown would lose something, the document
+ * stays unsaved ("blocked") until the user saves anyway or changes it
+ * (section 10, ADR 0014).
  */
 import { create } from 'zustand';
+import type { Loss } from '@/modules/editor/markdown/losses';
+import type { ProbeIssue } from '@/modules/editor/markdown/probe';
+import { closeAllSessions, closeSession, getSession, type SaveRequest } from '@/modules/editor/session';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
@@ -17,19 +25,35 @@ import type { TextFormat } from '@/types/generated/TextFormat';
 
 export const AUTOSAVE_DELAY_MS = 1000;
 
-export type SaveState = 'saved' | 'pending' | 'saving' | 'error';
+export type SaveState = 'saved' | 'pending' | 'saving' | 'error' | 'blocked';
+
+/** Rich text, Markdown source, or plain text (`.txt`). */
+export type DocumentView = 'rich' | 'source' | 'plain';
 
 export interface OpenDocument {
   id: string;
   title: string;
   format: DocumentFormat;
-  /** The text in the writing surface. */
-  text: string;
+  /** The text as read from the library; the editor session starts from it. */
+  loadedText: string;
   /** The text as last saved. */
   savedText: string;
+  /** Counts changes, so a save knows whether the text changed meanwhile. */
+  revision: number;
   state: SaveState;
   error: CommandError | null;
+  /** What saving as Markdown would lose (state "blocked"). */
+  losses: Loss[];
+  view: DocumentView;
+  /** Why the rich view is not shown: at opening, or when switching to it. */
+  viewIssues: ProbeIssue[];
   loaded: boolean;
+}
+
+/** Where a tab's text comes from when it is saved: its editor session. */
+export interface DocumentSource {
+  saveRequest: () => SaveRequest;
+  acceptLosses: (losses: readonly Loss[]) => void;
 }
 
 interface WorkspaceStore {
@@ -45,8 +69,18 @@ interface WorkspaceStore {
   refresh: () => Promise<void>;
   openDocument: (id: string) => Promise<boolean>;
   createDocument: (title: string, format?: TextFormat) => Promise<string | null>;
-  edit: (id: string, text: string) => void;
+  /** The text of the tab changed (the session has it). */
+  edit: (id: string) => void;
   save: (id: string) => Promise<boolean>;
+  /** "Trotzdem speichern": accept the losses shown and save. */
+  saveAnyway: (id: string) => Promise<boolean>;
+  /** Hides the loss warning; the document stays unsaved. */
+  dismissLosses: (id: string) => void;
+  /** Rich text ⇄ Markdown source (`Ctrl+/`). */
+  toggleView: (id: string) => boolean;
+  dismissViewIssues: (id: string) => void;
+  /** The session of a tab exists: its view, and why it is not rich text. */
+  attachView: (id: string, view: DocumentView, issues: ProbeIssue[]) => void;
   flush: (id: string) => Promise<boolean>;
   flushAll: () => Promise<boolean>;
   activate: (id: string) => void;
@@ -64,6 +98,33 @@ interface WorkspaceStore {
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const saving = new Map<string, Promise<boolean>>();
+const sources = new Map<string, DocumentSource>();
+
+/** The editor of a tab registers here once it exists. */
+export function setDocumentSource(id: string, source: DocumentSource | null): void {
+  if (source) {
+    sources.set(id, source);
+  } else {
+    sources.delete(id);
+  }
+}
+
+function newOpenDocument(id: string, title: string, format: DocumentFormat, loaded: boolean): OpenDocument {
+  return {
+    id,
+    title,
+    format,
+    loadedText: '',
+    savedText: '',
+    revision: 0,
+    state: 'saved',
+    error: null,
+    losses: [],
+    view: format === 'md' ? 'rich' : 'plain',
+    viewIssues: [],
+    loaded,
+  };
+}
 
 function clearTimer(id: string): void {
   const timer = timers.get(id);
@@ -106,15 +167,22 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
   const write = async (id: string): Promise<boolean> => {
     clearTimer(id);
     const document = get().open[id];
-    if (!document?.loaded) {
+    const source = sources.get(id);
+    if (!document?.loaded || !source) {
       return true;
     }
-    if (document.text === document.savedText) {
-      patch(id, { state: 'saved', error: null });
+    const request = source.saveRequest();
+    if (request.kind === 'blocked') {
+      patch(id, { state: 'blocked', losses: request.losses, error: null });
+      return false;
+    }
+    const { text } = request;
+    const revision = document.revision;
+    if (text === document.savedText) {
+      patch(id, { state: 'saved', error: null, losses: [] });
       return true;
     }
-    const text = document.text;
-    patch(id, { state: 'saving' });
+    patch(id, { state: 'saving', losses: [] });
     const result = await call('document_save', { id, text });
     const now = get().open[id];
     if (!result.ok) {
@@ -124,7 +192,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     }
     set((state) => ({ documents: upsert(state.documents, result.value) }));
     if (now) {
-      const unchangedSince = now.text === text;
+      const unchangedSince = now.revision === revision;
       patch(id, { savedText: text, state: unchangedSince ? 'saved' : 'pending', error: null });
       if (!unchangedSince) {
         schedule(id);
@@ -135,6 +203,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
 
   const removeTab = (id: string) => {
     clearTimer(id);
+    sources.delete(id);
+    closeSession(id);
     set((state) => {
       const index = state.tabs.indexOf(id);
       const tabs = state.tabs.filter((tab) => tab !== id);
@@ -176,16 +246,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         tabs: [...state.tabs, id],
         open: {
           ...state.open,
-          [id]: {
-            id,
-            title: summary?.title ?? '',
-            format: summary?.format ?? 'txt',
-            text: '',
-            savedText: '',
-            state: 'saved',
-            error: null,
-            loaded: false,
-          },
+          [id]: newOpenDocument(id, summary?.title ?? '', summary?.format ?? 'txt', false),
         },
       }));
       get().activate(id);
@@ -196,7 +257,14 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       const { document, text } = result.value;
-      patch(id, { title: document.title, format: document.format, text, savedText: text, loaded: true });
+      patch(id, {
+        title: document.title,
+        format: document.format,
+        loadedText: text,
+        savedText: text,
+        view: document.format === 'md' ? 'rich' : 'plain',
+        loaded: true,
+      });
       set((state) => ({ documents: upsert(state.documents, document) }));
       return true;
     },
@@ -213,28 +281,19 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         tabs: [...state.tabs, document.id],
         open: {
           ...state.open,
-          [document.id]: {
-            id: document.id,
-            title: document.title,
-            format: document.format,
-            text: '',
-            savedText: '',
-            state: 'saved',
-            error: null,
-            loaded: true,
-          },
+          [document.id]: newOpenDocument(document.id, document.title, document.format, true),
         },
       }));
       get().activate(document.id);
       return document.id;
     },
 
-    edit: (id, text) => {
+    edit: (id) => {
       const document = get().open[id];
       if (!document?.loaded) {
         return;
       }
-      patch(id, { text, state: text === document.savedText ? 'saved' : 'pending', error: null });
+      patch(id, { state: 'pending', error: null, revision: document.revision + 1 });
       schedule(id);
     },
 
@@ -249,6 +308,38 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
           saving.delete(id);
         }
       }
+    },
+
+    saveAnyway: async (id) => {
+      const document = get().open[id];
+      const source = sources.get(id);
+      if (!document || !source) {
+        return true;
+      }
+      source.acceptLosses(document.losses);
+      return get().save(id);
+    },
+
+    dismissLosses: (id) => {
+      patch(id, { losses: [] });
+    },
+
+    toggleView: (id) => {
+      const session = getSession(id);
+      if (!session?.isMarkdown) {
+        return false;
+      }
+      const result = session.toggleView();
+      patch(id, { view: session.view, viewIssues: result.issues });
+      return result.ok;
+    },
+
+    attachView: (id, view, issues) => {
+      patch(id, { view, viewIssues: issues });
+    },
+
+    dismissViewIssues: (id) => {
+      patch(id, { viewIssues: [] });
     },
 
     flush: async (id) => {
@@ -330,6 +421,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       for (const id of get().tabs) {
         clearTimer(id);
       }
+      sources.clear();
+      closeAllSessions();
       set({
         documents: [],
         listLoaded: false,

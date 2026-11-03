@@ -49,7 +49,20 @@ function openDocument(id: string, state: 'saved' | 'pending' = 'saved') {
     active: id,
     open: {
       ...current.open,
-      [id]: { id, title: id, format: 'md', text: '', savedText: '', state, error: null, loaded: true },
+      [id]: {
+        id,
+        title: id,
+        format: 'md',
+        loadedText: '',
+        savedText: '',
+        revision: 0,
+        state,
+        error: null,
+        losses: [],
+        view: 'rich',
+        viewIssues: [],
+        loaded: true,
+      },
     },
   }));
 }

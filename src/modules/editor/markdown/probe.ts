@@ -73,15 +73,33 @@ export function firstDifference(
   before: JSONContent,
   after: JSONContent,
 ): { block: number; type: string } | null {
-  const left = canonicalBlocks(before);
-  const right = canonicalBlocks(after);
+  const left = withoutBlankEdges(before.content ?? []);
+  const right = withoutBlankEdges(after.content ?? []);
   const length = Math.max(left.length, right.length);
   for (let index = 0; index < length; index += 1) {
-    if (left[index]?.key !== right[index]?.key) {
-      return { block: index, type: left[index]?.type ?? right[index]?.type ?? 'doc' };
+    const a = left[index];
+    const b = right[index];
+    // Most blocks come back exactly; only the others need the canonical form.
+    if (a !== undefined && b !== undefined && JSON.stringify(a) === JSON.stringify(b)) {
+      continue;
+    }
+    if (a === undefined || b === undefined || canonicalKey(a) !== canonicalKey(b)) {
+      return { block: index, type: a?.type ?? b?.type ?? 'doc' };
     }
   }
   return null;
+}
+
+function withoutBlankEdges(blocks: JSONContent[]): JSONContent[] {
+  let start = 0;
+  let end = blocks.length;
+  while (start < end && isBlankParagraph(blocks[start])) start += 1;
+  while (end > start && isBlankParagraph(blocks[end - 1])) end -= 1;
+  return blocks.slice(start, end);
+}
+
+function canonicalKey(block: JSONContent): string {
+  return JSON.stringify(canonicalNode(block, false));
 }
 
 interface CanonicalBlock {
@@ -107,14 +125,9 @@ interface CanonicalBlock {
  * * Mark order and attributes Markdown does not write are ignored.
  */
 export function canonicalBlocks(document: JSONContent): CanonicalBlock[] {
-  const blocks = document.content ?? [];
-  let start = 0;
-  let end = blocks.length;
-  while (start < end && isBlankParagraph(blocks[start])) start += 1;
-  while (end > start && isBlankParagraph(blocks[end - 1])) end -= 1;
-  return blocks.slice(start, end).map((block) => ({
+  return withoutBlankEdges(document.content ?? []).map((block) => ({
     type: block.type ?? 'unknown',
-    key: JSON.stringify(canonicalNode(block, false)),
+    key: canonicalKey(block),
   }));
 }
 

@@ -4,7 +4,7 @@
  */
 import { CircleAlert, Keyboard, Library, TriangleAlert } from 'lucide-react';
 import { useT } from '@/i18n';
-import type { SaveState } from '@/modules/documents/workspaceStore';
+import type { DocumentView, SaveState } from '@/modules/documents/workspaceStore';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import type { LibraryInfo } from '@/types/generated/LibraryInfo';
 
@@ -12,6 +12,8 @@ interface StatusBarProps {
   library: LibraryInfo | null;
   saveState: SaveState | null;
   format: DocumentFormat | null;
+  /** Rich text or source of a Markdown document. */
+  view: DocumentView | null;
   zoom: number;
   conflicts: number;
   onRetrySave: () => void;
@@ -26,6 +28,7 @@ export function StatusBar({
   library,
   saveState,
   format,
+  view,
   zoom,
   conflicts,
   onRetrySave,
@@ -34,7 +37,11 @@ export function StatusBar({
 }: StatusBarProps) {
   const t = useT();
   const formatLabel =
-    format === 'md' ? t('status.formatMarkdown') : format === 'txt' ? t('status.formatText') : null;
+    format === 'md'
+      ? t(view === 'source' ? 'status.formatMarkdown' : 'status.formatMarkdownRich')
+      : format === 'txt'
+        ? t('status.formatText')
+        : null;
   return (
     <footer
       aria-label={t('status.label')}
@@ -67,7 +74,11 @@ export function StatusBar({
             </button>
           ) : saveState ? (
             <span className={ITEM} data-testid="status-save" data-state={saveState}>
-              {saveState === 'saved' ? t('status.saved') : t('status.saving')}
+              {saveState === 'saved'
+                ? t('status.saved')
+                : saveState === 'blocked'
+                  ? t('status.blocked')
+                  : t('status.saving')}
             </span>
           ) : null}
         </span>

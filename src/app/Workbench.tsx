@@ -26,7 +26,7 @@ import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
 import { Explorer } from '@/modules/documents/Explorer';
 import { activeDocument, useWorkspace } from '@/modules/documents/workspaceStore';
-import { PlainTextEditor, panelElementId } from '@/modules/editor/PlainTextEditor';
+import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { useBindings, useShortcutLabel } from './bindings';
@@ -104,7 +104,14 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const tabs = workspace.tabs.flatMap((id) => {
     const document = workspace.open[id];
     return document
-      ? [{ id, title: document.title, marker: document.state === 'error' ? ('error' as const) : undefined }]
+      ? [
+          {
+            id,
+            title: document.title,
+            marker:
+              document.state === 'error' || document.state === 'blocked' ? ('error' as const) : undefined,
+          },
+        ]
       : [];
   });
 
@@ -182,7 +189,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               }}
             />
           ) : null}
-          <PlainTextEditor
+          <DocumentEditor
             tabs={workspace.tabs}
             open={workspace.open}
             active={workspace.active}
@@ -190,10 +197,6 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
             limitLineWidth={settings.limitLineWidth}
             focusMode={focusMode}
             readOnly={status?.state !== 'open'}
-            onEdit={(id, text) => {
-              workspace.edit(id, text);
-            }}
-            onLeave={(id) => void workspace.flush(id)}
             onNewDocument={available('document.new') ? run('document.new') : null}
             newDocumentShortcut={shortcut('document.new')}
           />
@@ -204,6 +207,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           library={library}
           saveState={current?.loaded ? current.state : null}
           format={current?.format ?? null}
+          view={current?.loaded ? current.view : null}
           zoom={settings.zoom}
           conflicts={conflicts}
           onRetrySave={() => {
