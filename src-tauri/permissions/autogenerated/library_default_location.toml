@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-default-location"
+description = "Enables the library_default_location command without any pre-configured scope."
+commands.allow = ["library_default_location"]
+
+[[permission]]
+identifier = "deny-library-default-location"
+description = "Denies the library_default_location command without any pre-configured scope."
+commands.deny = ["library_default_location"]

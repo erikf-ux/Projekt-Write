@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-reopen"
+description = "Enables the library_reopen command without any pre-configured scope."
+commands.allow = ["library_reopen"]
+
+[[permission]]
+identifier = "deny-library-reopen"
+description = "Denies the library_reopen command without any pre-configured scope."
+commands.deny = ["library_reopen"]

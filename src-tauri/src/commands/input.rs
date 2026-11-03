@@ -19,6 +19,19 @@ pub trait Validate {
     fn validate(&self) -> Result<(), CommandError>;
 }
 
+/// Request of commands that take no parameters: `{}`. Unknown fields are
+/// rejected like everywhere else.
+#[derive(Debug, Clone, Default, serde::Deserialize, ts_rs::TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct EmptyRequest {}
+
+impl Validate for EmptyRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        Ok(())
+    }
+}
+
 /// A deserialized and validated command argument.
 #[derive(Debug)]
 pub struct Input<T>(pub T);
@@ -33,6 +46,11 @@ impl<T: DeserializeOwned + Validate> Input<T> {
     /// Parses and validates a raw JSON argument. `key` is the argument name.
     pub fn parse(key: &str, value: Option<&serde_json::Value>) -> Result<Self, CommandError> {
         let value = value.ok_or_else(|| CommandError::invalid_input(key, "missing"))?;
+        // Requests are JSON objects. serde would also build a struct from an
+        // array of its field values; that form is not part of the contract.
+        if !value.is_object() {
+            return Err(CommandError::invalid_input(key, "not an object"));
+        }
         let parsed: T = serde_json::from_value(value.clone())
             .map_err(|error| CommandError::invalid_input(key, error.to_string()))?;
         parsed.validate()?;
@@ -91,6 +109,8 @@ mod tests {
             json!({ "count": "three" }),
             json!({ "count": 1, "path": "/etc" }),
             json!(42),
+            // The array form serde would otherwise accept for structs.
+            json!([3]),
         ] {
             let error = Input::<Sample>::parse("request", Some(&value)).unwrap_err();
             assert_eq!(error.code, ErrorCode::InvalidInput);

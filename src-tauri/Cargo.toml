@@ -31,6 +31,8 @@ sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio
 thiserror = "2.0.21"
 ts-rs = { version = "12.0.1", features = ["no-serde-warnings"] }
 tauri-plugin-wdio-webdriver = { version = "1.5.1", optional = true }
+tauri-plugin-single-instance = "2.5.5"
+rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
 sha2 = "0.10.9"
 time = "0.3.55"

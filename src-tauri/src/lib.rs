@@ -1,7 +1,8 @@
 //! Project Write – backend library.
 //!
-//! Layers (section 8): commands → services → database → SQLite. The frontend
-//! reaches Rust only through the commands registered in [`commands::handler`].
+//! Layers (section 8): commands → services → database / file system →
+//! SQLite. The frontend reaches Rust only through the commands registered in
+//! [`commands::handler`].
 
 #![deny(unsafe_code)]
 
@@ -15,7 +16,15 @@ pub mod security;
 pub mod services;
 pub mod state;
 
-use tauri::Manager;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use tauri::{AppHandle, Manager, Runtime};
+
+use clock::Generators;
+use services::dialog::{FolderPicker, SystemPicker};
+use services::session::AppDirs;
+use state::AppState;
 
 // Test plugins exist only in debug builds (section 20).
 #[cfg(all(feature = "e2e", not(debug_assertions)))]
@@ -25,18 +34,94 @@ compile_error!(
 
 /// Starts the application.
 pub fn run() {
-    let builder = tauri::Builder::default();
+    // Registered first: a second start hands over to the running instance and
+    // ends before anything else happens (section 9).
+    let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
+        |app, _arguments, _cwd| focus_main_window(app),
+    ));
 
     #[cfg(feature = "e2e")]
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
 
-    builder
+    let app = builder
         .setup(|app| {
-            let state = tauri::async_runtime::block_on(state::AppState::initialize())?;
+            let dirs = app_dirs(app.handle())?;
+            if let Err(error) = logging::init(&dirs.logs) {
+                eprintln!("log file not available: {error}");
+            }
+            log::info!("Project Write {} starting", env!("CARGO_PKG_VERSION"));
+            let picker = folder_picker(app.handle());
+            let state = tauri::async_runtime::block_on(AppState::initialize(
+                dirs,
+                picker,
+                Generators::system(),
+            ))?;
             app.manage(state);
             Ok(())
         })
         .invoke_handler(commands::handler())
-        .run(tauri::generate_context!())
-        .expect("error while running Project Write");
+        .build(tauri::generate_context!())
+        .expect("error while building Project Write");
+
+    app.run(|handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            // Close the database cleanly and release library.lock.
+            if let Some(state) = handle.try_state::<AppState>() {
+                tauri::async_runtime::block_on(state.session.close());
+            }
+            log::info!("Project Write stopped");
+        }
+    });
+}
+
+/// Brings the window to the front (second start of the app).
+fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Configuration, log and documents folders of the system.
+///
+/// Debug builds with the `e2e` feature use `PW_E2E_APP_DIRS` instead, so
+/// end-to-end tests never touch the folders of the machine they run on.
+fn app_dirs<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<AppDirs> {
+    #[cfg(feature = "e2e")]
+    if let Some(base) = std::env::var_os("PW_E2E_APP_DIRS") {
+        let base = PathBuf::from(base);
+        return Ok(AppDirs {
+            config: base.join("config"),
+            logs: base.join("logs"),
+            documents: Some(base.join("documents")),
+        });
+    }
+    let path = app.path();
+    Ok(AppDirs {
+        config: path.app_config_dir()?,
+        logs: path.app_log_dir()?,
+        documents: path.document_dir().ok().or_else(|| {
+            path.home_dir()
+                .ok()
+                .map(|home| home.join(documents_folder_name()))
+        }),
+    })
+}
+
+fn documents_folder_name() -> PathBuf {
+    PathBuf::from("Documents")
+}
+
+/// The native folder dialog; in `e2e` builds the answers listed in
+/// `PW_E2E_PICK_FOLDERS` (an empty entry means "cancelled").
+fn folder_picker<R: Runtime>(app: &AppHandle<R>) -> Arc<dyn FolderPicker> {
+    #[cfg(feature = "e2e")]
+    if let Some(list) = std::env::var_os("PW_E2E_PICK_FOLDERS") {
+        let answers: Vec<Option<PathBuf>> = std::env::split_paths(&list)
+            .map(|path| (!path.as_os_str().is_empty()).then_some(path))
+            .collect();
+        return Arc::new(services::dialog::ScriptedPicker::new(answers));
+    }
+    Arc::new(SystemPicker::new(app.clone()))
 }

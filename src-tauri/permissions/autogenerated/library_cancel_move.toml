@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-cancel-move"
+description = "Enables the library_cancel_move command without any pre-configured scope."
+commands.allow = ["library_cancel_move"]
+
+[[permission]]
+identifier = "deny-library-cancel-move"
+description = "Denies the library_cancel_move command without any pre-configured scope."
+commands.deny = ["library_cancel_move"]

@@ -2,7 +2,18 @@ fn main() {
     // App manifest (section 20): every app command must be listed here and is
     // denied unless a capability allows it explicitly. Keep this list in sync
     // with `commands::COMMAND_NAMES` (checked by tests/security_config.rs).
-    let app_manifest = tauri_build::AppManifest::new().commands(&["system_check"]);
+    let app_manifest = tauri_build::AppManifest::new().commands(&[
+        "system_check",
+        "library_status",
+        "library_default_location",
+        "library_choose_location",
+        "library_create",
+        "library_open",
+        "library_reopen",
+        "library_move",
+        "library_cancel_move",
+        "library_accept_location",
+    ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);
     if embed_windows_manifest_for_all_targets() {

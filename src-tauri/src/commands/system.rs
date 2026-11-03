@@ -14,7 +14,8 @@ pub async fn system_check(
     request: Input<SystemCheckRequest>,
 ) -> Result<SystemCheckResponse, CommandError> {
     let request = request.into_inner();
-    system::run_checks(&state.database, &request.checks)
+    let database = state.check_database().await;
+    system::run_checks(&database, &request.checks)
         .await
         .map_err(|error| {
             log::error!("system_check failed: {error}");

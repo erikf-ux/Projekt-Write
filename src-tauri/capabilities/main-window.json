@@ -3,5 +3,16 @@
   "identifier": "main-window",
   "description": "The only window. Grants exactly the app's own commands; no fs, shell, sql, path or other plugin permissions (section 20).",
   "windows": ["main"],
-  "permissions": ["allow-system-check"]
+  "permissions": [
+    "allow-system-check",
+    "allow-library-status",
+    "allow-library-default-location",
+    "allow-library-choose-location",
+    "allow-library-create",
+    "allow-library-open",
+    "allow-library-reopen",
+    "allow-library-move",
+    "allow-library-cancel-move",
+    "allow-library-accept-location"
+  ]
 }

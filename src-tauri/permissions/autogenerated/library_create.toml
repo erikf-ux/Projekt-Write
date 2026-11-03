@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-create"
+description = "Enables the library_create command without any pre-configured scope."
+commands.allow = ["library_create"]
+
+[[permission]]
+identifier = "deny-library-create"
+description = "Denies the library_create command without any pre-configured scope."
+commands.deny = ["library_create"]

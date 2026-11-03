@@ -31,16 +31,82 @@ pub enum ErrorCode {
     /// because the capability does not allow it). Produced by the frontend
     /// wrapper in `src/services/ipc.ts`, never by a command itself.
     IpcRejected,
+    /// Reading or writing a file failed (disk full, no permission …).
+    FileSystem,
+    /// The command needs an open library.
+    LibraryNotOpen,
+    /// The folder does not contain a library.
+    LibraryNotFound,
+    /// `library.json` is damaged.
+    LibraryInvalid,
+    /// The library was written by a newer version of Project Write.
+    LibraryTooNew,
+    /// The library is open in another instance.
+    LibraryLocked,
+    /// The location does not support file locks.
+    LibraryLockUnsupported,
+    /// The library was moved; `details.path` names the new location.
+    LibraryMoved,
+    /// A link or an invalid name in the library; `details.path` names it.
+    LibraryUnsafePath,
+    /// `database/projectwrite.db` is missing.
+    LibraryDatabaseMissing,
+    /// The database fails the integrity check.
+    LibraryDatabaseDamaged,
+    /// The copy before a migration failed; nothing was migrated.
+    LibraryBackupFailed,
+    /// A library move is running.
+    LibraryBusy,
+    /// The chosen folder contains other files.
+    FolderNotEmpty,
+    /// The chosen folder already contains a library.
+    FolderIsLibrary,
+    /// The location needs a confirmation (sync folder or network drive).
+    LocationNotAccepted,
+    /// The chosen location is no longer known (choose again).
+    LocationExpired,
+    /// The path cannot be represented as text.
+    PathNotUnicode,
+    /// The move was cancelled; the library was not changed.
+    MoveCancelled,
+    /// The target is inside the library or contains it.
+    MoveTargetInvalid,
+    /// A copied file differed from the original; nothing was switched.
+    MoveVerificationFailed,
+    /// The moved library could not be opened; the old one stays in use.
+    MoveSwitchFailed,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 5] = [
+    pub const ALL: [ErrorCode; 27] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
         ErrorCode::Internal,
         ErrorCode::IpcRejected,
+        ErrorCode::FileSystem,
+        ErrorCode::LibraryNotOpen,
+        ErrorCode::LibraryNotFound,
+        ErrorCode::LibraryInvalid,
+        ErrorCode::LibraryTooNew,
+        ErrorCode::LibraryLocked,
+        ErrorCode::LibraryLockUnsupported,
+        ErrorCode::LibraryMoved,
+        ErrorCode::LibraryUnsafePath,
+        ErrorCode::LibraryDatabaseMissing,
+        ErrorCode::LibraryDatabaseDamaged,
+        ErrorCode::LibraryBackupFailed,
+        ErrorCode::LibraryBusy,
+        ErrorCode::FolderNotEmpty,
+        ErrorCode::FolderIsLibrary,
+        ErrorCode::LocationNotAccepted,
+        ErrorCode::LocationExpired,
+        ErrorCode::PathNotUnicode,
+        ErrorCode::MoveCancelled,
+        ErrorCode::MoveTargetInvalid,
+        ErrorCode::MoveVerificationFailed,
+        ErrorCode::MoveSwitchFailed,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -51,6 +117,28 @@ impl ErrorCode {
             ErrorCode::SchemaTooNew => "error.schemaTooNew",
             ErrorCode::Internal => "error.internal",
             ErrorCode::IpcRejected => "error.ipcRejected",
+            ErrorCode::FileSystem => "error.fileSystem",
+            ErrorCode::LibraryNotOpen => "error.libraryNotOpen",
+            ErrorCode::LibraryNotFound => "error.libraryNotFound",
+            ErrorCode::LibraryInvalid => "error.libraryInvalid",
+            ErrorCode::LibraryTooNew => "error.libraryTooNew",
+            ErrorCode::LibraryLocked => "error.libraryLocked",
+            ErrorCode::LibraryLockUnsupported => "error.libraryLockUnsupported",
+            ErrorCode::LibraryMoved => "error.libraryMoved",
+            ErrorCode::LibraryUnsafePath => "error.libraryUnsafePath",
+            ErrorCode::LibraryDatabaseMissing => "error.libraryDatabaseMissing",
+            ErrorCode::LibraryDatabaseDamaged => "error.libraryDatabaseDamaged",
+            ErrorCode::LibraryBackupFailed => "error.libraryBackupFailed",
+            ErrorCode::LibraryBusy => "error.libraryBusy",
+            ErrorCode::FolderNotEmpty => "error.folderNotEmpty",
+            ErrorCode::FolderIsLibrary => "error.folderIsLibrary",
+            ErrorCode::LocationNotAccepted => "error.locationNotAccepted",
+            ErrorCode::LocationExpired => "error.locationExpired",
+            ErrorCode::PathNotUnicode => "error.pathNotUnicode",
+            ErrorCode::MoveCancelled => "error.moveCancelled",
+            ErrorCode::MoveTargetInvalid => "error.moveTargetInvalid",
+            ErrorCode::MoveVerificationFailed => "error.moveVerificationFailed",
+            ErrorCode::MoveSwitchFailed => "error.moveSwitchFailed",
         }
     }
 }
