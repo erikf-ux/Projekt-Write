@@ -1,6 +1,9 @@
 //! Read-only database diagnostics used by the system check.
 
-use sqlx::SqlitePool;
+use std::path::Path;
+
+use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::{ConnectOptions, Connection, SqlitePool};
 
 /// Version of the bundled SQLite library.
 pub async fn sqlite_version(pool: &SqlitePool) -> Result<String, sqlx::Error> {
@@ -37,6 +40,21 @@ pub async fn integrity_check(pool: &SqlitePool) -> Result<bool, sqlx::Error> {
     let rows: Vec<String> = sqlx::query_scalar("PRAGMA integrity_check")
         .fetch_all(pool)
         .await?;
+    Ok(rows.len() == 1 && rows[0] == "ok")
+}
+
+/// `PRAGMA integrity_check` on a database file that is not open elsewhere,
+/// through a single read-only connection (backups, section 18).
+pub async fn integrity_check_file(path: &Path) -> Result<bool, sqlx::Error> {
+    let mut connection = SqliteConnectOptions::new()
+        .filename(path)
+        .read_only(true)
+        .connect()
+        .await?;
+    let rows: Vec<String> = sqlx::query_scalar("PRAGMA integrity_check")
+        .fetch_all(&mut connection)
+        .await?;
+    connection.close().await?;
     Ok(rows.len() == 1 && rows[0] == "ok")
 }
 

@@ -61,14 +61,20 @@ async fn migration_runs_on_empty_database_and_second_run_changes_nothing() {
     assert_eq!(db.schema_version().await.unwrap(), 0);
 
     let first = db.migrate().await.unwrap();
-    assert_eq!(first.applied, vec![1]);
+    assert_eq!(
+        first.applied,
+        (1..=Database::supported_version()).collect::<Vec<_>>()
+    );
     assert_eq!(first.version, Database::supported_version());
     let after_first = schema_snapshot(&db).await;
-    assert!(
-        after_first
-            .iter()
-            .any(|line| line.starts_with("table|application_settings|"))
-    );
+    for table in ["application_settings", "documents"] {
+        assert!(
+            after_first
+                .iter()
+                .any(|line| line.starts_with(&format!("table|{table}|"))),
+            "{table}"
+        );
+    }
 
     let second = db.migrate().await.unwrap();
     assert!(

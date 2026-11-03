@@ -9,6 +9,7 @@
 //! Only this module and the repositories built on it touch SQL.
 
 pub mod diagnostics;
+pub mod documents;
 pub mod fts;
 
 use std::path::Path;
@@ -73,9 +74,23 @@ pub struct Database {
 impl Database {
     /// Opens (and creates if missing) a database file.
     ///
-    /// Migrations are not run automatically: Phase 2 creates a backup before
-    /// migrating, so the caller decides when to call [`Database::migrate`].
+    /// Migrations are not run automatically: the library creates a backup
+    /// before migrating, so the caller decides when to call
+    /// [`Database::migrate`].
     pub async fn open_file(path: &Path, journal: JournalMode) -> Result<Self, DatabaseError> {
+        Self::open_with(path, journal, true).await
+    }
+
+    /// Opens an existing database file; fails if it does not exist.
+    pub async fn open_existing(path: &Path, journal: JournalMode) -> Result<Self, DatabaseError> {
+        Self::open_with(path, journal, false).await
+    }
+
+    async fn open_with(
+        path: &Path,
+        journal: JournalMode,
+        create: bool,
+    ) -> Result<Self, DatabaseError> {
         let base = SqliteConnectOptions::new()
             .filename(path)
             .foreign_keys(true)
@@ -88,7 +103,7 @@ impl Database {
         let writer = SqlitePoolOptions::new()
             .max_connections(1)
             .min_connections(1)
-            .connect_with(base.clone().create_if_missing(true))
+            .connect_with(base.clone().create_if_missing(create))
             .await?;
         let reader = SqlitePoolOptions::new()
             .max_connections(READER_CONNECTIONS)
@@ -193,6 +208,30 @@ impl Database {
                 .fetch_all(&self.writer)
                 .await?;
         Ok(rows.iter().map(|row| row.get::<i64, _>(0)).collect())
+    }
+
+    /// Writes a consistent, compacted copy of the database to `target`
+    /// (`VACUUM INTO`, section 21). `target` must not exist. A copy that was
+    /// interrupted may be incomplete; callers check it with
+    /// [`diagnostics::integrity_check`] before relying on it.
+    pub async fn vacuum_into(&self, target: &Path) -> Result<(), DatabaseError> {
+        let target = target.to_str().ok_or_else(|| {
+            DatabaseError::Sqlx(sqlx::Error::Configuration(
+                "backup path is not valid UTF-8".into(),
+            ))
+        })?;
+        sqlx::query("VACUUM INTO ?1")
+            .bind(target)
+            .execute(&self.writer)
+            .await?;
+        Ok(())
+    }
+
+    /// Runs the migrations up to and including `version` (tests of the
+    /// upgrade path from every earlier schema version).
+    pub async fn migrate_to(&self, version: i64) -> Result<(), DatabaseError> {
+        MIGRATOR.run_to(version, &self.writer).await?;
+        Ok(())
     }
 
     /// Closes all connections and waits until they are released.
