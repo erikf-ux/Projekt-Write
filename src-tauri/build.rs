@@ -15,6 +15,10 @@ fn main() {
         "library_accept_location",
         "ui_state",
         "ui_update_settings",
+        "ui_subscribe",
+        "ui_menu_state",
+        "ui_set_focus_mode",
+        "ui_close_response",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

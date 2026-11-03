@@ -15,6 +15,10 @@
     "allow-library-cancel-move",
     "allow-library-accept-location",
     "allow-ui-state",
-    "allow-ui-update-settings"
+    "allow-ui-update-settings",
+    "allow-ui-subscribe",
+    "allow-ui-menu-state",
+    "allow-ui-set-focus-mode",
+    "allow-ui-close-response"
   ]
 }

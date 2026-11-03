@@ -10,17 +10,21 @@
  */
 import { Channel, invoke } from '@tauri-apps/api/core';
 import type { ChooseLocationRequest } from '@/types/generated/ChooseLocationRequest';
+import type { CloseResponseRequest } from '@/types/generated/CloseResponseRequest';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { CreateLibraryRequest } from '@/types/generated/CreateLibraryRequest';
 import type { EmptyRequest } from '@/types/generated/EmptyRequest';
 import type { ErrorCode } from '@/types/generated/ErrorCode';
+import type { FocusModeRequest } from '@/types/generated/FocusModeRequest';
 import type { LibraryStatus } from '@/types/generated/LibraryStatus';
 import type { LocationChoice } from '@/types/generated/LocationChoice';
+import type { MenuStateRequest } from '@/types/generated/MenuStateRequest';
 import type { MoveLibraryRequest } from '@/types/generated/MoveLibraryRequest';
 import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
+import type { UiEvent } from '@/types/generated/UiEvent';
 import type { UiState } from '@/types/generated/UiState';
 import type { UpdateUiSettingsRequest } from '@/types/generated/UpdateUiSettingsRequest';
 
@@ -38,6 +42,10 @@ export interface Commands {
   library_accept_location: { request: EmptyRequest; response: LibraryStatus };
   ui_state: { request: EmptyRequest; response: UiState };
   ui_update_settings: { request: UpdateUiSettingsRequest; response: UiState };
+  ui_subscribe: { request: EmptyRequest; response: null };
+  ui_menu_state: { request: MenuStateRequest; response: null };
+  ui_set_focus_mode: { request: FocusModeRequest; response: null };
+  ui_close_response: { request: CloseResponseRequest; response: null };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -127,6 +135,21 @@ export async function callWithProgress<C extends CommandName & keyof ProgressCom
   channel.onmessage = onProgress;
   try {
     const value = await invoke<Commands[C]['response']>(command, { request, onProgress: channel });
+    return { ok: true, value };
+  } catch (raw) {
+    return { ok: false, error: normalizeError(raw) };
+  }
+}
+
+/**
+ * Registers the handler for messages from Rust: menu clicks and close
+ * requests of the window. A later call replaces the handler. Never throws.
+ */
+export async function subscribeUiEvents(onEvent: (event: UiEvent) => void): Promise<CommandResult<null>> {
+  const channel = new Channel<UiEvent>();
+  channel.onmessage = onEvent;
+  try {
+    const value = await invoke<null>('ui_subscribe', { request: {}, onEvent: channel });
     return { ok: true, value };
   } catch (raw) {
     return { ok: false, error: normalizeError(raw) };

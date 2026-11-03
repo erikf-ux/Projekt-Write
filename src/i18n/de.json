@@ -103,5 +103,18 @@
   "error.moveVerificationFailed": "Eine kopierte Datei weicht vom Original ab. Der Umzug wurde nicht abgeschlossen; die Bibliothek ist unverändert.",
   "error.moveSwitchFailed": "Die umgezogene Bibliothek ließ sich nicht öffnen. Die bisherige Bibliothek bleibt in Gebrauch.",
   "error.settingsReadOnly": "Die Einstellungen stammen aus einer neueren Version von Project Write und werden nicht verändert.",
-  "error.settingsNotSaved": "Die Einstellungen konnten nicht gespeichert werden."
+  "error.settingsNotSaved": "Die Einstellungen konnten nicht gespeichert werden.",
+  "menu.file": "&Datei",
+  "menu.view": "&Ansicht",
+  "command.document.new": "Neues Dokument",
+  "command.document.save": "Speichern",
+  "command.tab.close": "Tab schließen",
+  "command.settings.open": "Einstellungen…",
+  "command.app.quit": "Beenden",
+  "command.palette.show": "Befehlspalette…",
+  "command.sidebar.toggle": "Seitenleiste ein-/ausblenden",
+  "command.focus.toggle": "Fokusmodus",
+  "command.zoom.in": "Vergrößern",
+  "command.zoom.out": "Verkleinern",
+  "command.zoom.reset": "Originalgröße"
 }

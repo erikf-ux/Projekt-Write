@@ -749,3 +749,75 @@ fn ui_settings_of_a_newer_version_are_used_but_not_changed() {
     );
     app.shut_down();
 }
+
+#[test]
+fn ui_event_menu_focus_and_close_commands_validate_their_input() {
+    let app = app();
+    // Valid requests.
+    invoke(
+        &app.webview,
+        "ui_subscribe",
+        json!({ "request": {}, "onEvent": "__CHANNEL__:3" }),
+    )
+    .unwrap();
+    call(
+        &app,
+        "ui_menu_state",
+        json!({ "items": {
+            "document.new": { "enabled": true, "shortcut": "Strg+N" },
+            "palette.show": { "enabled": true, "shortcut": null },
+            "tab.close": { "enabled": false, "shortcut": "Strg+W" }
+        } }),
+    )
+    .unwrap();
+    call(&app, "ui_set_focus_mode", json!({ "enabled": true })).unwrap();
+    call(&app, "ui_set_focus_mode", json!({ "enabled": false })).unwrap();
+    call(&app, "ui_close_response", json!({ "close": false })).unwrap();
+
+    // Invalid requests.
+    let cases = [
+        ("ui_menu_state", json!({}), "request"),
+        (
+            "ui_menu_state",
+            json!({ "items": { "document.delete": { "enabled": true, "shortcut": null } } }),
+            "request",
+        ),
+        (
+            "ui_menu_state",
+            json!({ "items": { "document.new": { "enabled": "yes", "shortcut": null } } }),
+            "request",
+        ),
+        (
+            "ui_menu_state",
+            json!({ "items": { "document.new": { "enabled": true, "shortcut": "x".repeat(33) } } }),
+            "shortcut",
+        ),
+        (
+            "ui_menu_state",
+            json!({ "items": { "document.new": { "enabled": true, "shortcut": "" } } }),
+            "shortcut",
+        ),
+        (
+            "ui_menu_state",
+            json!({ "items": { "document.new": { "enabled": true, "shortcut": "Strg\nN" } } }),
+            "shortcut",
+        ),
+        ("ui_set_focus_mode", json!({}), "request"),
+        ("ui_set_focus_mode", json!({ "enabled": "yes" }), "request"),
+        ("ui_close_response", json!({}), "request"),
+        (
+            "ui_close_response",
+            json!({ "close": true, "force": true }),
+            "request",
+        ),
+    ];
+    for (command, request, field) in cases {
+        let error = call(&app, command, request.clone())
+            .expect_err(&format!("{command} must fail: {request}"));
+        assert_uniform_error(&error, field);
+    }
+    let error = invoke(&app.webview, "ui_subscribe", json!({ "request": [] }))
+        .expect_err("array request");
+    assert_uniform_error(&error, "request");
+    app.shut_down();
+}

@@ -103,5 +103,18 @@
   "error.moveVerificationFailed": "A copied file differs from the original. The move was not completed; the library is unchanged.",
   "error.moveSwitchFailed": "The moved library could not be opened. The previous library stays in use.",
   "error.settingsReadOnly": "The settings come from a newer version of Project Write and are not changed.",
-  "error.settingsNotSaved": "The settings could not be saved."
+  "error.settingsNotSaved": "The settings could not be saved.",
+  "menu.file": "&File",
+  "menu.view": "&View",
+  "command.document.new": "New document",
+  "command.document.save": "Save",
+  "command.tab.close": "Close tab",
+  "command.settings.open": "Settings…",
+  "command.app.quit": "Quit",
+  "command.palette.show": "Command palette…",
+  "command.sidebar.toggle": "Toggle side bar",
+  "command.focus.toggle": "Focus mode",
+  "command.zoom.in": "Zoom in",
+  "command.zoom.out": "Zoom out",
+  "command.zoom.reset": "Reset zoom"
 }

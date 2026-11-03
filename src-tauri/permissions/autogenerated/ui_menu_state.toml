@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ui-menu-state"
+description = "Enables the ui_menu_state command without any pre-configured scope."
+commands.allow = ["ui_menu_state"]
+
+[[permission]]
+identifier = "deny-ui-menu-state"
+description = "Denies the ui_menu_state command without any pre-configured scope."
+commands.deny = ["ui_menu_state"]

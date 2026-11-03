@@ -17,7 +17,7 @@ pub mod services;
 pub mod state;
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -56,16 +56,44 @@ pub fn run() {
                 picker,
                 Generators::system(),
             ))?;
+            let menu = services::ui::menu::build(
+                app.handle(),
+                state.ui.locale(),
+                &state.ui.menu_state(),
+            )?;
             if let Some(window) = app.get_webview_window("main") {
+                window.set_menu(menu.menu.clone())?;
                 services::ui::window::apply_zoom(&window, state.ui.state().settings.zoom);
                 services::ui::window::restore(&window, state.ui.window_state());
             }
+            app.manage(services::ui::menu::MenuSlot(Mutex::new(Some(menu))));
             app.manage(state);
             Ok(())
         })
+        .on_menu_event(|app, event| {
+            let Some(state) = app.try_state::<AppState>() else {
+                return;
+            };
+            let id = event.id().as_ref();
+            // Without a listening frontend, "Quit" still closes the window.
+            if !state.ui.menu_command(id)
+                && id == services::ui::menu::MenuCommand::AppQuit.id()
+                && let Some(window) = app.get_webview_window("main")
+            {
+                let _ = window.close();
+            }
+        })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                remember_window_state(window.app_handle());
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let Some(state) = window.app_handle().try_state::<AppState>() else {
+                    return;
+                };
+                // The frontend saves what is pending first (section 9:
+                // autosave "beim Schließen") and then confirms.
+                match state.ui.close_requested() {
+                    services::ui::CloseDecision::Wait => api.prevent_close(),
+                    services::ui::CloseDecision::Close => remember_window_state(window.app_handle()),
+                }
             }
         })
         .invoke_handler(commands::handler())

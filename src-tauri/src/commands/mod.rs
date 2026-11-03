@@ -28,6 +28,10 @@ pub const COMMAND_NAMES: &[&str] = &[
     "library_accept_location",
     "ui_state",
     "ui_update_settings",
+    "ui_subscribe",
+    "ui_menu_state",
+    "ui_set_focus_mode",
+    "ui_close_response",
 ];
 
 /// The invoke handler with every app command.
@@ -45,5 +49,9 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         library::library_accept_location,
         ui::ui_state,
         ui::ui_update_settings,
+        ui::ui_subscribe,
+        ui::ui_menu_state,
+        ui::ui_set_focus_mode,
+        ui::ui_close_response,
     ]
 }
