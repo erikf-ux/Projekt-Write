@@ -51,6 +51,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'editor.e2e.ts'),
     path.join(specs, 'performance.e2e.ts'),
     path.join(specs, 'external.e2e.ts'),
+    path.join(specs, 'documents.e2e.ts'),
   ],
   maxInstances: 1,
   capabilities: [

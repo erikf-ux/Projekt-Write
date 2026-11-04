@@ -22,6 +22,9 @@
  */
 import { create } from 'zustand';
 import { ask } from '@/components/prompt/promptStore';
+import { translate, useLocale, type MessageKey } from '@/i18n';
+import { convertContent, needsConfirmation, type Conversion } from '@/modules/editor/convert';
+import { LOSS_KEYS } from '@/modules/editor/markdown/lossKeys';
 import type { Loss } from '@/modules/editor/markdown/losses';
 import type { ProbeIssue } from '@/modules/editor/markdown/probe';
 import { closeAllSessions, closeSession, getSession, type SaveRequest } from '@/modules/editor/session';
@@ -167,6 +170,8 @@ interface WorkspaceStore {
   takeIntoLibrary: (id: string) => Promise<string | null>;
   /** Before quitting: asks for each external tab with changes. False: stay. */
   confirmUnsaved: () => Promise<boolean>;
+  /** Converts a library document to another format, after a warning about losses. */
+  convertDocument: (id: string, format: TextFormat) => Promise<boolean>;
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -254,6 +259,28 @@ function loadedExternal(text: ExternalText): Partial<ExternalState> {
     outsideDeferred: false,
     differsFromFile: false,
   };
+}
+
+const FORMAT_KEYS: Record<DocumentFormat, MessageKey> = {
+  txt: 'format.txt',
+  md: 'format.md',
+  pwrite: 'format.pwrite',
+};
+
+/** What a conversion loses, as one line of text. */
+function conversionDetails(conversion: Conversion): string {
+  const text = (key: MessageKey) => translate(useLocale.getState().locale, key);
+  const parts = [...new Set(conversion.losses.map((loss) => text(LOSS_KEYS[loss.kind])))];
+  if (conversion.formattingLost) {
+    parts.push(text('convert.formattingLost'));
+  }
+  if (conversion.frontMatterLost) {
+    parts.push(text('convert.frontMatterLost'));
+  }
+  if (conversion.issues.length > 0) {
+    parts.push(text('convert.issues'));
+  }
+  return parts.join('; ');
 }
 
 function megabytes(size: number): string {
@@ -1072,6 +1099,65 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       }
       get().moveTab(summary.id, index);
       return summary.id;
+    },
+
+    convertDocument: async (id, format) => {
+      const document = get().open[id];
+      const session = getSession(id);
+      if (
+        !document?.loaded ||
+        document.external ||
+        document.readOnly ||
+        !session ||
+        document.format === format
+      ) {
+        return false;
+      }
+      const conversion = convertContent(document.format, format, session.conversionSource());
+      if (needsConfirmation(conversion)) {
+        const answer = await ask({
+          titleKey: 'convert.title',
+          textKey: 'convert.warning',
+          params: {
+            format: translate(useLocale.getState().locale, FORMAT_KEYS[format]),
+            details: conversionDetails(conversion),
+          },
+          choices: [
+            { id: 'convert', labelKey: 'convert.anyway', tone: 'primary' },
+            { id: 'cancel', labelKey: 'convert.cancel' },
+          ],
+          cancel: 'cancel',
+          testId: 'convert-prompt',
+        });
+        if (answer !== 'convert') {
+          return false;
+        }
+      }
+      // The conversion takes the editor's text; a pending save is not needed.
+      clearTimer(id);
+      await saving.get(id);
+      const result = await call('document_convert', { id, format, text: conversion.text });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      sources.delete(id);
+      closeSession(id);
+      const current = get().open[id] ?? document;
+      patch(id, {
+        format,
+        loadedText: conversion.text,
+        savedText: conversion.text,
+        state: 'saved',
+        error: null,
+        losses: [],
+        viewIssues: [],
+        view: format === 'txt' ? 'plain' : 'rich',
+        revision: current.revision + 1,
+        generation: current.generation + 1,
+      });
+      set((state) => ({ documents: upsert(state.documents, result.value) }));
+      return true;
     },
 
     confirmUnsaved: async () => {

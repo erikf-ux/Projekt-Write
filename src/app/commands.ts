@@ -53,6 +53,32 @@ const activeExternal = () => {
   return document?.external && document.loaded ? document : null;
 };
 
+/** "In … umwandeln" for the active library document (ADR 0015, decision 13). */
+function convertCommand(
+  id: 'document.convertToText' | 'document.convertToMarkdown' | 'document.convertToRichText',
+  titleKey:
+    | 'command.document.convertToText'
+    | 'command.document.convertToMarkdown'
+    | 'command.document.convertToRichText',
+  format: TextFormat,
+): CommandDefinition {
+  return {
+    id,
+    category: 'document',
+    titleKey,
+    isAvailable: () => {
+      const document = activeLibraryDocument();
+      return document !== null && document.loaded && !document.readOnly && document.format !== format;
+    },
+    run: async () => {
+      const document = activeLibraryDocument();
+      if (document) {
+        await workspace().convertDocument(document.id, format);
+      }
+    },
+  };
+}
+
 const activeSession = () => {
   const id = workspace().active;
   return id ? getSession(id) : undefined;
@@ -146,6 +172,9 @@ export function createAppCommands(): CommandDefinition[] {
         }
       },
     },
+    convertCommand('document.convertToText', 'command.document.convertToText', 'txt'),
+    convertCommand('document.convertToMarkdown', 'command.document.convertToMarkdown', 'md'),
+    convertCommand('document.convertToRichText', 'command.document.convertToRichText', 'pwrite'),
     {
       id: 'document.save',
       category: 'document',

@@ -148,6 +148,29 @@ pub async fn update_content(
     .rows_affected())
 }
 
+/// Converts a document (ADR 0015, decision 13): new format and content.
+pub async fn update_format(
+    pool: &SqlitePool,
+    id: &str,
+    format: &str,
+    size_bytes: i64,
+    content_sha256: &str,
+    updated_at: &str,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE documents SET format = ?2, size_bytes = ?3, content_sha256 = ?4, updated_at = ?5 \
+         WHERE id = ?1 AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .bind(format)
+    .bind(size_bytes)
+    .bind(content_sha256)
+    .bind(updated_at)
+    .execute(pool)
+    .await?
+    .rows_affected())
+}
+
 pub async fn update_title(
     pool: &SqlitePool,
     id: &str,

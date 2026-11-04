@@ -12,6 +12,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import type { ChooseLocationRequest } from '@/types/generated/ChooseLocationRequest';
 import type { CloseResponseRequest } from '@/types/generated/CloseResponseRequest';
 import type { CommandError } from '@/types/generated/CommandError';
+import type { ConvertDocumentRequest } from '@/types/generated/ConvertDocumentRequest';
 import type { CopyDocumentRequest } from '@/types/generated/CopyDocumentRequest';
 import type { CreateDocumentRequest } from '@/types/generated/CreateDocumentRequest';
 import type { CreateLibraryRequest } from '@/types/generated/CreateLibraryRequest';
@@ -76,6 +77,7 @@ export interface Commands {
   document_rename: { request: RenameDocumentRequest; response: DocumentSummary };
   document_copy: { request: CopyDocumentRequest; response: DocumentSummary };
   document_set_favorite: { request: SetFavoriteRequest; response: DocumentSummary };
+  document_convert: { request: ConvertDocumentRequest; response: DocumentSummary };
   link_open: { request: OpenLinkRequest; response: null };
   document_import: { request: ImportDocumentRequest; response: ImportResult };
   theme_import: { request: ImportThemeRequest; response: UiState };

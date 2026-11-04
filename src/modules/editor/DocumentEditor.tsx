@@ -16,6 +16,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import { errorText } from '@/components/errorText';
 import { translate, useLocale, useT, type MessageKey } from '@/i18n';
 import { useWorkspace, setDocumentSource, type OpenDocument } from '@/modules/documents/workspaceStore';
+import { LOSS_KEYS } from './markdown/lossKeys';
 import type { Loss } from './markdown/losses';
 import type { ProbeIssue } from './markdown/probe';
 import { useUi } from '@/modules/settings/uiStore';
@@ -210,6 +211,11 @@ function DocumentPanel({
       {document.state === 'blocked' && document.losses.length > 0 ? (
         <LossWarning
           losses={document.losses}
+          onSaveAsPwrite={
+            document.external || document.format !== 'md'
+              ? null
+              : () => void useWorkspace.getState().convertDocument(id, 'pwrite')
+          }
           onSaveAnyway={() => void useWorkspace.getState().saveAnyway(id)}
           onCancel={() => {
             useWorkspace.getState().dismissLosses(id);
@@ -370,25 +376,15 @@ function ViewIssues({
   );
 }
 
-const LOSS_KEYS: Record<Loss['kind'], MessageKey> = {
-  tableMergedCells: 'editor.loss.tableMergedCells',
-  tableCellBlocks: 'editor.loss.tableCellBlocks',
-  tableHeader: 'editor.loss.tableHeader',
-  tableAlignment: 'editor.loss.tableAlignment',
-  tableColumnWidth: 'editor.loss.tableColumnWidth',
-  listNumbering: 'editor.loss.listNumbering',
-  emphasisBoundary: 'editor.loss.emphasisBoundary',
-  codeBackticks: 'editor.loss.codeBackticks',
-  htmlLineStart: 'editor.loss.htmlLineStart',
-  changed: 'editor.loss.changed',
-};
-
 function LossWarning({
   losses,
+  onSaveAsPwrite,
   onSaveAnyway,
   onCancel,
 }: {
   losses: Loss[];
+  /** Library Markdown documents: keep everything as `.pwrite` (ADR 0015). */
+  onSaveAsPwrite: (() => void) | null;
   onSaveAnyway: () => void;
   onCancel: () => void;
 }) {
@@ -410,9 +406,21 @@ function LossWarning({
         {losses.length > 5 ? <li>{t('editor.losses.more', { count: losses.length - 5 })}</li> : null}
       </ul>
       <div className="flex gap-2">
+        {onSaveAsPwrite ? (
+          <button
+            type="button"
+            data-testid="save-as-pwrite"
+            className="inline-flex h-7 items-center rounded-pw bg-accent px-3 font-medium text-surface"
+            onClick={onSaveAsPwrite}
+          >
+            {t('editor.losses.saveAsPwrite')}
+          </button>
+        ) : null}
         <button
           type="button"
-          className="inline-flex h-7 items-center rounded-pw bg-accent px-3 font-medium text-surface"
+          className={`inline-flex h-7 items-center rounded-pw px-3 ${
+            onSaveAsPwrite ? 'border border-muted' : 'bg-accent font-medium text-surface'
+          }`}
           onClick={onSaveAnyway}
         >
           {t('editor.losses.saveAnyway')}

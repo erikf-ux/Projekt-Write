@@ -18,6 +18,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import { parseMarkdown, serializeMarkdown } from './markdown/adapter';
 import { excerpt, findLosses, type Loss } from './markdown/losses';
+import type { ConversionSource } from './convert';
 import { firstDifference, markdownSchema, probeMarkdown, type ProbeIssue } from './markdown/probe';
 import { plainClipboardText, plainDocument, plainExtensions, plainText } from './plain/schema';
 import { handleRichPaste } from './paste';
@@ -188,6 +189,14 @@ export class EditorSession {
       return serializeMarkdown({ frontMatter: this.frontMatter, body: this.rich.getJSON() });
     }
     return this.plain ? plainText(this.plain.state.doc) : '';
+  }
+
+  /** What a conversion starts from: the rich text if it is shown, else the text. */
+  conversionSource(): ConversionSource {
+    if (this.rich && (this.format === 'pwrite' || (this.isMarkdown && this.view === 'rich'))) {
+      return { kind: 'rich', content: this.rich.getJSON(), frontMatter: this.frontMatter };
+    }
+    return { kind: 'text', text: this.text() };
   }
 
   /** The text to save, or the losses the user has not accepted yet. */

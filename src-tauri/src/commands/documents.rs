@@ -151,6 +151,31 @@ impl Validate for SaveDocumentRequest {
     }
 }
 
+/// Request of `document_convert`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ConvertDocumentRequest {
+    pub id: String,
+    pub format: TextFormat,
+    /// The content in the new format (`.pwrite`: the editor content as JSON).
+    pub text: String,
+}
+
+impl Validate for ConvertDocumentRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id)?;
+        if self.text.len() as u64 > MAX_DOCUMENT_BYTES {
+            return Err(CommandError::new(ErrorCode::DocumentTooLarge));
+        }
+        if self.format == TextFormat::Pwrite {
+            serde_json::from_str::<serde_json::Value>(&self.text)
+                .map_err(|_| CommandError::invalid_input("text", "not JSON"))?;
+        }
+        Ok(())
+    }
+}
+
 /// Request of `document_rename`.
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -347,6 +372,28 @@ pub async fn document_save(
         .await
 }
 
+/// Converts a document to another format; the frontend converted the
+/// content and warned about losses (ADR 0015, decision 13).
+#[tauri::command]
+pub async fn document_convert(
+    state: State<'_, AppState>,
+    request: Input<ConvertDocumentRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let request = request.into_inner();
+    let id = parse_id(&request.id)?;
+    let language = pwrite::language_tag(state.ui.locale());
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .convert(id, request.format.into(), request.text.as_bytes(), language)
+                .await
+                .map_err(document_error)?;
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
 /// Changes the title (only the title, section 13).
 #[tauri::command]
 pub async fn document_rename(
@@ -485,5 +532,7 @@ pub(crate) fn document_error(error: DocumentError) -> CommandError {
         }
         DocumentError::InvalidPwrite => CommandError::new(ErrorCode::PwriteInvalid),
         DocumentError::ReadOnly => CommandError::new(ErrorCode::DocumentReadOnly),
+        DocumentError::SameFormat => CommandError::invalid_input("format", "same format"),
+        DocumentError::NotText => CommandError::new(ErrorCode::DocumentNotText),
     }
 }

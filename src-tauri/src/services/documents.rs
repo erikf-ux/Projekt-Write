@@ -166,6 +166,10 @@ pub enum DocumentError {
     InvalidPwrite,
     #[error("document is read only")]
     ReadOnly,
+    #[error("the document has this format already")]
+    SameFormat,
+    #[error("content is not UTF-8 text")]
+    NotText,
 }
 
 /// Trims a title and checks length and characters.
@@ -522,6 +526,95 @@ impl DocumentRepository {
         file.title.clone_from(&meta.title);
         file.updated_at = self.generators.now().to_iso();
         self.save(id, &pwrite::to_bytes(&file)).await
+    }
+
+    /// Converts a document to another format (section 10; ADR 0015,
+    /// decision 13). The frontend converts the content; `content` is the
+    /// text of the new format (`.pwrite`: the editor content as JSON). The
+    /// id stays. The new file is written first, then the row changes, the
+    /// old file goes last: a crash in between leaves at most an orphaned
+    /// file, which the check on opening reports, never a row without file.
+    pub async fn convert(
+        &self,
+        id: Uuid,
+        format: DocumentFormat,
+        content: &[u8],
+        language: &str,
+    ) -> Result<DocumentMeta, DocumentError> {
+        let (meta, stored) = self.read(id).await?;
+        if meta.deleted_at.is_some() {
+            return Err(DocumentError::InTrash);
+        }
+        if meta.format == format {
+            return Err(DocumentError::SameFormat);
+        }
+        if meta.format == DocumentFormat::Pwrite
+            && matches!(pwrite::parse(&stored), Ok(pwrite::Parsed::Newer { .. }))
+        {
+            return Err(DocumentError::ReadOnly);
+        }
+        let now = self.generators.now().to_iso();
+        let data = if format == DocumentFormat::Pwrite {
+            let value: serde_json::Value =
+                serde_json::from_slice(content).map_err(|_| DocumentError::InvalidPwrite)?;
+            pwrite::check_content(&value).map_err(|_| DocumentError::InvalidPwrite)?;
+            let mut file = pwrite::new_file(
+                &meta.id.hyphenated().to_string(),
+                &meta.title,
+                &meta.created_at,
+                language,
+                value,
+            );
+            file.updated_at.clone_from(&now);
+            pwrite::to_bytes(&file)
+        } else {
+            std::str::from_utf8(content).map_err(|_| DocumentError::NotText)?;
+            content.to_vec()
+        };
+        check_size(&data)?;
+
+        let _guard = self.write_lock.lock().await;
+        let new_path = self.prepare_path(format, &format.relative_path(meta.id))?;
+        let old_path = self.prepare_path(meta.format, &meta.format.relative_path(meta.id))?;
+        let size = i64::try_from(data.len()).map_err(|_| DocumentError::TooLarge)?;
+        let sha = sha256_hex(&data);
+        let target = new_path.clone();
+        blocking(move || atomic::write_atomic(&target, &data)).await?;
+        let updated = rows::update_format(
+            self.database.writer(),
+            &meta.id.hyphenated().to_string(),
+            format.as_str(),
+            size,
+            &sha,
+            &now,
+        )
+        .await;
+        match updated {
+            Ok(1) => {}
+            Ok(_) => {
+                let _ = std::fs::remove_file(&new_path);
+                return Err(DocumentError::NotFound);
+            }
+            Err(error) => {
+                let _ = std::fs::remove_file(&new_path);
+                return Err(error.into());
+            }
+        }
+        if let Err(error) = std::fs::remove_file(&old_path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            log::warn!(
+                "old file of converted document {} not removed: {error}",
+                meta.id
+            );
+        }
+        log::info!(
+            "document {} converted from {} to {}",
+            meta.id,
+            meta.format.as_str(),
+            format.as_str()
+        );
+        self.get(id).await?.ok_or(DocumentError::NotFound)
     }
 
     /// Makes a document a favourite or not. Changes neither content nor

@@ -1718,3 +1718,106 @@ fn external_commands_reject_invalid_input_uniformly() {
     assert_error_code(&error, "FILE_UNKNOWN");
     app.shut_down();
 }
+
+#[test]
+fn documents_are_converted_between_formats_keeping_their_id() {
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Wandel", "format": "txt" }),
+    )
+    .unwrap();
+    let id = created["id"].as_str().unwrap().to_owned();
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Erste Zeile" }),
+    )
+    .unwrap();
+    let txt = app.path(&format!("Dokumente/ProjectWrite/documents/text/{id}.txt"));
+    assert!(txt.exists());
+
+    let md = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "md", "text": "# Erste Zeile\n" }),
+    )
+    .unwrap();
+    assert_eq!(md["id"], id.as_str());
+    assert_eq!(md["format"], "md");
+    let md_file = app.path(&format!(
+        "Dokumente/ProjectWrite/documents/markdown/{id}.md"
+    ));
+    assert_eq!(std::fs::read(&md_file).unwrap(), b"# Erste Zeile\n");
+    assert!(!txt.exists());
+
+    let content = json!({ "type": "doc", "content": [
+        { "type": "heading", "attrs": { "level": 1 }, "content": [{ "type": "text", "text": "Erste Zeile" }] }
+    ] });
+    let rich = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "pwrite", "text": content.to_string() }),
+    )
+    .unwrap();
+    assert_eq!(rich["format"], "pwrite");
+    assert!(!md_file.exists());
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    let stored: Value = serde_json::from_str(read["text"].as_str().unwrap()).unwrap();
+    assert_eq!(stored, content);
+    let envelope: Value = serde_json::from_slice(
+        &std::fs::read(app.path(&format!(
+            "Dokumente/ProjectWrite/documents/richtext/{id}.pwrite"
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(envelope["id"], id.as_str());
+    assert_eq!(envelope["title"], "Wandel");
+    assert_eq!(envelope["createdAt"], created["createdAt"]);
+
+    // The same format, invalid content and unknown documents fail cleanly.
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "pwrite", "text": content.to_string() }),
+    )
+    .unwrap_err();
+    assert_uniform_error(&error, "format");
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "md", "text": "Text" }),
+    );
+    assert!(error.is_ok());
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "pwrite", "text": "[1]" }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "PWRITE_INVALID");
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "pwrite", "text": "kein JSON" }),
+    )
+    .unwrap_err();
+    assert_uniform_error(&error, "text");
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c", "format": "md", "text": "" }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "DOCUMENT_NOT_FOUND");
+    let error = call(
+        &app,
+        "document_convert",
+        json!({ "id": id, "format": "docx", "text": "" }),
+    )
+    .unwrap_err();
+    assert_uniform_error(&error, "request");
+    app.shut_down();
+}

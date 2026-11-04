@@ -27,6 +27,7 @@ fn main() {
         "document_import",
         "document_copy",
         "document_set_favorite",
+        "document_convert",
         "external_open",
         "external_read",
         "external_check",

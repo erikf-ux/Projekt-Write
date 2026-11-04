@@ -28,6 +28,7 @@
     "allow-document-import",
     "allow-document-copy",
     "allow-document-set-favorite",
+    "allow-document-convert",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",
