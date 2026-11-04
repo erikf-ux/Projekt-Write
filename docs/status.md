@@ -138,6 +138,7 @@ CI: Seit Lauf 78 startet kein Job (alle Jobs enden nach 2–3 s ohne einen Schri
 
 ### Entscheidungen des Auftraggebers
 
+- GitHub-Actions-Minuten verbraucht (vom Auftraggeber am 4. November 2026 bestätigt): CI startet keine Jobs, bis das Kontingent zurückgesetzt oder erweitert ist. Bis dahin wird lokal geprüft (alle Schritte des Linux-Jobs, Clippy für Windows, Release-Prüfung, `npm audit`); Windows-Tests, `cargo audit` und `cargo deny` stehen aus. Ein Push kostet in diesem Zustand keine Minuten.
 - macOS vorerst zurückgestellt (2. November 2026): CI läuft nur auf Windows und Linux. Priorität: zuerst Windows, dann Linux. macOS-spezifische Arbeiten ruhen, bis der Auftraggeber sie wieder freigibt.
 - Erledigt: Bundle-Kennung `app.projectwrite.desktop` bestätigt; App-Icon festgelegt (Schreibmaschine, größte Größe 256 × 256 px, erzeugt mit `scripts/app-icons.mjs`).
 - CI-Lauf 22 (Commit `a89afae`, App-Icon): Linux, Windows, Release-Prüfung und Audits grün. Der macOS-Job bekam zweimal keinen Runner zugeteilt und wurde nach 15 Minuten abgebrochen, ohne einen Schritt auszuführen – kein Codefehler. Das Icon (jetzt 256 × 256 px) unter macOS beim nächsten CI-Lauf prüfen.
