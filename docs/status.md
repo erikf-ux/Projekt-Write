@@ -4,29 +4,24 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 4 – Editor** (Abschnitte 10 und 12): freigegeben am 3. November 2026, abgeschlossen am 4. November 2026. Bericht: `docs/bericht-phase-4.md`. Wartet auf die Freigabe von Phase 5.
+**Phase 5 – Dokumente und externe Dateien** (Abschnitte 9, 10, 12, 13): freigegeben am 4. November 2026 („Weiter“), in Arbeit.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Umfangsentscheidungen (ADR 0014):
+Umfangsentscheidungen (ADR 0015): Löschen, Papierkorb und Archiv in Phase 6 (Abschnitt 25; ADR 0011 nannte Phase 5), Verschieben und Tags in Phase 7, Ordnerimport in Phase 8. Kodierungen ohne neue Abhängigkeit, Änderungen von außen per Abfrage statt Dateiwächter.
 
-- Tiptap 3.32.2 (MIT) mit `@tiptap/markdown` hinter dem Adapter in `modules/editor/markdown/`; Suchen und Ersetzen mit `@tiptap/extension-find-and-replace` (MIT, reguläre Ausdrücke über RE2).
-- Bilder in Markdown bleiben beim Laden und Speichern erhalten und erscheinen als Hinweis mit Adresse, ohne geladen zu werden; Einfügen und Import von Bildern kommt mit den Medien (Phase 8), PDF-Verweise ebenso.
-- Verlustschutz: Das Schema hält nur, was Markdown abbilden kann. Ein Dokument, das der Adapter nicht verlustfrei halten kann, öffnet in der Quelltextansicht und nennt den Grund. Die Option „Als `.pwrite` speichern“ kommt mit dem Format (Phase 5).
-- Interne Links (`[[`) und Rückverweise folgen in Phase 5, Drucken in Phase 10, Wiederherstellung in Phase 6.
+Plan Phase 5 (Reihenfolge):
 
-Plan Phase 4 (Reihenfolge):
+1. ADR 0015, `docs/pwrite-format.md`.
+2. Migration 0004 (`favorited_at`, `last_opened_at`, `document_links`), Favoriten, Zuletzt verwendet, Kopieren.
+3. `.pwrite` in Rust (Hülle, unbekannte Felder, neuere Versionen schreibgeschützt) und im Editor; Round-Trip-Test.
+4. Externe Dateien: Systemdialog, Kodierung und Zeilenenden, bytegleich ohne Änderung, `Strg + S`, Änderungspunkt, Schließen mit Rückfrage, Änderungen von außen, Speichern unter, 10-MB-Warnung, Binärdateien, In Bibliothek aufnehmen.
+5. Umwandeln mit Verlustschutz.
+6. Dateizuordnung: Startargumente, zweiter Start, Warteschlange, `.pwrite` im Bundle.
+7. Interne Links `[[`, `pwrite://`, Rückverweise in der Seitenleiste „Verbindungen“.
+8. Tests (Vitest, Rust, E2E), Doku, Bericht.
 
-1. Abhängigkeiten, ADR 0014 (Editor-Architektur, Adapter, Normalisierungen, Verlustschutz).
-2. Markdown-Adapter: YAML-Kopf, Fußnoten, HTML-Rohblöcke, erlaubte HTML-Teilmenge, Bild im Link, Bildgröße, Tabellen; Round-Trip-Probe beim Öffnen.
-3. Mindestens 50 Fälle in `tests/fixtures/markdown/` mit Round-Trip-Test (Struktur und Inhalt, nicht nur HTML) und abschließend dokumentierten Normalisierungen.
-4. Editor-Komponente: Rich Text mit Markdown-Kürzeln für MD, Minimal-Schema für TXT und Quelltextansicht (`Ctrl + /`), Laden und Speichern über den Speicherkern, Autosave, Verlustschutz.
-5. Schreibstatistik (Unicode-Wörter, Zeichen, ohne Leerzeichen, Absätze, Lesezeit; für die Markierung).
-6. Suchen und Ersetzen (Treffernavigation, Groß-/Kleinschreibung, ganze Wörter, reguläre Ausdrücke).
-7. Einfügen: HTML durch das Schema, `Ctrl + Shift + V` reiner Text.
-8. Befehle und Menü: Bearbeiten-Menü, Formatierungen, Weblinks mit `Ctrl + Klick` im Systembrowser.
-9. Leistung: Tippverzögerung und Öffnen bei 50.000 Wörtern messen.
-10. Tests (Vitest, Rust, E2E), Doku, CI, Bericht.
+CI: Die Läufe 78 bis 80 starteten keinen Job (0 Minuten abgerechnet); vermutlich ist das Actions-Kontingent des Kontos erschöpft. Bis zur Klärung wird lokal geprüft (Linux, Clippy auch für das Windows-Ziel).
 
 ## Stand Phase 4
 
@@ -125,7 +120,7 @@ Plan Phase 4 (Reihenfolge):
 
 - Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
-- Phase 5: Löschen (Papierkorb mit Wiederherstellen), Kopieren, Favoriten, Zuletzt verwendet, externe Dateien, weitere Kodierungen beim Import (ADR 0011).
+- Phase 6: Löschen und Papierkorb mit Wiederherstellen, Archiv (Abschnitt 25; ADR 0015 korrigiert ADR 0011).
 - Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
 - Referenzbibliothek ergänzen: Medien, Subnetze, Tags und Verbindungen mit ihren Tabellen (Phasen 7, 8, 11), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).

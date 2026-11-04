@@ -19,3 +19,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0012](0012-befehle-tastenkuerzel-und-menue.md)   | Befehle, Tastenkürzel, natives Menü                                          | angenommen                                    |
 | [0013](0013-importierbare-designs.md)             | Importierbare Designs und Oberflächeneinstellungen                           | angenommen                                    |
 | [0014](0014-editor-und-markdown-adapter.md)       | Editor: Schema, Markdown-Adapter und Verlustschutz                           | angenommen                                    |
+| [0015](0015-dokumente-und-externe-dateien.md)     | Dokumente und externe Dateien                                                | angenommen                                    |
