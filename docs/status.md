@@ -30,18 +30,18 @@ Plan Phase 4 (Reihenfolge):
 
 ## Stand Phase 4
 
-| Schritt | Inhalt                                                                                                 | Stand    |
-| ------- | ------------------------------------------------------------------------------------------------------ | -------- |
-| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt |
-| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt |
-| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt |
-| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt |
-| 5       | Schreibstatistik                                                                                       | erledigt |
-| 6       | Suchen und Ersetzen                                                                                    | erledigt |
-| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt |
-| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt |
-| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt |
-| 10      | Tests, Doku, CI, Bericht                                                                               | erledigt |
+| Schritt | Inhalt                                                                                                 | Stand                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt                                                                                                 |
+| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt                                                                                                 |
+| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt                                                                                                 |
+| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt                                                                                                 |
+| 5       | Schreibstatistik                                                                                       | erledigt                                                                                                 |
+| 6       | Suchen und Ersetzen                                                                                    | erledigt                                                                                                 |
+| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt                                                                                                 |
+| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt                                                                                                 |
+| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt                                                                                                 |
+| 10      | Tests, Doku, CI, Bericht                                                                               | erledigt; CI-Lauf 77 Windows grün, Linux bis auf F-17; Lauf 78 startete keinen Job (Actions-Kontingent?) |
 
 ## Stand Phase 3
 
@@ -108,6 +108,7 @@ Plan Phase 4 (Reihenfolge):
 | F-15 | E2E (Leistung): Die Statusleiste zählte unter Linux 49.940 statt 50.000 Wörter                                                                                                                                                     | JavaScriptCore meldet Zahlen in `Intl.Segmenter` als nicht wortartig, V8 als wortartig; es fehlten die 60 Kapitelnummern. Ein Wort ist jetzt ein Wortsegment mit Buchstabe oder Ziffer; Unit-Test mit nachgebildetem WebKit-Verhalten                                                                                                                                                                                        |
 | F-16 | E2E (Leistung): Ein Dokument mit 50.000 Wörtern öffnete unter Linux in 16 s statt ≤ 500 ms                                                                                                                                         | Quadratisches Lesen: Drei Tokenizer teilten oder durchsuchten den ganzen Resttext, und JavaScriptCore führt einige Ausdrücke von marked im Interpreter aus, der trotz `^` jede Startposition probiert. Eigene marked-Instanz mit Schnellprüfungen und ausgerollter Trennlinien-Regel (ADR 0014, Punkt 16); Vergleichstests der Tokens. Danach 269–469 ms                                                                     |
 | F-17 | CI-Lauf 77 (Linux): `restart.e2e.ts` bekam keine Sitzung (WebDriver auf Port 4445 nicht erreichbar)                                                                                                                                | Kein Fehler der App, ein Wettlauf im Testablauf: `library.e2e.ts` schließt das Fenster, die nächste Datei startete, bevor der Prozess beendet war; der Testdienst startet die App nur neu, wenn ihr WebDriver nicht mehr antwortet. Der letzte Test von `library.e2e.ts` wartet jetzt, bis der Port geschlossen ist                                                                                                          |
+| F-18 | E2E: `editor.e2e.ts` tippte einmal in ein anderes Dokument                                                                                                                                                                         | Wettlauf im Test: Die App startete mit einem wiederhergestellten Tab, der Test nahm dessen ID statt der des neuen Dokuments. Der Test wartet jetzt auf den neuen Tab                                                                                                                                                                                                                                                         |
 
 ## Offene Aufgaben
 

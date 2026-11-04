@@ -114,7 +114,9 @@ export class EditorSession {
       this.view = 'source';
       this.plain = this.createPlain(options.text);
     }
-    this.updateStatistics();
+    // Counted after the text is shown: a long document opens sooner
+    // (section 6: 50,000 words in ≤ 500 ms).
+    this.scheduleStatistics();
   }
 
   /** Writes the statistics of the current view and selection to the store. */

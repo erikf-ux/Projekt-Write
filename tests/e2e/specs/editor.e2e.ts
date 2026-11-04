@@ -24,6 +24,14 @@ async function activeDocumentId(): Promise<string> {
   return (await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').getAttribute('data-tab')) ?? '';
 }
 
+async function tabIds(): Promise<string[]> {
+  const ids: string[] = [];
+  for (const tab of await $$('[data-testid="tabs"] [role="tab"]').getElements()) {
+    ids.push((await tab.getAttribute('data-tab')) ?? '');
+  }
+  return ids;
+}
+
 async function saved(): Promise<void> {
   await browser.waitUntil(
     async () => (await $('[data-testid="status-save"]').getAttribute('data-state')) === 'saved',
@@ -98,13 +106,20 @@ describe('Project Write – Phase 4 editor', () => {
     await pinMainWindow();
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
     await closeSettings();
+    // The app may start with the tabs of the last session: wait for the new one.
+    const before = await tabIds();
     await $('[data-testid="explorer"] [role="listbox"]').click();
     await browser.keys(['Control', 'n']);
-    await browser.waitUntil(async () => (await activeDocumentId()) !== '', {
-      timeoutMsg: 'Ctrl+N did not open a new document',
-    });
+    await browser.waitUntil(
+      async () => {
+        const active = await activeDocumentId();
+        return active !== '' && !before.includes(active);
+      },
+      { timeoutMsg: 'Ctrl+N did not open a new document' },
+    );
     id = await activeDocumentId();
     const editor = await activeEditor();
+    await editor.waitForDisplayed();
     await editor.click();
     // A web address becomes a link when the space after it is typed.
     await typeText('Erst https://example.org/eins dann https://example.org/zwei Ende');
