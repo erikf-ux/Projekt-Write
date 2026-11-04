@@ -143,6 +143,22 @@ describe('Project Write – Phase 2 library', () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     expect(text).toContain('Project Write stopped');
+    // The next file may only start once the process is gone: the test
+    // service restarts the app only if its WebDriver no longer answers
+    // (CI run 77: the next file came first and found the port closed).
+    const status = `http://${browser.options.hostname ?? '127.0.0.1'}:${String(browser.options.port ?? 4445)}/status`;
+    let gone = false;
+    const exitDeadline = Date.now() + 30_000;
+    while (!gone && Date.now() < exitDeadline) {
+      try {
+        await fetch(status, { signal: AbortSignal.timeout(1_000) });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (error) {
+        // A refused connection means the server is gone; a timeout, that it is ending.
+        gone = !(error instanceof DOMException && error.name === 'TimeoutError');
+      }
+    }
+    expect(gone).toBe(true);
     // The library was closed before the process ended (lock released,
     // database closed).
     const lines = text.trimEnd().split('\n');

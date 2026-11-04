@@ -79,7 +79,7 @@ Keine bekannten. Bekannte Grenze (ADR 0014): marked liest manche dicht gepackten
 
 ## Behobene Fehler
 
-F-12 bis F-16 in `docs/status.md`. F-12 (Escape im Fokusmodus), F-14 (Autolink „im.Am“), F-15 (Wortzählung unter Linux) und F-16 (Öffnen 16 s unter Linux) fanden die E2E-Tests im echten Programm; F-13 (Windows-Clippy) fand CI. Die Round-Trip-Fehler, die der Stabilitätstest während der Entwicklung fand, wurden jeweils vor dem Commit behoben; die verbleibenden Grenzen beschreibt ADR 0014.
+F-12 bis F-17 in `docs/status.md`. F-12 (Escape im Fokusmodus), F-14 (Autolink „im.Am“), F-15 (Wortzählung unter Linux) und F-16 (Öffnen 16 s unter Linux) fanden die E2E-Tests im echten Programm; F-13 (Windows-Clippy) und F-17 (Wettlauf beim Neustart der App zwischen zwei E2E-Dateien, nur Test) fand CI. Die Round-Trip-Fehler, die der Stabilitätstest während der Entwicklung fand, wurden jeweils vor dem Commit behoben; die verbleibenden Grenzen beschreibt ADR 0014.
 
 ## Gefundene Widersprüche und Abweichungen
 
