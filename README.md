@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 4 – Editor**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 5 – Dokumente und externe Dateien**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -46,10 +46,16 @@ Beim ersten Start wählen Sie den Ort der Bibliothek und die Sprache; danach öf
 
 Markdown-Dokumente bearbeiten Sie als Rich Text; Markdown-Kürzel wie `# ` oder `**fett**` wirken beim Tippen, `Strg + /` zeigt den Markdown-Quelltext. Gespeichert wird immer Markdown. Was Markdown nicht verlustfrei halten kann, meldet der Editor vor dem Speichern; ein Dokument, das er nicht verlustfrei darstellen kann, öffnet in der Quelltextansicht und nennt den Grund. Die Statusleiste zeigt die Wörter und die Lesezeit, ein Klick darauf die ganze Statistik. Bilder erscheinen als Hinweis mit Adresse und werden nie geladen. Weblinks öffnen Sie mit `Strg + Klick` im Systembrowser.
 
+Neben Text (`.txt`) und Markdown (`.md`) gibt es Rich-Text-Dokumente im Format `.pwrite`; Dokumente lassen sich kopieren, als Favorit markieren und zwischen den Formaten umwandeln (die App nennt vorher, was verloren ginge). `[[` verlinkt ein anderes Dokument der Bibliothek; die Seitenleiste „Verbindungen“ zeigt, welche Dokumente auf das aktuelle verweisen.
+
+Dateien außerhalb der Bibliothek öffnen Sie mit `Strg + O` (oder per Doppelklick auf eine `.pwrite`-Datei). Kodierung und Zeilenenden bleiben, wie sie sind; gespeichert wird mit `Strg + S` (automatisch nur, wenn Sie es unter Einstellungen › Allgemein einschalten). Ändert ein anderes Programm die Datei, fragt die App, welche Fassung gelten soll.
+
 | Aktion                                 | Kürzel (macOS: `Cmd` statt `Strg`)             |
 | -------------------------------------- | ---------------------------------------------- |
 | Befehlspalette                         | `Strg + Umschalt + P`                          |
 | Neues Dokument, Speichern              | `Strg + N`, `Strg + S`                         |
+| Datei öffnen, Speichern unter          | `Strg + O`, `Strg + Umschalt + S`              |
+| Dokument verlinken                     | `[[` tippen                                    |
 | Tab schließen, nächster/vorheriger     | `Strg + W`, `Strg + Bild ab/auf`               |
 | Dokument umbenennen                    | `F2`                                           |
 | Explorer, Seitenleiste ein/aus         | `Strg + Umschalt + E`, `Strg + Umschalt + B`   |

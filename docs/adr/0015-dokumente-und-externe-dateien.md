@@ -31,4 +31,13 @@ Phase 5 umfasst laut Abschnitt 25: Erstellen, Öffnen, Bearbeiten, Umbenennen, K
 
 - Externe Dateien haben keine Historie, keine Suche und kein Mesh, bis sie in die Bibliothek aufgenommen sind (Abschnitt 9). Recovery-Entwürfe auch für externe Dateien kommen mit Phase 6.
 - Ein Doppelklick lässt sich in CI nicht auslösen: Getestet werden Startargumente und zweiter Start, also das, was das System bei einem Doppelklick tut.
-- `docs/database.md`: Migration 0004 legt `favorited_at`, `last_opened_at` und `document_links` an.
+- `docs/database.md`: Migration 0004 legt `favorited_at` und `last_opened_at` an, Migration 0005 `document_links`.
+
+## Nachträge aus der Umsetzung
+
+- **Zwei Migrationen statt einer.** `document_links` kam mit den internen Links als eigene Migration 0005; `target_id` hat keinen Fremdschlüssel (ein Link auf ein fehlendes Dokument bleibt ein Link), eine Spalte `count` gibt es nicht (`docs/database.md`).
+- **Linux-Dateizuordnung.** Die Desktop-Vorlage von Tauri hat `Exec=` ohne `%F`; Dateimanager übergeben die Datei dann nicht. Die Pakete (`.deb`, `.rpm`) nutzen deshalb eine eigene Vorlage (`src-tauri/linux/project-write.desktop`, `Exec=project-write %F`) und bringen den MIME-Typ `application/x-project-write` für `*.pwrite` mit (`linux/project-write-mime.xml`). Startargumente dürfen auch `file://`-Adressen sein. Geprüft an einem lokal gebauten Debug-`.deb`; installiert wurde es nicht (Abschnitt 2).
+- **Änderungen von außen**: Schließen der Rückfrage (Escape) verschiebt die Entscheidung; ein Hinweis über dem Text öffnet sie wieder, und gespeichert wird bis dahin nicht. Bei einer verschwundenen Datei bietet die Rückfrage „Speichern unter …“, „Weiter bearbeiten“ und „Tab schließen“.
+- **„Als `.pwrite` speichern“** in der Verlustwarnung wandelt Bibliotheksdokumente um. Externe Markdown-Dateien bekommen den Knopf nicht: „Speichern unter“ behält das Format der Datei, eine Umwandlung externer Dateien gehört nicht zum Umfang dieser Phase.
+- **Bibliothek wechseln** schließt die Tabs der Bibliotheksdokumente; Tabs externer Dateien bleiben offen.
+- **Rückfragen** (Speichern/Verwerfen/Abbrechen, große Datei, Duplikat, Umwandeln) laufen über einen gemeinsamen Dialog (`components/prompt/`).

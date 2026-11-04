@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 5 – Dokumente und externe Dateien
+
+#### Hinzugefügt
+
+- Rich-Text-Dokumente im eigenen Format `.pwrite` (Version 1, `docs/pwrite-format.md`): unbekannte Felder bleiben beim Speichern erhalten, Dateien einer neueren Formatversion öffnen schreibgeschützt mit Hinweis.
+- Explorer als Baum mit „Favoriten“, „Zuletzt verwendet“ (auch externe Dateien) und „Alle Dokumente“; Dokumente kopieren („… (Kopie)“), als Favorit markieren.
+- Externe Dateien öffnen (`Strg + O`), bearbeiten und speichern (`Strg + S`, „Speichern unter …“ mit `Strg + Umschalt + S`): Kodierung (UTF-8 mit und ohne BOM, UTF-16 LE/BE, Windows-1252) und Zeilenenden (LF, CRLF) bleiben erhalten und lassen sich in der Statusleiste umstellen; eine unveränderte Datei wird nie geschrieben. Änderungspunkt im Tab, Rückfrage beim Schließen und Beenden („Speichern, Verwerfen, Abbrechen“), Rückfrage ab 10 MB, Binärdateien werden abgelehnt, schreibgeschützte oder verschwundene Dateien bieten „Speichern unter“. Autosave für externe Dateien ist einstellbar (Standard aus).
+- Änderungen von außen: Die App vergleicht offene Dateien alle 2 s und beim Fokus mit der Platte und fragt „Neu laden“, „Meine Fassung behalten“ oder „Als Kopie speichern“.
+- „In Bibliothek aufnehmen“ legt eine Kopie einer externen Datei in der Bibliothek an; der Tab zeigt danach das Bibliotheksdokument.
+- Umwandeln zwischen TXT, Markdown und `.pwrite` mit Warnung vor Verlusten; die Verlustwarnung beim Speichern von Markdown bietet „Als `.pwrite` speichern“.
+- Dateizuordnung für `.pwrite`; eine Datei als Startargument oder bei einem zweiten Start öffnet in der laufenden App, eine Datei aus dem Dokumentordner der Bibliothek als Bibliotheksdokument.
+- Interne Links: `[[` öffnet eine Dokumentauswahl, der Link zeigt auf `pwrite://<id>` und überlebt das Umbenennen; `Strg + Klick` öffnet das Dokument. Die Seitenleiste „Verbindungen“ zeigt die Rückverweise.
+- Migrationen 0004 (Favoriten, zuletzt geöffnet) und 0005 (`document_links`).
+
+#### Geändert
+
+- Der Import per Drag & Drop erkennt dieselben Kodierungen wie externe Dateien und nimmt `.pwrite` an.
+
 ### Phase 4 – Editor
 
 #### Hinzugefügt

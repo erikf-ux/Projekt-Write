@@ -1,6 +1,6 @@
 # Abhängigkeiten – Project Write
 
-Stand: 3. November 2026 (Phase 2). Jede neue Abhängigkeit wird hier mit Zweck, Version und Lizenz begründet (Abschnitt 2). Versionen sind exakt festgelegt (`.npmrc`: `save-exact=true`, Lockfiles committet). Kompatibilitätsentscheidungen: ADR 0001.
+Stand: 4. November 2026 (Phase 5; seit Phase 4 keine neue Abhängigkeit). Jede neue Abhängigkeit wird hier mit Zweck, Version und Lizenz begründet (Abschnitt 2). Versionen sind exakt festgelegt (`.npmrc`: `save-exact=true`, Lockfiles committet). Kompatibilitätsentscheidungen: ADR 0001.
 
 ## Werkzeuge der Entwicklungsumgebung
 
@@ -23,9 +23,9 @@ Stand: 3. November 2026 (Phase 2). Jede neue Abhängigkeit wird hier mit Zweck, 
 | `ts-rs`                        | 12.0.1  | MIT               | Erzeugt TypeScript-Typen aus Rust-Typen (Abschnitt 8)                                                                                                                                                                                                                                                                                                                     |
 | `tauri-plugin-wdio-webdriver`  | 1.5.1   | MIT               | **Nur Feature `e2e`, nur Debug.** Eingebetteter WebDriver-Server für E2E-Tests (ADR 0003)                                                                                                                                                                                                                                                                                 |
 | `tauri-plugin-single-instance` | 2.5.5   | Apache-2.0 OR MIT | Phase 2. Ein zweiter Programmstart übergibt an die laufende Instanz (Abschnitt 9, ADR 0006). Registriert keine Befehle. Unter Linux über D-Bus (`zbus` 5, MIT, samt `async-*`-Hilfscrates unter MIT/Apache-2.0)                                                                                                                                                           |
-| `rfd`                          | 0.17.2  | MIT               | Phase 2. Nativer Ordnerdialog aus Rust (ADR 0008); Feature `gtk3`, ohne `xdg-portal`. Statt `tauri-plugin-dialog`, das `tauri-plugin-fs` mitbringt                                                                                                                                                                                                                        |
+| `rfd`                          | 0.17.2  | MIT               | Phase 2. Nativer Ordnerdialog aus Rust (ADR 0008), ab Phase 5 auch Öffnen- und Speichern-unter-Dialog für externe Dateien (ADR 0015); Feature `gtk3`, ohne `xdg-portal`. Statt `tauri-plugin-dialog`, das `tauri-plugin-fs` mitbringt                                                                                                                                     |
 | `uuid`                         | 1.26.1  | Apache-2.0 OR MIT | Phase 2. IDs (v4) für Bibliothek und Dokumente; war bereits im Abhängigkeitsbaum (über `tauri-utils`)                                                                                                                                                                                                                                                                     |
-| `sha2`                         | 0.10.9  | MIT OR Apache-2.0 | Phase 2. SHA-256 für Prüfsummen von Dokumenten und Kopien; war bereits im Baum (über `sqlx-core`)                                                                                                                                                                                                                                                                         |
+| `sha2`                         | 0.10.9  | MIT OR Apache-2.0 | Phase 2. SHA-256 für Prüfsummen von Dokumenten und Kopien, ab Phase 5 auch für den Vergleich externer Dateien mit der Platte; war bereits im Baum (über `sqlx-core`)                                                                                                                                                                                                      |
 | `time`                         | 0.3.55  | MIT OR Apache-2.0 | Phase 2. UTC-Zeitstempel (Kalenderrechnung); war bereits im Baum (über `cookie`/`tauri`)                                                                                                                                                                                                                                                                                  |
 | `tokio`                        | 1.x     | MIT               | Phase 2. `sync` (asynchrone Sperren, Einmal-Kanäle) und `rt` (`spawn_blocking` für Dateiarbeit); Tauri nutzt dieselbe Laufzeit                                                                                                                                                                                                                                            |
 | `libc`                         | 0.2.191 | MIT OR Apache-2.0 | Phase 2, nur Unix. Konstante `O_NOFOLLOW` beim Öffnen (keine Verknüpfung im letzten Pfadteil); war bereits im Baum                                                                                                                                                                                                                                                        |
@@ -90,15 +90,18 @@ Stand: 3. November 2026 (Phase 2). Jede neue Abhängigkeit wird hier mit Zweck, 
 
 Optional für Entwickler unter Linux: `mingw-w64` und das Rust-Ziel `x86_64-pc-windows-gnu`, um Windows-Code mit `cargo clippy --target x86_64-pc-windows-gnu` vor dem CI-Lauf zu prüfen (nur Prüfung, kein Auslieferungsbuild).
 
-## Geprüft und nicht verwendet (Phase 2)
+## Geprüft und nicht verwendet (Phasen 2 und 5)
 
-| Kandidat                    | Grund                                                                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tauri-plugin-dialog`       | hängt von `tauri-plugin-fs` ab (Abschnitte 7/20) und registriert Befehle; `rfd` direkt genügt (ADR 0008)                                       |
-| `tauri-plugin-window-state` | eigene, nicht atomar geschriebene Datei; in E2E-Tests unter Windows nicht in die Sandbox umlenkbar; Fensterzustand folgt in Phase 3 (ADR 0009) |
-| `tauri-plugin-log`          | Logging bleibt Rust-seitig ohne Frontend-Befehl; eigener Logger ohne neue Abhängigkeit (ADR 0009)                                              |
-| `fs4`, `fd-lock`            | `std::fs::File::try_lock` (Rust 1.89) deckt die Bibliothekssperre ab                                                                           |
-| `dunce`                     | das Entfernen des `\\?\`-Präfixes ist in `security/paths.rs` mit Prüfung der Namen umgesetzt                                                   |
+| Kandidat                             | Grund                                                                                                                                          |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tauri-plugin-dialog`                | hängt von `tauri-plugin-fs` ab (Abschnitte 7/20) und registriert Befehle; `rfd` direkt genügt (ADR 0008)                                       |
+| `tauri-plugin-window-state`          | eigene, nicht atomar geschriebene Datei; in E2E-Tests unter Windows nicht in die Sandbox umlenkbar; Fensterzustand folgt in Phase 3 (ADR 0009) |
+| `tauri-plugin-log`                   | Logging bleibt Rust-seitig ohne Frontend-Befehl; eigener Logger ohne neue Abhängigkeit (ADR 0009)                                              |
+| `fs4`, `fd-lock`                     | `std::fs::File::try_lock` (Rust 1.89) deckt die Bibliothekssperre ab                                                                           |
+| `dunce`                              | das Entfernen des `\\?\`-Präfixes ist in `security/paths.rs` mit Prüfung der Namen umgesetzt                                                   |
+| `encoding_rs`, `chardetng` (Phase 5) | für vier Kodierungen genügt eine eigene, getestete Erkennung in `services/encoding.rs` (ADR 0015, Punkt 4)                                     |
+| `notify` (Phase 5)                   | Dateiwächter mit drei Plattform-Backends; eine Abfrage alle 2 s und beim Fokus ist überall gleich und testbar (ADR 0015, Punkt 7)              |
+| `percent-encoding`, `url` (Phase 5)  | `file://`-Startargumente decodiert `services/opening.rs` selbst (wenige Zeilen, Unit-Test)                                                     |
 
 ## Grafiken
 

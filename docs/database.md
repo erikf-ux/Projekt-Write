@@ -36,18 +36,20 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 - **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), kopiert die App sie mit `VACUUM INTO` nach `backups/pre-migration/projectwrite-schema-<alt>-<Zeit>.db`, prüft die Kopie mit `PRAGMA integrity_check` und migriert erst dann. Scheitert die Sicherung, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten Kopien bleiben, ältere entfernt die App (nur eigene Dateien nach diesem Namensmuster). Ab Phase 10 ersetzt ein vollständiges `.pwbackup` diese Kopie (Abschnitt 21).
 - **Tests ab jeder früheren Version:** `tests/migrations.rs` legt für jede Version 0 … n−1 eine Datenbank an, füllt die Tabellen dieser Version mit Testdaten, migriert auf die aktuelle Version und prüft: Schema identisch zu einer frisch migrierten Datenbank, Daten erhalten, `integrity_check` = ok, `foreign_key_check` leer. Jede neue Migration bringt eine Testzeile für ihre Tabellen mit.
 
-| Version | Datei                           | Inhalt                         | Phase |
-| ------- | ------------------------------- | ------------------------------ | ----- |
-| 1       | `0001_application_settings.sql` | Tabelle `application_settings` | 1     |
-| 2       | `0002_documents.sql`            | Tabelle `documents`            | 2     |
-| 3       | `0003_document_import.sql`      | `documents.original_name`      | 3     |
+| Version | Datei                           | Inhalt                                                                            | Phase |
+| ------- | ------------------------------- | --------------------------------------------------------------------------------- | ----- |
+| 1       | `0001_application_settings.sql` | Tabelle `application_settings`                                                    | 1     |
+| 2       | `0002_documents.sql`            | Tabelle `documents`                                                               | 2     |
+| 3       | `0003_document_import.sql`      | `documents.original_name`                                                         | 3     |
+| 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent` | 5     |
+| 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                          | 5     |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
 | Phase | Inhalt                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 5     | `documents`: `favorited_at`, `last_opened_at`, `import_folder`; Tabelle `document_links`                                                   |
 | 6     | `document_history`                                                                                                                         |
+| 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015)                                                                                 |
 | 7     | `subnets`, `subnet_memberships`, `tags`, `document_tags`                                                                                   |
 | 8     | `media`, `media_tags`, `document_media`                                                                                                    |
 | 9     | `search_entries`, `search_words`, `search_parts`                                                                                           |
@@ -63,8 +65,8 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | Tabelle                        | Zweck                                            | Stand              |
 | ------------------------------ | ------------------------------------------------ | ------------------ |
 | `application_settings`         | Bibliotheksweite Einstellungen                   | vorhanden (v1)     |
-| `documents`                    | Dokumente (TXT, MD, `.pwrite`)                   | vorhanden (v2)     |
-| `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | geplant (Phase 5)  |
+| `documents`                    | Dokumente (TXT, MD, `.pwrite`)                   | vorhanden (v2–v4)  |
+| `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | vorhanden (v5)     |
 | `document_history`             | Versionen eines Dokuments                        | geplant (Phase 6)  |
 | `subnets`                      | Hierarchische Gruppen                            | geplant (Phase 7)  |
 | `subnet_memberships`           | Zuordnung Element → Subnetz                      | geplant (Phase 7)  |
@@ -110,7 +112,7 @@ Abgeleitete Verbindungen (Referenz, Tag, Enthalten-in, Abschnitt 15) werden **ni
 
 Appweite Einstellungen (Bibliothekspfad, später Fensterzustand, Sprache, Tastenkürzel) liegen **nicht** hier, sondern in `settings.json` im Konfigurationsordner des Systems (ADR 0009).
 
-### `documents` – vorhanden (Version 3)
+### `documents` – vorhanden (Versionen 2 bis 4)
 
 | Spalte           | Typ                   | Regeln                                                               | Phase |
 | ---------------- | --------------------- | -------------------------------------------------------------------- | ----- |
@@ -126,25 +128,28 @@ Appweite Einstellungen (Bibliothekspfad, später Fensterzustand, Sprache, Tasten
 | `favorited_at`   | TEXT NULL             | Favorit seit                                                         | 5     |
 | `last_opened_at` | TEXT NULL             | für „Zuletzt verwendet“                                              | 5     |
 | `original_name`  | TEXT NULL             | Dateiname beim Import (Abschnitt 9), 1–255 Zeichen                   | 3     |
-| `import_folder`  | TEXT NULL             | Importordner als Anzeigetext (Metadatum); kommt mit dem Ordnerimport | 5     |
+| `import_folder`  | TEXT NULL             | Importordner als Anzeigetext (Metadatum); kommt mit dem Ordnerimport | 8     |
 
-`original_name` kam mit dem Drag-&-Drop-Import in Phase 3 statt wie geplant in Phase 5 (Migration 0003). Abgelegte Dateien kommen ohne Ordner an (der Webview nennt nur den Namen); `import_folder` entsteht deshalb erst mit dem Ordnerimport. Bibliotheksdokumente in TXT und MD sind UTF-8 mit LF-Zeilenenden; der Import wandelt CRLF und CR um.
+`original_name` kam mit dem Drag-&-Drop-Import in Phase 3 statt wie geplant in Phase 5 (Migration 0003). Abgelegte Dateien kommen ohne Ordner an (der Webview nennt nur den Namen); `import_folder` entsteht deshalb erst mit dem Ordnerimport, der laut Abschnitt 25 zu Phase 8 gehört (ADR 0015, Punkt 1). `favorited_at` und `last_opened_at` kamen mit Migration 0004 (Phase 5); beide sind ISO 8601 UTC wie die übrigen Zeitspalten, `last_opened_at` setzt das Öffnen in einem Tab, `favorited_at` ändert `updated_at` nicht. Bibliotheksdokumente in TXT und MD sind UTF-8 mit LF-Zeilenenden; der Import erkennt UTF-8 (mit und ohne BOM), UTF-16 und Windows-1252 und wandelt CRLF und CR um (ADR 0015, Punkt 16).
 
-Index: `ix_documents_active_updated_at (updated_at) WHERE deleted_at IS NULL`. Datei: `documents/text/<id>.txt`, `documents/markdown/<id>.md`, `documents/richtext/<id>.pwrite`.
+Indizes: `ix_documents_active_updated_at (updated_at) WHERE deleted_at IS NULL`, `ix_documents_recent (last_opened_at) WHERE last_opened_at IS NOT NULL AND deleted_at IS NULL`. Datei: `documents/text/<id>.txt`, `documents/markdown/<id>.md`, `documents/richtext/<id>.pwrite` (Hülle: `docs/pwrite-format.md`).
+
+**Umwandeln** (ADR 0015, Punkt 13): Die ID bleibt. Rust schreibt zuerst die Datei des neuen Formats, ändert dann in einer Transaktion `format`, `size_bytes`, `content_sha256`, `updated_at` und die Links und löscht zuletzt die alte Datei. Ein Absturz dazwischen hinterlässt höchstens eine verwaiste Datei, die die Prüfung beim Öffnen meldet – nie eine Zeile ohne Datei.
 
 Bewusst **ohne** `updated_at >= created_at`: Eine Zeitkorrektur der Systemuhr darf ein Speichern nie scheitern lassen. Sprache und Autokorrektur je Dokument stehen in `language_profiles`.
 
 Schreibreihenfolge und Absturzverhalten: Abschnitt 6 und ADR 0007.
 
-### `document_links` – geplant (Phase 5)
+### `document_links` – vorhanden (Version 5)
 
-| Spalte      | Typ     | Regeln                              |
-| ----------- | ------- | ----------------------------------- |
-| `source_id` | TEXT    | → `documents(id)` ON DELETE CASCADE |
-| `target_id` | TEXT    | → `documents(id)` ON DELETE CASCADE |
-| `count`     | INTEGER | ≥ 1, Anzahl der Links im Quelltext  |
+| Spalte      | Typ  | Regeln                                        |
+| ----------- | ---- | --------------------------------------------- |
+| `source_id` | TEXT | → `documents(id)` ON DELETE CASCADE           |
+| `target_id` | TEXT | UUID in Kleinbuchstaben; ungleich `source_id` |
 
-Primärschlüssel `(source_id, target_id)`, Index auf `target_id` (Rückverweise, Seitenleiste „Verbindungen“). Wird beim Speichern aus dem Inhalt abgeleitet, in derselben Transaktion wie die Metadaten.
+`STRICT, WITHOUT ROWID`, Primärschlüssel `(source_id, target_id)`, Index `ix_document_links_target (target_id, source_id)` für die Rückverweise (Seitenleiste „Verbindungen“). Rust leitet die Zeilen bei jedem Speichern, Anlegen, Import, Kopieren und Umwandeln aus dem Inhalt ab und schreibt sie in derselben Transaktion wie die Metadaten: in Markdown jedes `pwrite://<id>`, in `.pwrite` die Link-Markierungen mit `pwrite://<id>`; TXT hat keine Links.
+
+Abweichungen vom Entwurf: `target_id` hat **keinen** Fremdschlüssel, weil ein Link auf ein (noch) fehlendes Dokument ein Link bleibt (zum Beispiel aus einer anderen Bibliothek importiert); die Spalte `count` entfällt, weil die Verbindungen nur zählen, ob ein Dokument verweist. Rückverweise aus dem Papierkorb zeigt die Abfrage nicht.
 
 ### `document_history` – geplant (Phase 6)
 

@@ -4,24 +4,26 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 5 – Dokumente und externe Dateien** (Abschnitte 9, 10, 12, 13): freigegeben am 4. November 2026 („Weiter“), in Arbeit.
+**Phase 5 – Dokumente und externe Dateien** (Abschnitte 9, 10, 12, 13): freigegeben am 4. November 2026 („Weiter“), **abgeschlossen** am 4. November 2026; Bericht: `docs/bericht-phase-5.md`. Wartet auf Freigabe von Phase 6.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Umfangsentscheidungen (ADR 0015): Löschen, Papierkorb und Archiv in Phase 6 (Abschnitt 25; ADR 0011 nannte Phase 5), Verschieben und Tags in Phase 7, Ordnerimport in Phase 8. Kodierungen ohne neue Abhängigkeit, Änderungen von außen per Abfrage statt Dateiwächter.
 
-Plan Phase 5 (Reihenfolge):
+CI: Seit Lauf 78 startet kein Job (alle Jobs enden nach 2–3 s ohne einen Schritt, zuletzt Lauf 93); vermutlich ist das Actions-Kontingent des Kontos erschöpft. Bis zur Klärung wird lokal geprüft: alle Schritte des CI-Jobs unter Linux, Clippy zusätzlich für das Windows-Ziel. Windows-Tests und die Audits laufen erst wieder in CI.
 
-1. ADR 0015, `docs/pwrite-format.md`.
-2. Migration 0004 (`favorited_at`, `last_opened_at`, `document_links`), Favoriten, Zuletzt verwendet, Kopieren.
-3. `.pwrite` in Rust (Hülle, unbekannte Felder, neuere Versionen schreibgeschützt) und im Editor; Round-Trip-Test.
-4. Externe Dateien: Systemdialog, Kodierung und Zeilenenden, bytegleich ohne Änderung, `Strg + S`, Änderungspunkt, Schließen mit Rückfrage, Änderungen von außen, Speichern unter, 10-MB-Warnung, Binärdateien, In Bibliothek aufnehmen.
-5. Umwandeln mit Verlustschutz.
-6. Dateizuordnung: Startargumente, zweiter Start, Warteschlange, `.pwrite` im Bundle.
-7. Interne Links `[[`, `pwrite://`, Rückverweise in der Seitenleiste „Verbindungen“.
-8. Tests (Vitest, Rust, E2E), Doku, Bericht.
+## Stand Phase 5
 
-CI: Die Läufe 78 bis 80 starteten keinen Job (0 Minuten abgerechnet); vermutlich ist das Actions-Kontingent des Kontos erschöpft. Bis zur Klärung wird lokal geprüft (Linux, Clippy auch für das Windows-Ziel).
+| Schritt | Inhalt                                                                                                                                                                                                                                  | Stand                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 1       | ADR 0015, `docs/pwrite-format.md`                                                                                                                                                                                                       | erledigt                                                       |
+| 2       | Migration 0004 (`favorited_at`, `last_opened_at`), Favoriten, Zuletzt verwendet, Kopieren, Explorer als Baum                                                                                                                            | erledigt                                                       |
+| 3       | `.pwrite` in Rust (Hülle, unbekannte Felder, neuere Versionen schreibgeschützt) und im Editor                                                                                                                                           | erledigt                                                       |
+| 4       | Externe Dateien: Dialoge, Kodierung und Zeilenenden, bytegleich ohne Änderung, `Strg + S`, Änderungspunkt, Rückfragen, Änderungen von außen, Speichern unter, 10-MB-Rückfrage, Binärdateien, In Bibliothek aufnehmen, Zuletzt verwendet | erledigt                                                       |
+| 5       | Umwandeln mit Verlustschutz, „Als `.pwrite` speichern“                                                                                                                                                                                  | erledigt                                                       |
+| 6       | Dateizuordnung `.pwrite`, Startargumente, zweiter Start, Warteschlange                                                                                                                                                                  | erledigt                                                       |
+| 7       | Interne Links `[[`, `pwrite://`, Migration 0005, Rückverweise „Verbindungen“                                                                                                                                                            | erledigt                                                       |
+| 8       | Tests, Doku, Bericht                                                                                                                                                                                                                    | erledigt; CI startet keine Jobs (siehe oben), lokal alles grün |
 
 ## Stand Phase 4
 
@@ -104,15 +106,18 @@ CI: Die Läufe 78 bis 80 starteten keinen Job (0 Minuten abgerechnet); vermutlic
 | F-16 | E2E (Leistung): Ein Dokument mit 50.000 Wörtern öffnete unter Linux in 16 s statt ≤ 500 ms                                                                                                                                         | Quadratisches Lesen: Drei Tokenizer teilten oder durchsuchten den ganzen Resttext, und JavaScriptCore führt einige Ausdrücke von marked im Interpreter aus, der trotz `^` jede Startposition probiert. Eigene marked-Instanz mit Schnellprüfungen und ausgerollter Trennlinien-Regel (ADR 0014, Punkt 16); Vergleichstests der Tokens. Danach 269–469 ms                                                                     |
 | F-17 | CI-Lauf 77 (Linux): `restart.e2e.ts` bekam keine Sitzung (WebDriver auf Port 4445 nicht erreichbar)                                                                                                                                | Kein Fehler der App, ein Wettlauf im Testablauf: `library.e2e.ts` schließt das Fenster, die nächste Datei startete, bevor der Prozess beendet war; der Testdienst startet die App nur neu, wenn ihr WebDriver nicht mehr antwortet. Der letzte Test von `library.e2e.ts` wartet jetzt, bis der Port geschlossen ist                                                                                                          |
 | F-18 | E2E: `editor.e2e.ts` tippte einmal in ein anderes Dokument                                                                                                                                                                         | Wettlauf im Test: Die App startete mit einem wiederhergestellten Tab, der Test nahm dessen ID statt der des neuen Dokuments. Der Test wartet jetzt auf den neuen Tab                                                                                                                                                                                                                                                         |
+| F-19 | UTF-16 ohne BOM wurde als UTF-8 gelesen                                                                                                                                                                                            | Lateinischer Text in UTF-16 ist gültiges UTF-8 mit Nullbytes. Enthält eine Datei Nullbytes, prüft die Erkennung zuerst das Muster von UTF-16; Unit-Test über alle Kodierungen und Zeilenenden                                                                                                                                                                                                                                |
+| F-20 | E2E: Text landete am Anfang statt am Ende des Dokuments                                                                                                                                                                            | `Strg + Ende` des eingebetteten WebDrivers bewegt die Schreibmarke unter WebKitGTK nicht; der Test setzt sie über die DOM-Auswahl, der ProseMirror folgt                                                                                                                                                                                                                                                                     |
+| F-21 | E2E: Der zweite Dialog „Datei wurde außerhalb geändert“ galt als unsichtbar                                                                                                                                                        | Der Test hielt die Elementreferenz des ersten Dialogs; jedes Warten sucht das Element jetzt neu                                                                                                                                                                                                                                                                                                                              |
+| F-22 | E2E: Der Kürzel-Test der Phase 3 scheiterte einmal in fünf Läufen                                                                                                                                                                  | Die Tasten kamen, bevor der Aufnahmebereich den Fokus hatte (er bekommt ihn in einem Effekt); `Strg + N` legte dann ein Dokument an. Der Test wartet auf den Fokus                                                                                                                                                                                                                                                           |
 
 ## Offene Aufgaben
 
-### In Phase 5
-
-- Verlustschutz: „Als `.pwrite` speichern“ in der Warnung und Umwandeln zwischen den Formaten (Abschnitt 10).
-- Interne Links (`[[`, `pwrite://`) und Rückverweise (Abschnitt 12).
-
 ### Später
+
+- Dateizuordnung auf echten Systemen von Hand prüfen: Doppelklick und „Öffnen mit“ unter Windows (Installer, Phase 14) und Linux (installiertes `.deb`); in CI sind nur Startargumente und zweiter Start testbar. Der erste Start mit Dateiargument ist per Rust-Test (Argumente, Warteschlange, Abholen) geprüft, nicht im E2E-Test.
+- Externe Dateien unter Windows: Rechte (ACL) der ersetzten Datei; die neue Datei erbt die des Ordners. Harte Links werden beim atomaren Ersetzen getrennt (wie bei den meisten Editoren).
+- Recovery-Entwürfe auch für externe Dateien (Phase 6).
 
 - Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
 - Bilder einfügen und importieren, PDF-Verweise (Phase 8); Drucken (Phase 10); Wiederherstellen aus den Tabs (Phase 6).
@@ -144,4 +149,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 5 (Dokumente und externe Dateien, Abschnitte 9, 10, 12, 13).
+Nach Freigabe: Phase 6 (Historie, Papierkorb, Archiv, Recovery; Abschnitt 25).
