@@ -10,6 +10,7 @@ const state: UiState = {
     zoom: 1,
     sidebar: { visible: true, width: 260 },
     limitLineWidth: true,
+    autosaveExternal: false,
     readingTime: { visible: false, wordsPerMinute: 200 },
     keybindings: {},
   },

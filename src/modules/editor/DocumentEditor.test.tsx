@@ -25,6 +25,8 @@ function openDocument(
     viewIssues: [],
     loaded: true,
     readOnly: false,
+    generation: 0,
+    external: null,
     ...extra,
   };
 }

@@ -20,6 +20,11 @@ zoom: number, sidebar: SidebarSettings,
  */
 limitLineWidth: boolean, readingTime: ReadingTimeSettings, 
 /**
+ * External files are saved automatically like library documents
+ * (ADR 0015: optional, off by default).
+ */
+autosaveExternal: boolean, 
+/**
  * Shortcuts that differ from the defaults: command id → chords such as
  * `Ctrl+Shift+P`. An empty list removes every shortcut of the command.
  */

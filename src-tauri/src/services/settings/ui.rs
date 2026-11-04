@@ -123,6 +123,9 @@ pub struct UiSettings {
     /// Lines of the writing surface at most 72 characters wide (section 11).
     pub limit_line_width: bool,
     pub reading_time: ReadingTimeSettings,
+    /// External files are saved automatically like library documents
+    /// (ADR 0015: optional, off by default).
+    pub autosave_external: bool,
     /// Shortcuts that differ from the defaults: command id → chords such as
     /// `Ctrl+Shift+P`. An empty list removes every shortcut of the command.
     pub keybindings: BTreeMap<String, Vec<String>>,
@@ -137,6 +140,7 @@ impl Default for UiSettings {
             sidebar: SidebarSettings::default(),
             limit_line_width: true,
             reading_time: ReadingTimeSettings::default(),
+            autosave_external: false,
             keybindings: BTreeMap::new(),
         }
     }
@@ -150,6 +154,7 @@ const KEY_ZOOM: &str = "zoom";
 const KEY_SIDEBAR: &str = "sidebar";
 const KEY_LIMIT_LINE_WIDTH: &str = "limitLineWidth";
 const KEY_READING_TIME: &str = "readingTime";
+const KEY_AUTOSAVE_EXTERNAL: &str = "autosaveExternal";
 const KEY_KEYBINDINGS: &str = "keybindings";
 const KEY_WINDOW: &str = "window";
 
@@ -183,6 +188,8 @@ impl UiSettings {
                 .unwrap_or(defaults.limit_line_width),
             reading_time: take(object, KEY_READING_TIME, validate_reading_time)
                 .unwrap_or(defaults.reading_time),
+            autosave_external: take(object, KEY_AUTOSAVE_EXTERNAL, |_| Ok(()))
+                .unwrap_or(defaults.autosave_external),
             keybindings: take(object, KEY_KEYBINDINGS, validate_keybindings)
                 .unwrap_or(defaults.keybindings),
         }
@@ -592,6 +599,7 @@ mod tests {
                 visible: true,
                 words_per_minute: 250,
             },
+            autosave_external: true,
             keybindings: BTreeMap::new(),
         };
         settings
@@ -600,6 +608,7 @@ mod tests {
         let mut object = Map::new();
         settings.put_into(&mut object);
         assert_eq!(object["limitLineWidth"], json!(false));
+        assert_eq!(object["autosaveExternal"], json!(true));
         assert_eq!(
             object["readingTime"],
             json!({ "visible": true, "wordsPerMinute": 250 })

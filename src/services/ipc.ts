@@ -35,6 +35,16 @@ import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
 import type { RemoveThemeRequest } from '@/types/generated/RemoveThemeRequest';
 import type { RenameDocumentRequest } from '@/types/generated/RenameDocumentRequest';
 import type { SaveDocumentRequest } from '@/types/generated/SaveDocumentRequest';
+import type { ExternalFileInfo } from '@/types/generated/ExternalFileInfo';
+import type { ExternalFileRequest } from '@/types/generated/ExternalFileRequest';
+import type { ExternalText } from '@/types/generated/ExternalText';
+import type { FileCheck } from '@/types/generated/FileCheck';
+import type { ImportExternalRequest } from '@/types/generated/ImportExternalRequest';
+import type { OpenExternalRequest } from '@/types/generated/OpenExternalRequest';
+import type { RecentFileEntry } from '@/types/generated/RecentFileEntry';
+import type { SaveExternalAsRequest } from '@/types/generated/SaveExternalAsRequest';
+import type { SaveExternalRequest } from '@/types/generated/SaveExternalRequest';
+import type { SaveOutcome } from '@/types/generated/SaveOutcome';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
 import type { UiEvent } from '@/types/generated/UiEvent';
@@ -70,6 +80,17 @@ export interface Commands {
   document_import: { request: ImportDocumentRequest; response: ImportResult };
   theme_import: { request: ImportThemeRequest; response: UiState };
   theme_remove: { request: RemoveThemeRequest; response: UiState };
+  external_open: { request: OpenExternalRequest; response: ExternalFileInfo | null };
+  external_read: { request: ExternalFileRequest; response: ExternalText };
+  external_check: { request: ExternalFileRequest; response: FileCheck };
+  external_keep_mine: { request: ExternalFileRequest; response: null };
+  external_save: { request: SaveExternalRequest; response: SaveOutcome };
+  external_save_as: { request: SaveExternalAsRequest; response: ExternalFileInfo | null };
+  external_close: { request: ExternalFileRequest; response: null };
+  external_import: { request: ImportExternalRequest; response: ImportResult };
+  external_recent: { request: EmptyRequest; response: RecentFileEntry[] };
+  external_open_recent: { request: ExternalFileRequest; response: ExternalFileInfo };
+  external_forget_recent: { request: ExternalFileRequest; response: RecentFileEntry[] };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -124,6 +145,11 @@ const errorCodes: Record<ErrorCode, true> = {
   LINK_OPEN_FAILED: true,
   PWRITE_INVALID: true,
   DOCUMENT_READ_ONLY: true,
+  FILE_UNKNOWN: true,
+  FILE_MISSING: true,
+  FILE_CHANGED: true,
+  FILE_READ_ONLY: true,
+  FILE_UNENCODABLE: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

@@ -23,6 +23,7 @@ import type { MenuCommand } from '@/types/generated/MenuCommand';
 import type { MenuItemState } from '@/types/generated/MenuItemState';
 import { currentBindings } from './bindings';
 import { ClosePrompt } from './ClosePrompt';
+import { PromptDialog } from '@/components/prompt/PromptDialog';
 import { createFormatCommands } from './formatCommands';
 import { createAppCommands } from './commands';
 import { requestQuit } from './lifecycle';
@@ -272,6 +273,7 @@ export function App() {
       ) : null}
       {settingsSection !== null ? <SettingsDialog /> : null}
       {closePrompt ? <ClosePrompt /> : null}
+      <PromptDialog />
       <NoticeBar notice={shownNotice} onClose={closeNotice} />
     </>
   );

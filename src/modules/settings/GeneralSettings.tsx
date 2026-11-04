@@ -162,6 +162,16 @@ export function GeneralSettings() {
           />
           {t('settings.limitLineWidth')}
         </label>
+        <label className="text-ui mt-2 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.autosaveExternal}
+            data-testid="autosave-external"
+            onChange={(event) => void update({ autosaveExternal: event.target.checked })}
+          />
+          {t('settings.autosaveExternal')}
+        </label>
+        <p className="text-ui mt-1 text-muted">{t('settings.autosaveExternalHint')}</p>
       </fieldset>
 
       <fieldset className={FIELDSET}>

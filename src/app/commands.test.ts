@@ -21,6 +21,7 @@ const uiState: UiState = {
     zoom: 1,
     sidebar: { visible: true, width: 260 },
     limitLineWidth: true,
+    autosaveExternal: false,
     readingTime: { visible: false, wordsPerMinute: 200 },
     keybindings: {},
   },
@@ -65,6 +66,8 @@ function openDocument(id: string, state: 'saved' | 'pending' = 'saved') {
         viewIssues: [],
         loaded: true,
         readOnly: false,
+        generation: 0,
+        external: null,
       },
     },
   }));

@@ -667,6 +667,7 @@ fn default_ui_settings() -> Value {
         "sidebar": { "visible": true, "width": 260 },
         "limitLineWidth": true,
         "readingTime": { "visible": false, "wordsPerMinute": 200 },
+        "autosaveExternal": false,
         "keybindings": {}
     })
 }

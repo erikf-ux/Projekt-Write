@@ -23,6 +23,8 @@ function document(id: string, format: 'md' | 'txt'): OpenDocument {
     viewIssues: [],
     loaded: true,
     readOnly: false,
+    generation: 0,
+    external: null,
   };
 }
 
