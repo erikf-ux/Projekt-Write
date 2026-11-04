@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-requests-take"
+description = "Enables the open_requests_take command without any pre-configured scope."
+commands.allow = ["open_requests_take"]
+
+[[permission]]
+identifier = "deny-open-requests-take"
+description = "Denies the open_requests_take command without any pre-configured scope."
+commands.deny = ["open_requests_take"]

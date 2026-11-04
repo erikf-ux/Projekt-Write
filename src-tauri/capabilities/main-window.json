@@ -40,6 +40,7 @@
     "allow-external-recent",
     "allow-external-open-recent",
     "allow-external-forget-recent",
+    "allow-open-requests-take",
     "allow-theme-import",
     "allow-theme-remove",
     "allow-link-open"

@@ -172,6 +172,11 @@ interface WorkspaceStore {
   confirmUnsaved: () => Promise<boolean>;
   /** Converts a library document to another format, after a warning about losses. */
   convertDocument: (id: string, format: TextFormat) => Promise<boolean>;
+  /**
+   * Opens the files passed at start or by a second start (ADR 0015,
+   * decision 15), once the workbench has loaded the library.
+   */
+  takeOpenRequests: () => Promise<void>;
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -179,6 +184,13 @@ const saving = new Map<string, Promise<boolean>>();
 const sources = new Map<string, DocumentSource>();
 /** Counts saves of external tabs, so a check that crossed a save is ignored. */
 const saveEpochs = new Map<string, number>();
+
+/** The workbench has loaded the library: files from outside can open. */
+let openRequestsReady = false;
+
+export function setOpenRequestsReady(ready: boolean): void {
+  openRequestsReady = ready;
+}
 
 /** Tab id of an external file. */
 export function externalTabId(fileId: string): string {
@@ -1158,6 +1170,26 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       });
       set((state) => ({ documents: upsert(state.documents, result.value) }));
       return true;
+    },
+
+    takeOpenRequests: async () => {
+      if (!openRequestsReady) {
+        return;
+      }
+      const result = await call('open_requests_take', {});
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return;
+      }
+      for (const target of result.value) {
+        if (target.kind === 'library') {
+          await get().openDocument(target.id);
+        } else if (target.kind === 'external') {
+          await get().openExternal(target.file);
+        } else {
+          set({ lastError: target.error });
+        }
+      }
     },
 
     confirmUnsaved: async () => {

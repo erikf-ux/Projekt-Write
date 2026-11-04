@@ -56,6 +56,29 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["pwrite"],
+        "name": "Project Write",
+        "description": "Project Write document",
+        "role": "Editor",
+        "mimeType": "application/x-project-write"
+      }
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/project-write.desktop",
+        "files": {
+          "/usr/share/mime/packages/app.projectwrite.desktop.xml": "linux/project-write-mime.xml"
+        }
+      },
+      "rpm": {
+        "desktopTemplate": "linux/project-write.desktop",
+        "files": {
+          "/usr/share/mime/packages/app.projectwrite.desktop.xml": "linux/project-write-mime.xml"
+        }
+      }
+    }
   }
 }

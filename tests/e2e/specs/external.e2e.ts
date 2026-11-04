@@ -8,15 +8,18 @@
  * * A change from outside opens the dialog: "Neu laden" shows the file's
  *   text, "Meine Fassung behalten" writes the tab's text over it.
  * * Closing a tab with changes asks; "Verwerfen" leaves the file as it was.
+ * * A second start of the app with a file (what a double-click or "Öffnen
+ *   mit" does while the app runs) opens it in the running app and ends.
  *
  * The e2e build answers the file dialog from `PW_E2E_PICK_FILES`
  * (`pickedFiles` in sandbox.ts, ADR 0008); the files lie in the test folder.
  * Runs last, in the library the earlier files left.
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { $, $$, browser, expect } from '@wdio/globals';
-import { pickedFiles } from '../sandbox';
+import { application, pickedFiles, secondStartFile } from '../sandbox';
 import { closeSettings, pinMainWindow } from '../session';
 
 const BOM_UTF8 = Buffer.from([0xef, 0xbb, 0xbf]);
@@ -263,6 +266,22 @@ describe('External files (Phase 5)', () => {
     await $('[data-testid="unsaved-prompt"] [data-choice="discard"]').click();
     await $(tabSelector(path.basename(pickedFiles.draft))).waitForExist({ reverse: true });
     expect(fs.readFileSync(pickedFiles.draft, 'utf8')).toBe('Entwurf');
+  });
+
+  it('opens a file passed to a second start in the running app', async () => {
+    fs.writeFileSync(secondStartFile, '# Aus dem zweiten Start\n');
+    // The second instance hands the file over and ends at once.
+    const second = spawnSync(application, [secondStartFile], { env: process.env, timeout: 60_000 });
+    expect(second.error).toBeUndefined();
+    expect(second.status).toBe(0);
+    const tab = $(tabSelector(path.basename(secondStartFile)));
+    await tab.waitForExist({ timeout: 20_000, timeoutMsg: 'the file of the second start did not open' });
+    await browser.waitUntil(async () => (await tab.getAttribute('aria-selected')) === 'true');
+    await browser.waitUntil(async () =>
+      (await (await activeEditor()).getText()).includes('Aus dem zweiten Start'),
+    );
+    await closeActiveTab();
+    await tab.waitForExist({ reverse: true });
   });
 
   it('lists the files under "Zuletzt verwendet"', async () => {

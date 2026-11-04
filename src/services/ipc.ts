@@ -42,6 +42,7 @@ import type { ExternalText } from '@/types/generated/ExternalText';
 import type { FileCheck } from '@/types/generated/FileCheck';
 import type { ImportExternalRequest } from '@/types/generated/ImportExternalRequest';
 import type { OpenExternalRequest } from '@/types/generated/OpenExternalRequest';
+import type { OpenTarget } from '@/types/generated/OpenTarget';
 import type { RecentFileEntry } from '@/types/generated/RecentFileEntry';
 import type { SaveExternalAsRequest } from '@/types/generated/SaveExternalAsRequest';
 import type { SaveExternalRequest } from '@/types/generated/SaveExternalRequest';
@@ -93,6 +94,7 @@ export interface Commands {
   external_recent: { request: EmptyRequest; response: RecentFileEntry[] };
   external_open_recent: { request: ExternalFileRequest; response: ExternalFileInfo };
   external_forget_recent: { request: ExternalFileRequest; response: RecentFileEntry[] };
+  open_requests_take: { request: EmptyRequest; response: OpenTarget[] };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */

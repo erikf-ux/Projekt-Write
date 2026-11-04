@@ -37,7 +37,19 @@ pub fn run() {
     // Registered first: a second start hands over to the running instance and
     // ends before anything else happens (section 9).
     let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
-        |app, _arguments, _cwd| focus_main_window(app),
+        |app, arguments, cwd| {
+            // A double-click or "Öffnen mit" while the app runs (ADR 0015).
+            let paths = services::opening::paths_from_args(
+                arguments.into_iter().map(std::ffi::OsString::from),
+                std::path::Path::new(&cwd),
+            );
+            if let Some(state) = app.try_state::<AppState>()
+                && state.opening.push(paths)
+            {
+                state.ui.send(services::ui::UiEvent::OpenRequested);
+            }
+            focus_main_window(app);
+        },
     ));
 
     #[cfg(feature = "e2e")]
@@ -66,6 +78,13 @@ pub fn run() {
                 services::ui::window::restore(&window, state.ui.window_state());
             }
             app.manage(services::ui::menu::MenuSlot(Mutex::new(Some(menu))));
+            // Files passed at start (a double-click or "Öffnen mit").
+            if let Ok(cwd) = std::env::current_dir() {
+                state.opening.push(services::opening::paths_from_args(
+                    std::env::args_os(),
+                    &cwd,
+                ));
+            }
             app.manage(state);
             Ok(())
         })

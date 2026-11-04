@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The .pwrite file type for shared-mime-info (ADR 0015, decision 15). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-project-write">
+    <comment>Project Write document</comment>
+    <comment xml:lang="de">Project-Write-Dokument</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.pwrite"/>
+  </mime-type>
+</mime-info>

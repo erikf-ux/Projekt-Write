@@ -18,7 +18,7 @@
 //! same document cannot interleave.
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -615,6 +615,30 @@ impl DocumentRepository {
             format.as_str()
         );
         self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// The library document stored in `path`, if the file lies in this
+    /// library's documents folder (ADR 0015, decision 15: such a file opens
+    /// as the library document, not as an external file).
+    pub async fn document_at(&self, path: &Path) -> Option<DocumentMeta> {
+        let path = std::fs::canonicalize(path).ok()?;
+        let name = path.file_name()?.to_str()?;
+        for format in DocumentFormat::ALL {
+            let Some(id) = format.id_from_file_name(name) else {
+                continue;
+            };
+            let folder = std::fs::canonicalize(self.root.resolve(format.directory()).ok()?).ok()?;
+            if path.parent() != Some(folder.as_path()) {
+                continue;
+            }
+            return self
+                .get(id)
+                .await
+                .ok()
+                .flatten()
+                .filter(|meta| meta.format == format && meta.deleted_at.is_none());
+        }
+        None
     }
 
     /// Makes a document a favourite or not. Changes neither content nor

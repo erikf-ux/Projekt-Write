@@ -196,6 +196,11 @@ describe('Project Write – Phase 3 workbench', () => {
     await openSettings('shortcuts');
     await $('[data-testid="shortcut-change-palette.show"]').click();
     await $('[data-testid="shortcut-recorder"]').waitForDisplayed();
+    // The recorder takes the focus in an effect after it appears; keys
+    // pressed before that would run Ctrl+N instead.
+    await browser.waitUntil(() =>
+      browser.execute(() => document.activeElement?.getAttribute('data-testid') === 'shortcut-recorder'),
+    );
     await browser.keys(['Control', 'n']);
     const question = $('[data-testid="shortcut-conflict-question"]');
     await expect(question).toHaveText(expect.stringContaining('Neues Dokument'));

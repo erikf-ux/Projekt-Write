@@ -5,4 +5,4 @@ import type { MenuCommand } from "./MenuCommand";
  * Messages from Rust to the frontend, sent through the channel the
  * frontend registers with `ui_subscribe` (no event permission needed).
  */
-export type UiEvent = { "kind": "command", command: MenuCommand, } | { "kind": "closeRequested" };
+export type UiEvent = { "kind": "command", command: MenuCommand, } | { "kind": "closeRequested" } | { "kind": "openRequested" };

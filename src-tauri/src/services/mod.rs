@@ -8,6 +8,7 @@ pub mod import;
 pub mod library;
 pub mod links;
 pub mod locale;
+pub mod opening;
 pub mod pwrite;
 pub mod session;
 pub mod settings;

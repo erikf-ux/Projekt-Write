@@ -8,6 +8,7 @@ use crate::services::dialog::{FilePicker, FolderPicker};
 use crate::services::external::ExternalFiles;
 use crate::services::links::LinkOpener;
 use crate::services::locale;
+use crate::services::opening::OpenQueue;
 use crate::services::session::{AppDirs, LibrarySession};
 use crate::services::settings::app::AppSettingsStore;
 use crate::services::ui::UiService;
@@ -20,6 +21,9 @@ pub struct AppState {
     pub files: Arc<dyn FilePicker>,
     /// External files open in this session.
     pub external: Arc<ExternalFiles>,
+    /// Files from start arguments and second starts, until the interface
+    /// takes them.
+    pub opening: OpenQueue,
     /// Opens web links (`link_open`).
     pub links: Arc<dyn LinkOpener>,
     /// In-memory database for the system check while no library is open
@@ -53,6 +57,7 @@ impl AppState {
             picker,
             files,
             external,
+            opening: OpenQueue::default(),
             links,
             probe,
         })

@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use ts_rs::TS;
 
@@ -361,6 +361,64 @@ pub async fn external_forget_recent(
         Ok(external.forget_recent(&recent))
     })
     .await
+}
+
+/// A file from outside, ready for a tab.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum OpenTarget {
+    /// The file is a document of the open library.
+    Library {
+        id: String,
+    },
+    External {
+        file: ExternalFileInfo,
+    },
+    /// The file cannot be opened; `name` is its file name.
+    Failed {
+        name: String,
+        error: CommandError,
+    },
+}
+
+/// The files passed at start or by a second start, oldest first (ADR 0015,
+/// decision 15). The interface calls this once it is ready and after each
+/// `openRequested` event; the queue is empty afterwards.
+#[tauri::command]
+pub async fn open_requests_take(
+    state: State<'_, AppState>,
+    request: Input<EmptyRequest>,
+) -> Result<Vec<OpenTarget>, CommandError> {
+    let _ = request.into_inner();
+    let mut targets = Vec::new();
+    for path in state.opening.take() {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let probe = path.clone();
+        let library = state
+            .session
+            .with_documents(|documents| async move { Ok(documents.document_at(&probe).await) })
+            .await
+            .ok()
+            .flatten();
+        if let Some(meta) = library {
+            targets.push(OpenTarget::Library {
+                id: meta.id.hyphenated().to_string(),
+            });
+            continue;
+        }
+        match blocking(&state.external, move |external| external.register(&path)).await {
+            Ok(file) => {
+                log::info!("external file {} opened from outside", file.id);
+                targets.push(OpenTarget::External { file });
+            }
+            Err(error) => targets.push(OpenTarget::Failed { name, error }),
+        }
+    }
+    Ok(targets)
 }
 
 /// The folder of the newest recent file that still exists.

@@ -39,6 +39,7 @@ fn main() {
         "external_recent",
         "external_open_recent",
         "external_forget_recent",
+        "open_requests_take",
         "theme_import",
         "theme_remove",
         "link_open",

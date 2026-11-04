@@ -71,6 +71,9 @@ pub enum UiEvent {
     /// The user wants to close the window. The frontend saves what is
     /// pending and answers with `ui_close_response`.
     CloseRequested,
+    /// Files wait to be opened (`open_requests_take`): a second start or
+    /// "Öffnen mit" while the app runs.
+    OpenRequested,
 }
 
 /// What happens with a close request of the window.

@@ -26,7 +26,12 @@ import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
 import { Explorer } from '@/modules/documents/Explorer';
 import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
-import { activeDocument, hasUnsavedChanges, useWorkspace } from '@/modules/documents/workspaceStore';
+import {
+  activeDocument,
+  hasUnsavedChanges,
+  setOpenRequestsReady,
+  useWorkspace,
+} from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
@@ -69,10 +74,14 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       return;
     }
     void (async () => {
+      setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
       await useWorkspace.getState().refresh();
-      const { documents } = useWorkspace.getState();
-      if (openEmptyDocument && !created.current && documents.length === 0) {
+      // Files passed at start or by a second start open now.
+      setOpenRequestsReady(true);
+      await useWorkspace.getState().takeOpenRequests();
+      const { documents, tabs } = useWorkspace.getState();
+      if (openEmptyDocument && !created.current && documents.length === 0 && tabs.length === 0) {
         created.current = true;
         await runCommand('document.new');
       }

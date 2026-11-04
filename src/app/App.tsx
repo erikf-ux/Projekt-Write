@@ -137,6 +137,8 @@ export function App() {
     void subscribeUiEvents((event) => {
       if (event.kind === 'command') {
         void runCommand(event.command);
+      } else if (event.kind === 'openRequested') {
+        void useWorkspace.getState().takeOpenRequests();
       } else {
         void requestQuit();
       }

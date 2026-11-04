@@ -1821,3 +1821,62 @@ fn documents_are_converted_between_formats_keeping_their_id() {
     assert_uniform_error(&error, "request");
     app.shut_down();
 }
+
+#[test]
+fn files_from_start_arguments_open_as_library_documents_or_external_files() {
+    use tauri::Manager;
+    let app = app_with_library();
+    assert_eq!(
+        call(&app, "open_requests_take", json!({})).unwrap(),
+        json!([])
+    );
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Kapitel", "format": "md" }),
+    )
+    .unwrap();
+    let id = created["id"].as_str().unwrap().to_owned();
+    let library_file = app.path(&format!(
+        "Dokumente/ProjectWrite/documents/markdown/{id}.md"
+    ));
+    let external = user_file(&app, "Brief.pwrite", &{
+        let file = project_write_lib::services::pwrite::new_file(
+            "0b8f8f4e-6d0e-4f3e-9a3c-2a1d3c4b5e6f",
+            "Brief",
+            "2026-11-04T10:00:00Z",
+            "de-DE",
+            project_write_lib::services::pwrite::empty_content(),
+        );
+        project_write_lib::services::pwrite::to_bytes(&file)
+    });
+    let csv = user_file(&app, "Tabelle.csv", b"a;b\n");
+    {
+        let state = app._app.state::<AppState>();
+        state.opening.push([
+            library_file,
+            external,
+            app.path("Eigene Dateien/fehlt.md"),
+            csv,
+        ]);
+    }
+    let targets = call(&app, "open_requests_take", json!({})).unwrap();
+    let targets = targets.as_array().unwrap();
+    assert_eq!(targets.len(), 4);
+    assert_eq!(targets[0], json!({ "kind": "library", "id": id }));
+    assert_eq!(targets[1]["kind"], "external");
+    assert_eq!(targets[1]["file"]["name"], "Brief.pwrite");
+    assert_eq!(targets[1]["file"]["format"], "pwrite");
+    assert_eq!(targets[2]["kind"], "failed");
+    assert_eq!(targets[2]["name"], "fehlt.md");
+    assert_error_code(&targets[2]["error"], "FILE_MISSING");
+    assert_error_code(&targets[3]["error"], "IMPORT_UNSUPPORTED_TYPE");
+    // Taken once.
+    assert_eq!(
+        call(&app, "open_requests_take", json!({})).unwrap(),
+        json!([])
+    );
+    let error = call(&app, "open_requests_take", json!({ "path": "/etc" })).unwrap_err();
+    assert_uniform_error(&error, "request");
+    app.shut_down();
+}

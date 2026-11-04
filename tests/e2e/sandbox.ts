@@ -42,3 +42,6 @@ export const pickedFiles = {
   outside: path.join(ownFiles, 'aussen.txt'),
   draft: path.join(ownFiles, 'entwurf.txt'),
 };
+
+/** Passed to a second start of the app (not a dialog answer). */
+export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
