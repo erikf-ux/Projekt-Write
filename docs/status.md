@@ -28,6 +28,21 @@ Plan Phase 4 (Reihenfolge):
 9. Leistung: Tippverzögerung und Öffnen bei 50.000 Wörtern messen.
 10. Tests (Vitest, Rust, E2E), Doku, CI, Bericht.
 
+## Stand Phase 4
+
+| Schritt | Inhalt                                                                                                 | Stand     |
+| ------- | ------------------------------------------------------------------------------------------------------ | --------- |
+| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt  |
+| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt  |
+| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt  |
+| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt  |
+| 5       | Schreibstatistik                                                                                       | erledigt  |
+| 6       | Suchen und Ersetzen                                                                                    | erledigt  |
+| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt  |
+| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt  |
+| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt  |
+| 10      | Tests, Doku, CI, Bericht                                                                               | in Arbeit |
+
 ## Stand Phase 3
 
 | Schritt | Inhalt                                                                                             | Stand                                      |

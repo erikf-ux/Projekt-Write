@@ -10,6 +10,7 @@
  */
 import type { JSONContent } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
+import { lexBoth } from '@/test/plainMarked';
 import { parseMarkdown, serializeMarkdown } from './adapter';
 import { findLosses } from './losses';
 import { firstDifference, markdownSchema } from './probe';
@@ -318,6 +319,9 @@ describe('save stability', () => {
   it.each(SEEDS)('document %i', (seed) => {
     const original = asEditorJson(documentForSeed(seed));
     const markdown = serializeMarkdown({ frontMatter: '', body: original });
+    // The quick checks in front of marked's rules (manager.ts) read the same tokens.
+    const lexed = lexBoth(markdown);
+    expect(lexed.checked).toBe(lexed.plain);
     if (findLosses(original).length > 0) {
       return;
     }

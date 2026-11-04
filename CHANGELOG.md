@@ -4,6 +4,30 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 4 – Editor
+
+#### Hinzugefügt
+
+- Schreibfläche mit Tiptap 3: Rich Text für Markdown (Überschriften, Fett, Kursiv, Unterstrichen, Durchgestrichen, Inline-Code, Links, Listen, Nummerierungen, Aufgabenlisten, Zitate, Codeblöcke, Trennlinien, Tabellen) mit Markdown-Kürzeln beim Tippen; Reintext für `.txt`; Quelltextansicht für Markdown (`Strg + /`). Bilder erscheinen als Hinweis mit Adresse und werden nie geladen.
+- Markdown-Adapter mit lesbarem Escaping, erlaubter HTML-Teilmenge, YAML-Kopf, Fußnoten und Rohblöcken; 69 Round-Trip-Fälle in `tests/fixtures/markdown/`, 15 abschließend dokumentierte Normalisierungen (ADR 0014).
+- Verlustschutz: Was der Editor nicht verlustfrei halten kann, öffnet in der Quelltextansicht mit Begründung; vor dem Speichern prüft der Editor geänderte Blöcke und warnt mit „Trotzdem speichern“ und „Abbrechen“.
+- Schreibstatistik in der Statusleiste und als Dialog: Wörter nach Unicode-Regeln, Zeichen, Zeichen ohne Leerzeichen, Absätze, Lesezeit (Wörter pro Minute einstellbar); für die Markierung.
+- Suchen und Ersetzen im Dokument (`Strg + F`, `Strg + H`, `F3`, `Umschalt + F3`): Groß-/Kleinschreibung, ganze Wörter, reguläre Ausdrücke (RE2), Treffer einzeln oder alle ersetzen.
+- Einfügen: HTML durch das Editor-Schema, Markdown-Text als Markdown, `Strg + Umschalt + V` als reiner Text.
+- Menüs Bearbeiten und Format, Formatierungsbefehle mit Kürzeln (`Strg + B/I/U/E/K` …), Link-Dialog (nur `http`, `https`, `mailto` und relative Adressen).
+- Weblinks öffnen mit `Strg + Klick` im Systembrowser: Rust prüft die Adresse (`link_open`) und übergibt sie dem System als ein Argument, nie durch eine Shell. Beim Tippen werden nur Adressen mit `http://`, `https://`, `mailto:` oder `www.` und E-Mail-Adressen von selbst zu Links; ein fehlendes Leerzeichen nach einem Punkt („im.Am“) bleibt Text.
+- Leistungsmessung im echten Programm (`tests/e2e/specs/performance.e2e.ts`): Ein Manuskript mit 50.000 Wörtern öffnet unter Linux in höchstens 463 ms, 95 % der Anschläge erscheinen nach höchstens 38 ms (Rich Text) bzw. 37 ms (Quelltext).
+
+#### Geändert
+
+- Die Schreibfläche der Phase 3 (Textfeld) ist durch Tiptap ersetzt; Rückgängig und Wiederholen sind Befehle des Editors.
+- Escape beendet den Fokusmodus auch, wenn der Fokus in der Schreibfläche liegt.
+
+#### Behoben
+
+- Unter Linux (WebKitGTK) dauerte das Öffnen langer Markdown-Dokumente quadratisch lange (50.000 Wörter: 16 s): JavaScriptCore kompiliert einige Ausdrücke von marked nicht, und drei Tokenizer durchsuchten den ganzen Resttext. Der Adapter liest jetzt in linearer Zeit, mit denselben Tokens.
+- Die Wortzählung war unter Linux niedriger als unter Windows (Zahlen zählten nicht als Wörter); sie ist jetzt auf allen Systemen gleich.
+
 ### Phase 3 – Oberfläche
 
 #### Hinzugefügt

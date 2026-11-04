@@ -9,7 +9,9 @@
  * 3. Saving and reading again gives the same document up to the allowed
  *    normalizations; `canonicalBlocks` is their executable definition
  *    (ADR 0014). The comparison is on the document, not on rendered HTML,
- *    and the YAML front matter must come back byte for byte.
+ *    and the YAML front matter must come back byte for byte. If saving
+ *    writes the file exactly as it is (a file the app saved), reading it
+ *    again gives the same document, so the second reading is skipped.
  */
 import { getSchema, type JSONContent } from '@tiptap/core';
 import type { Schema } from '@tiptap/pm/model';
@@ -57,7 +59,11 @@ export function probeMarkdown(markdown: string): ProbeResult {
     issues.push({ kind: 'invalid' });
     return { document, issues };
   }
-  const again = parseMarkdown(serializeMarkdown(document));
+  const saved = serializeMarkdown(document);
+  if (saved === markdown) {
+    return { document, issues };
+  }
+  const again = parseMarkdown(saved);
   if (again.frontMatter !== document.frontMatter) {
     issues.push({ kind: 'frontMatter' });
   }

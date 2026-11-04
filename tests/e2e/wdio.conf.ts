@@ -45,6 +45,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'library.e2e.ts'),
     path.join(specs, 'restart.e2e.ts'),
     path.join(specs, 'workbench.e2e.ts'),
+    path.join(specs, 'performance.e2e.ts'),
   ],
   maxInstances: 1,
   capabilities: [

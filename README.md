@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 3 – Oberfläche**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 4 – Editor**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -44,18 +44,27 @@ Project Write speichert Dokumente in einer **Bibliothek**: einem Ordner mit Date
 
 Beim ersten Start wählen Sie den Ort der Bibliothek und die Sprache; danach öffnet sich ein leeres Dokument. Dokumente der Bibliothek speichern von selbst (1 s nach der letzten Eingabe, beim Tab-Wechsel und beim Schließen); die Statusleiste zeigt „Gespeichert“. Text- und Markdown-Dateien, die Sie auf das Fenster ziehen, werden in die Bibliothek importiert; das Original bleibt unverändert.
 
-| Aktion                                 | Kürzel (macOS: `Cmd` statt `Strg`)           |
-| -------------------------------------- | -------------------------------------------- |
-| Befehlspalette                         | `Strg + Umschalt + P`                        |
-| Neues Dokument, Speichern              | `Strg + N`, `Strg + S`                       |
-| Tab schließen, nächster/vorheriger     | `Strg + W`, `Strg + Bild ab/auf`             |
-| Dokument umbenennen                    | `F2`                                         |
-| Explorer, Seitenleiste ein/aus         | `Strg + Umschalt + E`, `Strg + Umschalt + B` |
-| Fokusmodus                             | `F11` (Esc beendet ihn)                      |
-| Vergrößern, Verkleinern, Originalgröße | `Strg + +`, `Strg + -`, `Strg + 0`           |
-| Einstellungen                          | `Strg + ,`                                   |
+Markdown-Dokumente bearbeiten Sie als Rich Text; Markdown-Kürzel wie `# ` oder `**fett**` wirken beim Tippen, `Strg + /` zeigt den Markdown-Quelltext. Gespeichert wird immer Markdown. Was Markdown nicht verlustfrei halten kann, meldet der Editor vor dem Speichern; ein Dokument, das er nicht verlustfrei darstellen kann, öffnet in der Quelltextansicht und nennt den Grund. Die Statusleiste zeigt die Wörter und die Lesezeit, ein Klick darauf die ganze Statistik. Bilder erscheinen als Hinweis mit Adresse und werden nie geladen. Weblinks öffnen Sie mit `Strg + Klick` im Systembrowser.
 
-Alle Kürzel lassen sich unter Einstellungen › Tastenkürzel ändern; Konflikte werden gemeldet. Eigene Designs (JSON-Dateien mit allen Farben, Kontrast mindestens 4,5:1) importieren Sie unter Einstellungen › Allgemein.
+| Aktion                                 | Kürzel (macOS: `Cmd` statt `Strg`)             |
+| -------------------------------------- | ---------------------------------------------- |
+| Befehlspalette                         | `Strg + Umschalt + P`                          |
+| Neues Dokument, Speichern              | `Strg + N`, `Strg + S`                         |
+| Tab schließen, nächster/vorheriger     | `Strg + W`, `Strg + Bild ab/auf`               |
+| Dokument umbenennen                    | `F2`                                           |
+| Explorer, Seitenleiste ein/aus         | `Strg + Umschalt + E`, `Strg + Umschalt + B`   |
+| Fokusmodus                             | `F11` (Esc beendet ihn)                        |
+| Quelltextansicht ein/aus               | `Strg + /`                                     |
+| Suchen, Ersetzen                       | `Strg + F`, `Strg + H`                         |
+| Nächster, vorheriger Treffer           | `F3`, `Umschalt + F3`                          |
+| Fett, Kursiv, Unterstrichen, Code      | `Strg + B`, `Strg + I`, `Strg + U`, `Strg + E` |
+| Link setzen                            | `Strg + K`                                     |
+| Rückgängig, Wiederholen                | `Strg + Z`, `Strg + Y`                         |
+| Als reinen Text einfügen               | `Strg + Umschalt + V`                          |
+| Vergrößern, Verkleinern, Originalgröße | `Strg + +`, `Strg + -`, `Strg + 0`             |
+| Einstellungen                          | `Strg + ,`                                     |
+
+Alle Kürzel außer denen der Texteingabe (Rückgängig, Wiederholen, Einfügen) lassen sich unter Einstellungen › Tastenkürzel ändern; Konflikte werden gemeldet. Eigene Designs (JSON-Dateien mit allen Farben, Kontrast mindestens 4,5:1) importieren Sie unter Einstellungen › Allgemein.
 
 ## Datenschutz
 
