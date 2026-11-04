@@ -3,6 +3,7 @@
 pub mod dialog;
 pub mod documents;
 pub mod encoding;
+pub mod external;
 pub mod import;
 pub mod library;
 pub mod links;

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-close"
+description = "Enables the external_close command without any pre-configured scope."
+commands.allow = ["external_close"]
+
+[[permission]]
+identifier = "deny-external-close"
+description = "Denies the external_close command without any pre-configured scope."
+commands.deny = ["external_close"]

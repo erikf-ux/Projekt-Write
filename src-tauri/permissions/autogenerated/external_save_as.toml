@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-save-as"
+description = "Enables the external_save_as command without any pre-configured scope."
+commands.allow = ["external_save_as"]
+
+[[permission]]
+identifier = "deny-external-save-as"
+description = "Denies the external_save_as command without any pre-configured scope."
+commands.deny = ["external_save_as"]

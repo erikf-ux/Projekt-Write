@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-open"
+description = "Enables the external_open command without any pre-configured scope."
+commands.allow = ["external_open"]
+
+[[permission]]
+identifier = "deny-external-open"
+description = "Denies the external_open command without any pre-configured scope."
+commands.deny = ["external_open"]

@@ -449,7 +449,7 @@ pub async fn document_import(
         .await
 }
 
-fn import_error(error: ImportError) -> CommandError {
+pub(crate) fn import_error(error: ImportError) -> CommandError {
     match error {
         ImportError::UnsupportedType => CommandError::new(ErrorCode::ImportUnsupportedType),
         ImportError::NotText(reason) => {
@@ -460,7 +460,7 @@ fn import_error(error: ImportError) -> CommandError {
     }
 }
 
-fn document_error(error: DocumentError) -> CommandError {
+pub(crate) fn document_error(error: DocumentError) -> CommandError {
     match error {
         DocumentError::NotFound | DocumentError::InTrash => {
             CommandError::new(ErrorCode::DocumentNotFound)

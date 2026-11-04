@@ -105,11 +105,21 @@ pub enum ErrorCode {
     PwriteInvalid,
     /// The document is read only (a newer `.pwrite` format version).
     DocumentReadOnly,
+    /// No open external file with this id (its tab was closed).
+    FileUnknown,
+    /// The external file no longer exists.
+    FileMissing,
+    /// The external file was changed outside the app since it was read.
+    FileChanged,
+    /// The external file cannot be written.
+    FileReadOnly,
+    /// The chosen encoding cannot represent a character of the text.
+    FileUnencodable,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 42] = [
+    pub const ALL: [ErrorCode; 47] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -152,6 +162,11 @@ impl ErrorCode {
         ErrorCode::LinkOpenFailed,
         ErrorCode::PwriteInvalid,
         ErrorCode::DocumentReadOnly,
+        ErrorCode::FileUnknown,
+        ErrorCode::FileMissing,
+        ErrorCode::FileChanged,
+        ErrorCode::FileReadOnly,
+        ErrorCode::FileUnencodable,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -199,6 +214,11 @@ impl ErrorCode {
             ErrorCode::LinkOpenFailed => "error.linkOpenFailed",
             ErrorCode::PwriteInvalid => "error.pwriteInvalid",
             ErrorCode::DocumentReadOnly => "error.documentReadOnly",
+            ErrorCode::FileUnknown => "error.fileUnknown",
+            ErrorCode::FileMissing => "error.fileMissing",
+            ErrorCode::FileChanged => "error.fileChanged",
+            ErrorCode::FileReadOnly => "error.fileReadOnly",
+            ErrorCode::FileUnencodable => "error.fileUnencodable",
         }
     }
 }

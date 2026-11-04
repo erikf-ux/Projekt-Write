@@ -81,8 +81,8 @@ pub fn check(file_name: &str, data: &[u8]) -> Result<CheckedImport, ImportError>
 }
 
 /// The positive list: the extension decides the format, the content must
-/// then be text of that kind.
-fn format_of(file_name: &str) -> Result<(&str, DocumentFormat), ImportError> {
+/// then be text of that kind. Returns the stem and the format.
+pub fn format_of(file_name: &str) -> Result<(&str, DocumentFormat), ImportError> {
     let (stem, extension) = file_name
         .rsplit_once('.')
         .ok_or(ImportError::UnsupportedType)?;

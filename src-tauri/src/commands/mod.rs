@@ -7,6 +7,7 @@
 //!   the window capability (checked by `tests/security_config.rs`).
 
 pub mod documents;
+pub mod external;
 pub mod input;
 pub mod library;
 pub mod links;
@@ -42,6 +43,17 @@ pub const COMMAND_NAMES: &[&str] = &[
     "document_import",
     "document_copy",
     "document_set_favorite",
+    "external_open",
+    "external_read",
+    "external_check",
+    "external_keep_mine",
+    "external_save",
+    "external_save_as",
+    "external_close",
+    "external_import",
+    "external_recent",
+    "external_open_recent",
+    "external_forget_recent",
     "theme_import",
     "theme_remove",
     "link_open",
@@ -74,6 +86,17 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         documents::document_import,
         documents::document_copy,
         documents::document_set_favorite,
+        external::external_open,
+        external::external_read,
+        external::external_check,
+        external::external_keep_mine,
+        external::external_save,
+        external::external_save_as,
+        external::external_close,
+        external::external_import,
+        external::external_recent,
+        external::external_open_recent,
+        external::external_forget_recent,
         ui::theme_import,
         ui::theme_remove,
         links::link_open,

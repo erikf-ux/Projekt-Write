@@ -14,7 +14,8 @@
 //!   the defaults are used; nothing is lost silently.
 //!
 //! Phase 2 stores the library path; Phase 3 adds the interface settings and
-//! the window state ([`super::ui`]). Interface values are checked one by one
+//! the window state ([`super::ui`]); Phase 5 the recently used external
+//! files (`recentFiles`, ADR 0015). Interface values are checked one by one
 //! when loading: an invalid value gets its default instead of marking the
 //! whole file as damaged.
 
@@ -40,6 +41,9 @@ pub struct AppSettings {
     pub ui: UiSettings,
     /// Size and position of the main window.
     pub window: Option<WindowState>,
+    /// External files opened last, newest first (at most
+    /// [`MAX_RECENT_FILES`]).
+    pub recent_files: Vec<RecentFile>,
     /// Fields of newer versions, kept unchanged.
     pub other: Map<String, Value>,
 }
@@ -51,13 +55,41 @@ impl Default for AppSettings {
             library_path: None,
             ui: UiSettings::default(),
             window: None,
+            recent_files: Vec::new(),
             other: Map::new(),
         }
     }
 }
 
+/// Most entries kept in `recentFiles`.
+pub const MAX_RECENT_FILES: usize = 20;
+
+/// An external file in "Zuletzt verwendet". The path stays in Rust.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecentFile {
+    pub path: String,
+    /// ISO 8601 (UTC).
+    pub opened_at: String,
+}
+
+impl RecentFile {
+    fn from_value(value: &Value) -> Option<Self> {
+        let path = value.get("path")?.as_str()?;
+        let opened_at = value.get("openedAt")?.as_str()?;
+        (!path.is_empty() && Timestamp::parse_iso(opened_at).is_some()).then(|| Self {
+            path: path.to_owned(),
+            opened_at: opened_at.to_owned(),
+        })
+    }
+
+    fn to_value(&self) -> Value {
+        serde_json::json!({ "path": self.path, "openedAt": self.opened_at })
+    }
+}
+
 const KEY_FORMAT_VERSION: &str = "formatVersion";
 const KEY_LIBRARY_PATH: &str = "libraryPath";
+const KEY_RECENT_FILES: &str = "recentFiles";
 
 impl AppSettings {
     /// Reads the settings from the top-level object of the file.
@@ -72,11 +104,21 @@ impl AppSettings {
         };
         let ui = UiSettings::take_from(&mut object);
         let window = WindowState::take_from(&mut object);
+        // Invalid entries are dropped one by one, like interface values.
+        let recent_files = match object.remove(KEY_RECENT_FILES) {
+            Some(Value::Array(entries)) => entries
+                .iter()
+                .filter_map(RecentFile::from_value)
+                .take(MAX_RECENT_FILES)
+                .collect(),
+            _ => Vec::new(),
+        };
         Ok(Self {
             format_version,
             library_path,
             ui,
             window,
+            recent_files,
             other: object,
         })
     }
@@ -98,6 +140,14 @@ impl AppSettings {
         }
         self.ui.put_into(&mut object);
         WindowState::put_into(self.window.as_ref(), &mut object);
+        if self.recent_files.is_empty() {
+            object.remove(KEY_RECENT_FILES);
+        } else {
+            object.insert(
+                KEY_RECENT_FILES.to_owned(),
+                Value::Array(self.recent_files.iter().map(RecentFile::to_value).collect()),
+            );
+        }
         Value::Object(object)
     }
 }
@@ -334,6 +384,34 @@ mod tests {
         assert_eq!(written["language"], "en");
         assert_eq!(written["libraryPath"], "/a");
         assert_eq!(written["formatVersion"], 1);
+    }
+
+    #[test]
+    fn recent_files_drop_invalid_entries() {
+        let dir = dir();
+        let path = dir.path().join(APP_SETTINGS_FILE);
+        std::fs::write(
+            &path,
+            r#"{"formatVersion": 1, "recentFiles": [
+                {"path": "/a/Notiz.md", "openedAt": "2026-11-04T10:00:00Z"},
+                {"path": "", "openedAt": "2026-11-04T10:00:00Z"},
+                {"path": "/b.txt", "openedAt": "gestern"},
+                "/c.txt"
+            ]}"#,
+        )
+        .unwrap();
+        let (mut store, outcome) = AppSettingsStore::load(dir.path(), now());
+        assert_eq!(outcome, LoadOutcome::Loaded);
+        assert_eq!(
+            store.get().recent_files,
+            [RecentFile {
+                path: "/a/Notiz.md".to_owned(),
+                opened_at: "2026-11-04T10:00:00Z".to_owned()
+            }]
+        );
+        store.update(|s| s.recent_files.clear()).unwrap();
+        let written: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert!(written.get("recentFiles").is_none());
     }
 
     #[test]

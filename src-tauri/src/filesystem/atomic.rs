@@ -39,7 +39,7 @@ pub fn write_atomic(target: &Path, data: &[u8]) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "target has no file name"))?;
     let temp = parent.join(temp_name(name));
 
-    let result = write_and_replace(&temp, target, parent, data);
+    let result = write_and_replace(&temp, target, parent, data, create_new_private);
     if result.is_err() {
         // The temp file may or may not exist at this point.
         let _ = fs::remove_file(&temp);
@@ -47,12 +47,65 @@ pub fn write_atomic(target: &Path, data: &[u8]) -> io::Result<()> {
     result
 }
 
+/// Like [`write_atomic`], for the user's own files outside the library
+/// (section 9, "Externe Dateien"): an existing file keeps its permissions
+/// (Unix mode bits), a new file gets the usual ones (Unix: `0o666` less the
+/// umask). On Windows the new file gets the permissions of its folder, as a
+/// file saved by any editor.
+pub fn write_atomic_keeping_permissions(target: &Path, data: &[u8]) -> io::Result<()> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "target has no parent"))?;
+    let name = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "target has no file name"))?;
+    let existing = match fs::metadata(target) {
+        Ok(metadata) => Some(metadata.permissions()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    let temp = parent.join(temp_name(name));
+    let result = write_and_replace(&temp, target, parent, data, |path| {
+        create_new_shared(path, existing)
+    });
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
+}
+
+/// A new file for [`write_atomic_keeping_permissions`].
+fn create_new_shared(path: &Path, permissions: Option<fs::Permissions>) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o666);
+    }
+    let file = options.open(path)?;
+    #[cfg(unix)]
+    if let Some(permissions) = permissions {
+        file.set_permissions(permissions)?;
+    }
+    #[cfg(not(unix))]
+    let _ = permissions;
+    Ok(file)
+}
+
 fn temp_name(name: &str) -> String {
     format!(".{name}.{}{TEMP_SUFFIX}", uuid::Uuid::new_v4().simple())
 }
 
-fn write_and_replace(temp: &Path, target: &Path, parent: &Path, data: &[u8]) -> io::Result<()> {
-    let mut file = create_new_private(temp)?;
+fn write_and_replace(
+    temp: &Path,
+    target: &Path,
+    parent: &Path,
+    data: &[u8],
+    create: impl FnOnce(&Path) -> io::Result<File>,
+) -> io::Result<()> {
+    let mut file = create(temp)?;
     file.write_all(data)?;
     file.sync_all()?;
     drop(file);
@@ -223,6 +276,26 @@ mod tests {
             .map(|e| e.unwrap().file_name())
             .collect();
         assert_eq!(names, ["doc.txt"]);
+    }
+
+    #[test]
+    fn user_files_keep_their_permissions() {
+        let dir = temp_dir();
+        let target = dir.path().join("notiz.txt");
+        write_atomic_keeping_permissions(&target, b"neu").unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"neu");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&target, fs::Permissions::from_mode(0o640)).unwrap();
+            write_atomic_keeping_permissions(&target, b"zweite Fassung").unwrap();
+            let mode = fs::metadata(&target).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o640);
+        }
+        #[cfg(not(unix))]
+        write_atomic_keeping_permissions(&target, b"zweite Fassung").unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"zweite Fassung");
+        assert!(leftover_temp_files(dir.path()).unwrap().is_empty());
     }
 
     #[test]

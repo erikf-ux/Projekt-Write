@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-read"
+description = "Enables the external_read command without any pre-configured scope."
+commands.allow = ["external_read"]
+
+[[permission]]
+identifier = "deny-external-read"
+description = "Denies the external_read command without any pre-configured scope."
+commands.deny = ["external_read"]

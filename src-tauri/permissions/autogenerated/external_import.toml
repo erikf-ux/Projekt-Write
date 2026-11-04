@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-import"
+description = "Enables the external_import command without any pre-configured scope."
+commands.allow = ["external_import"]
+
+[[permission]]
+identifier = "deny-external-import"
+description = "Denies the external_import command without any pre-configured scope."
+commands.deny = ["external_import"]

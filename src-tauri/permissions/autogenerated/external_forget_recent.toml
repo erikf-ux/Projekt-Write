@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-forget-recent"
+description = "Enables the external_forget_recent command without any pre-configured scope."
+commands.allow = ["external_forget_recent"]
+
+[[permission]]
+identifier = "deny-external-forget-recent"
+description = "Denies the external_forget_recent command without any pre-configured scope."
+commands.deny = ["external_forget_recent"]

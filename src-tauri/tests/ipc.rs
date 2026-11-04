@@ -63,6 +63,7 @@ fn app_at(base: &Path, dir: Option<tempfile::TempDir>) -> TestApp {
     let state = tauri::async_runtime::block_on(AppState::initialize(
         dirs(base),
         picker.clone(),
+        picker.clone(),
         links.clone(),
         Generators::system(),
     ))
@@ -1444,5 +1445,275 @@ fn theme_commands_reject_invalid_files_and_input() {
     .unwrap_err();
     assert_error_code(&error, "THEME_NOT_FOUND");
     assert!(!app.path("config/themes").exists(), "nothing was stored");
+    app.shut_down();
+}
+
+/// A file of the user outside the library, inside the test folder.
+fn user_file(app: &TestApp, name: &str, data: &[u8]) -> PathBuf {
+    let path = app.path(&format!("Eigene Dateien/{name}"));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, data).unwrap();
+    path
+}
+
+fn open_external(app: &TestApp, path: &Path) -> Value {
+    app.picker.push(Some(path.to_path_buf()));
+    let info = call(app, "external_open", json!({ "title": "Öffnen" })).unwrap();
+    assert_eq!(info["name"], path.file_name().unwrap().to_str().unwrap());
+    info
+}
+
+#[test]
+fn external_files_keep_encoding_line_endings_and_unchanged_bytes() {
+    let app = app();
+    // UTF-16 LE with byte order mark and CRLF.
+    let original: Vec<u8> = [0xFF, 0xFE]
+        .into_iter()
+        .chain(
+            "Größe\r\nZeile\r\n"
+                .encode_utf16()
+                .flat_map(u16::to_le_bytes),
+        )
+        .collect();
+    let path = user_file(&app, "brief.txt", &original);
+    let info = open_external(&app, &path);
+    assert_eq!(info["format"], "txt");
+    assert_eq!(info["large"], false);
+    assert!(info["folder"].as_str().unwrap().ends_with("Eigene Dateien"));
+    assert!(info.get("path").is_none());
+    let id = info["id"].as_str().unwrap().to_owned();
+    let (dialog, request) = app.picker.file_requests().pop().unwrap();
+    assert_eq!(
+        dialog,
+        project_write_lib::services::dialog::FileDialog::Open
+    );
+    assert_eq!(request.title, "Öffnen");
+
+    let text = call(&app, "external_read", json!({ "id": id })).unwrap();
+    assert_eq!(text["text"], "Größe\nZeile\n");
+    assert_eq!(text["encoding"], "utf16Le");
+    assert_eq!(text["lineEnding"], "crlf");
+    assert_eq!(text["mixedLineEndings"], false);
+    assert_eq!(text["readOnly"], false);
+
+    let save = |text: &str, overwrite: bool| {
+        call(
+            &app,
+            "external_save",
+            json!({ "id": id, "text": text, "encoding": "utf16Le", "lineEnding": "crlf", "overwrite": overwrite }),
+        )
+    };
+    assert_eq!(save("Größe\nZeile\n", false).unwrap(), "unchanged");
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    assert_eq!(save("Größe\nZeile\nNeu\n", false).unwrap(), "saved");
+    let expected: Vec<u8> = [0xFF, 0xFE]
+        .into_iter()
+        .chain(
+            "Größe\r\nZeile\r\nNeu\r\n"
+                .encode_utf16()
+                .flat_map(u16::to_le_bytes),
+        )
+        .collect();
+    assert_eq!(std::fs::read(&path).unwrap(), expected);
+    let check = call(&app, "external_check", json!({ "id": id })).unwrap();
+    assert_eq!(check, json!({ "status": "unchanged", "readOnly": false }));
+
+    // A change from outside: reported, never overwritten without consent.
+    std::fs::write(&path, b"von au\xC3\x9Fen\n").unwrap();
+    let check = call(&app, "external_check", json!({ "id": id })).unwrap();
+    assert_eq!(check["status"], "changed");
+    assert_error_code(&save("Meine Fassung\n", false).unwrap_err(), "FILE_CHANGED");
+    assert_eq!(std::fs::read(&path).unwrap(), "von außen\n".as_bytes());
+    call(&app, "external_keep_mine", json!({ "id": id })).unwrap();
+    assert_eq!(save("Meine Fassung\n", false).unwrap(), "saved");
+
+    // Windows-1252 cannot hold every character: nothing is written.
+    let error = call(
+        &app,
+        "external_save",
+        json!({ "id": id, "text": "Pfeil →\n", "encoding": "windows1252", "lineEnding": "lf", "overwrite": false }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "FILE_UNENCODABLE");
+    assert_eq!(error["details"]["codePoint"], "U+2192");
+
+    // Save as: the id stands for the new file, the old one stays.
+    let target = app.path("Eigene Dateien/kopie");
+    app.picker.push(Some(target.clone()));
+    let copy = call(
+        &app,
+        "external_save_as",
+        json!({ "id": id, "title": "Speichern unter", "text": "Kopie\n", "encoding": "utf8", "lineEnding": "lf" }),
+    )
+    .unwrap();
+    assert_eq!(copy["id"], id.as_str());
+    assert_eq!(copy["name"], "kopie.txt");
+    assert_eq!(
+        std::fs::read(app.path("Eigene Dateien/kopie.txt")).unwrap(),
+        b"Kopie\n"
+    );
+    let (dialog, request) = app.picker.file_requests().pop().unwrap();
+    assert_eq!(
+        dialog,
+        project_write_lib::services::dialog::FileDialog::Save
+    );
+    assert_eq!(request.file_name.as_deref(), Some("brief.txt"));
+    // Cancelled dialogs change nothing.
+    let cancelled = call(&app, "external_open", json!({ "title": "Öffnen" })).unwrap();
+    assert_eq!(cancelled, Value::Null);
+
+    // Recently used, newest first; a missing entry is marked and removable.
+    let recent = call(&app, "external_recent", json!({})).unwrap();
+    let names: Vec<_> = recent
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(names, ["kopie.txt", "brief.txt"]);
+    std::fs::remove_file(&path).unwrap();
+    let recent = call(&app, "external_recent", json!({})).unwrap();
+    assert_eq!(recent[1]["missing"], true);
+    let error = call(
+        &app,
+        "external_open_recent",
+        json!({ "id": recent[1]["id"] }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "FILE_MISSING");
+    let left = call(
+        &app,
+        "external_forget_recent",
+        json!({ "id": recent[1]["id"] }),
+    )
+    .unwrap();
+    assert_eq!(left.as_array().unwrap().len(), 1);
+    let again = call(
+        &app,
+        "external_open_recent",
+        json!({ "id": recent[0]["id"] }),
+    )
+    .unwrap();
+    assert_eq!(again["id"], id.as_str());
+    let settings: Value =
+        serde_json::from_slice(&std::fs::read(app.path("config/settings.json")).unwrap()).unwrap();
+    assert_eq!(settings["recentFiles"].as_array().unwrap().len(), 1);
+
+    call(&app, "external_close", json!({ "id": id })).unwrap();
+    let error = call(&app, "external_read", json!({ "id": id })).unwrap_err();
+    assert_error_code(&error, "FILE_UNKNOWN");
+    app.shut_down();
+}
+
+#[test]
+fn external_files_refuse_binary_content_and_foreign_types() {
+    let app = app();
+    let binary = user_file(&app, "bild.md", b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR");
+    let info = open_external(&app, &binary);
+    let error = call(&app, "external_read", json!({ "id": info["id"] })).unwrap_err();
+    assert_error_code(&error, "DOCUMENT_NOT_TEXT");
+    let csv = user_file(&app, "tabelle.csv", b"a;b\n");
+    app.picker.push(Some(csv));
+    let error = call(&app, "external_open", json!({ "title": "Öffnen" })).unwrap_err();
+    assert_error_code(&error, "IMPORT_UNSUPPORTED_TYPE");
+    app.shut_down();
+}
+
+#[test]
+fn external_files_are_taken_into_the_library_as_a_copy() {
+    let app = app_with_library();
+    let original = b"# Kapitel\r\n\r\nText von au\xDFen\r\n".to_vec();
+    let path = user_file(&app, "Kapitel 1.md", &original);
+    let info = open_external(&app, &path);
+    let id = info["id"].as_str().unwrap().to_owned();
+    let text = call(&app, "external_read", json!({ "id": id })).unwrap();
+    assert_eq!(text["encoding"], "windows1252");
+    let result = call(
+        &app,
+        "external_import",
+        json!({ "id": id, "text": text["text"], "allowDuplicate": false }),
+    )
+    .unwrap();
+    assert_eq!(result["kind"], "imported");
+    let document = &result["document"];
+    assert_eq!(document["title"], "Kapitel 1");
+    assert_eq!(document["format"], "md");
+    let read = call(&app, "document_read", json!({ "id": document["id"] })).unwrap();
+    assert_eq!(read["text"], "# Kapitel\n\nText von außen\n");
+    // The original stays untouched.
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    let again = call(
+        &app,
+        "external_import",
+        json!({ "id": id, "text": text["text"], "allowDuplicate": false }),
+    )
+    .unwrap();
+    assert_eq!(again["kind"], "duplicate");
+    app.shut_down();
+}
+
+#[test]
+fn external_commands_reject_invalid_input_uniformly() {
+    let app = app();
+    let id = "0123456789abcdef0123456789abcdef";
+    let cases = [
+        ("external_open", json!({}), "request"),
+        ("external_open", json!({ "title": "" }), "title"),
+        ("external_open", json!({ "title": "a\u{7}" }), "title"),
+        (
+            "external_open",
+            json!({ "title": "Öffnen", "path": "/etc/passwd" }),
+            "request",
+        ),
+        ("external_read", json!({ "id": "../../etc/passwd" }), "id"),
+        ("external_read", json!({ "id": id.to_uppercase() }), "id"),
+        ("external_check", json!({ "id": 7 }), "request"),
+        ("external_keep_mine", json!({}), "request"),
+        (
+            "external_save",
+            json!({ "id": id, "text": "", "encoding": "latin9", "lineEnding": "lf", "overwrite": false }),
+            "request",
+        ),
+        (
+            "external_save",
+            json!({ "id": id, "text": "", "encoding": "utf8", "lineEnding": "cr", "overwrite": false }),
+            "request",
+        ),
+        (
+            "external_save",
+            json!({ "id": id, "text": "", "encoding": "utf8", "lineEnding": "lf" }),
+            "request",
+        ),
+        (
+            "external_save_as",
+            json!({ "id": id, "title": "", "text": "", "encoding": "utf8", "lineEnding": "lf" }),
+            "title",
+        ),
+        (
+            "external_import",
+            json!({ "id": id, "text": "" }),
+            "request",
+        ),
+        ("external_recent", json!({ "limit": 3 }), "request"),
+        ("external_open_recent", json!({ "id": "" }), "id"),
+        ("external_forget_recent", json!({ "id": "/home" }), "id"),
+        (
+            "external_close",
+            json!({ "id": id, "force": true }),
+            "request",
+        ),
+    ];
+    for (command, request, field) in cases {
+        let error = call(&app, command, request.clone())
+            .expect_err(&format!("{command} must fail: {request}"));
+        assert_uniform_error(&error, field);
+    }
+    // Well-formed but unknown ids.
+    for command in ["external_read", "external_check", "external_keep_mine"] {
+        let error = call(&app, command, json!({ "id": id })).unwrap_err();
+        assert_error_code(&error, "FILE_UNKNOWN");
+    }
+    let error = call(&app, "external_open_recent", json!({ "id": id })).unwrap_err();
+    assert_error_code(&error, "FILE_UNKNOWN");
     app.shut_down();
 }

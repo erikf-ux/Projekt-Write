@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, Runtime};
 
 use clock::Generators;
-use services::dialog::{FolderPicker, SystemPicker};
+use services::dialog::{FilePicker, FolderPicker, SystemPicker};
 use services::session::AppDirs;
 use state::AppState;
 
@@ -54,6 +54,7 @@ pub fn run() {
             let state = tauri::async_runtime::block_on(AppState::initialize(
                 dirs,
                 picker,
+                file_picker(app.handle()),
                 link_opener(),
                 Generators::system(),
             ))?;
@@ -178,6 +179,19 @@ fn link_opener() -> Arc<dyn services::links::LinkOpener> {
 fn folder_picker<R: Runtime>(app: &AppHandle<R>) -> Arc<dyn FolderPicker> {
     #[cfg(feature = "e2e")]
     if let Some(list) = std::env::var_os("PW_E2E_PICK_FOLDERS") {
+        let answers: Vec<Option<PathBuf>> = std::env::split_paths(&list)
+            .map(|path| (!path.as_os_str().is_empty()).then_some(path))
+            .collect();
+        return Arc::new(services::dialog::ScriptedPicker::new(answers));
+    }
+    Arc::new(SystemPicker::new(app.clone()))
+}
+
+/// The native open and save dialogs; in `e2e` builds the answers listed in
+/// `PW_E2E_PICK_FILES` (an empty entry means "cancelled").
+fn file_picker<R: Runtime>(app: &AppHandle<R>) -> Arc<dyn FilePicker> {
+    #[cfg(feature = "e2e")]
+    if let Some(list) = std::env::var_os("PW_E2E_PICK_FILES") {
         let answers: Vec<Option<PathBuf>> = std::env::split_paths(&list)
             .map(|path| (!path.as_os_str().is_empty()).then_some(path))
             .collect();
