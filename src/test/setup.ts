@@ -26,3 +26,11 @@ if (typeof window.matchMedia !== 'function') {
 Element.prototype.scrollIntoView = function scrollIntoView() {
   // Nothing to scroll in jsdom.
 };
+
+// jsdom has no ClipboardEvent; ProseMirror's pasteText and pasteHTML create one.
+if (typeof globalThis.ClipboardEvent !== 'function') {
+  class ClipboardEventStub extends Event {
+    readonly clipboardData: DataTransfer | null = null;
+  }
+  Object.defineProperty(globalThis, 'ClipboardEvent', { configurable: true, value: ClipboardEventStub });
+}

@@ -20,6 +20,7 @@ import { parseMarkdown, serializeMarkdown } from './markdown/adapter';
 import { excerpt, findLosses, type Loss } from './markdown/losses';
 import { firstDifference, markdownSchema, probeMarkdown, type ProbeIssue } from './markdown/probe';
 import { plainClipboardText, plainDocument, plainExtensions, plainText } from './plain/schema';
+import { handleRichPaste } from './paste';
 import { markdownExtensions } from './schema/extensions';
 import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
 import { useStatistics } from './statisticsStore';
@@ -378,7 +379,12 @@ export class EditorSession {
                 return true;
               },
             }
-          : {}),
+          : {
+              handlePaste: (view, event) =>
+                handleRichPaste(view, event, (content) => {
+                  this.rich?.commands.insertContent(content);
+                }),
+            }),
       },
       onUpdate: () => {
         if (!this.silent) {

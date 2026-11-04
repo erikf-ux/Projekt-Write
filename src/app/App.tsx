@@ -14,6 +14,7 @@ import { installShortcuts } from '@/modules/commands/shortcuts';
 import type { CommandCategory } from '@/modules/commands/types';
 import { DropZone } from '@/modules/documents/DropZone';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
+import { notePlainPasteChord } from '@/modules/editor/paste';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { SettingsDialog } from '@/modules/settings/SettingsDialog';
 import { useUi } from '@/modules/settings/uiStore';
@@ -127,6 +128,14 @@ export function App() {
       }),
     [],
   );
+
+  // Ctrl+Shift+V pastes plain text, also where the webview does not.
+  useEffect(() => {
+    window.addEventListener('keydown', notePlainPasteChord, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', notePlainPasteChord, { capture: true });
+    };
+  }, []);
 
   // Escape ends focus mode (after dialogs and menus had their turn).
   useEffect(() => {
