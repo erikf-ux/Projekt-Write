@@ -26,6 +26,7 @@ import type { ImportThemeRequest } from '@/types/generated/ImportThemeRequest';
 import type { LibraryStatus } from '@/types/generated/LibraryStatus';
 import type { LocationChoice } from '@/types/generated/LocationChoice';
 import type { MenuStateRequest } from '@/types/generated/MenuStateRequest';
+import type { OpenLinkRequest } from '@/types/generated/OpenLinkRequest';
 import type { MoveLibraryRequest } from '@/types/generated/MoveLibraryRequest';
 import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { OpenLibraryRequest } from '@/types/generated/OpenLibraryRequest';
@@ -61,6 +62,7 @@ export interface Commands {
   document_read: { request: DocumentRequest; response: DocumentText };
   document_save: { request: SaveDocumentRequest; response: DocumentSummary };
   document_rename: { request: RenameDocumentRequest; response: DocumentSummary };
+  link_open: { request: OpenLinkRequest; response: null };
   document_import: { request: ImportDocumentRequest; response: ImportResult };
   theme_import: { request: ImportThemeRequest; response: UiState };
   theme_remove: { request: RemoveThemeRequest; response: UiState };
@@ -114,6 +116,8 @@ const errorCodes: Record<ErrorCode, true> = {
   THEME_CONTRAST: true,
   THEME_LIMIT: true,
   THEME_NOT_FOUND: true,
+  LINK_NOT_ALLOWED: true,
+  LINK_OPEN_FAILED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

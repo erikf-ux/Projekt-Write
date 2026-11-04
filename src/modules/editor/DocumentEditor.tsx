@@ -14,10 +14,20 @@ import { useT, type MessageKey } from '@/i18n';
 import { useWorkspace, setDocumentSource, type OpenDocument } from '@/modules/documents/workspaceStore';
 import type { Loss } from './markdown/losses';
 import type { ProbeIssue } from './markdown/probe';
+import { useUi } from '@/modules/settings/uiStore';
+import { call } from '@/services/ipc';
 import { FindBar } from './find/FindBar';
 import { useFind } from './find/findStore';
 import { getSession, openSession } from './session';
 import './editor.css';
+
+/** Opens a web link in the system browser; only http, https and mailto (Rust checks). */
+async function openLink(href: string): Promise<void> {
+  const result = await call('link_open', { url: href });
+  if (!result.ok) {
+    useUi.getState().showNotice({ tone: 'error', key: 'error.linkOpenFailed', error: result.error });
+  }
+}
 
 export function panelElementId(id: string): string {
   return `pw-panel-${id}`;
@@ -128,6 +138,9 @@ function DocumentPanel({
       },
       onBlur: () => {
         void useWorkspace.getState().flush(id);
+      },
+      onOpenLink: (href) => {
+        void openLink(href);
       },
     });
     setDocumentSource(id, session);

@@ -97,11 +97,15 @@ pub enum ErrorCode {
     ThemeLimit,
     /// No imported theme with this id.
     ThemeNotFound,
+    /// A link with another scheme than http, https or mailto.
+    LinkNotAllowed,
+    /// The system could not open a link.
+    LinkOpenFailed,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 38] = [
+    pub const ALL: [ErrorCode; 40] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -140,6 +144,8 @@ impl ErrorCode {
         ErrorCode::ThemeContrast,
         ErrorCode::ThemeLimit,
         ErrorCode::ThemeNotFound,
+        ErrorCode::LinkNotAllowed,
+        ErrorCode::LinkOpenFailed,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -183,6 +189,8 @@ impl ErrorCode {
             ErrorCode::ThemeContrast => "error.themeContrast",
             ErrorCode::ThemeLimit => "error.themeLimit",
             ErrorCode::ThemeNotFound => "error.themeNotFound",
+            ErrorCode::LinkNotAllowed => "error.linkNotAllowed",
+            ErrorCode::LinkOpenFailed => "error.linkOpenFailed",
         }
     }
 }

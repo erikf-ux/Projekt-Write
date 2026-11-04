@@ -51,10 +51,56 @@ pub enum MenuCommand {
     ZoomOut,
     #[serde(rename = "zoom.reset")]
     ZoomReset,
+    #[serde(rename = "edit.undo")]
+    EditUndo,
+    #[serde(rename = "edit.redo")]
+    EditRedo,
+    #[serde(rename = "find.show")]
+    FindShow,
+    #[serde(rename = "replace.show")]
+    ReplaceShow,
+    #[serde(rename = "editor.toggleSource")]
+    EditorToggleSource,
+    #[serde(rename = "statistics.show")]
+    StatisticsShow,
+    #[serde(rename = "format.bold")]
+    FormatBold,
+    #[serde(rename = "format.italic")]
+    FormatItalic,
+    #[serde(rename = "format.underline")]
+    FormatUnderline,
+    #[serde(rename = "format.strike")]
+    FormatStrike,
+    #[serde(rename = "format.code")]
+    FormatCode,
+    #[serde(rename = "format.paragraph")]
+    FormatParagraph,
+    #[serde(rename = "format.heading1")]
+    FormatHeading1,
+    #[serde(rename = "format.heading2")]
+    FormatHeading2,
+    #[serde(rename = "format.heading3")]
+    FormatHeading3,
+    #[serde(rename = "format.bulletList")]
+    FormatBulletList,
+    #[serde(rename = "format.orderedList")]
+    FormatOrderedList,
+    #[serde(rename = "format.taskList")]
+    FormatTaskList,
+    #[serde(rename = "format.blockquote")]
+    FormatBlockquote,
+    #[serde(rename = "format.codeBlock")]
+    FormatCodeBlock,
+    #[serde(rename = "format.link")]
+    FormatLink,
+    #[serde(rename = "format.horizontalRule")]
+    FormatHorizontalRule,
+    #[serde(rename = "format.table")]
+    FormatTable,
 }
 
 impl MenuCommand {
-    pub const ALL: [MenuCommand; 11] = [
+    pub const ALL: [MenuCommand; 34] = [
         MenuCommand::DocumentNew,
         MenuCommand::DocumentSave,
         MenuCommand::TabClose,
@@ -66,6 +112,29 @@ impl MenuCommand {
         MenuCommand::ZoomIn,
         MenuCommand::ZoomOut,
         MenuCommand::ZoomReset,
+        MenuCommand::EditUndo,
+        MenuCommand::EditRedo,
+        MenuCommand::FindShow,
+        MenuCommand::ReplaceShow,
+        MenuCommand::EditorToggleSource,
+        MenuCommand::StatisticsShow,
+        MenuCommand::FormatBold,
+        MenuCommand::FormatItalic,
+        MenuCommand::FormatUnderline,
+        MenuCommand::FormatStrike,
+        MenuCommand::FormatCode,
+        MenuCommand::FormatParagraph,
+        MenuCommand::FormatHeading1,
+        MenuCommand::FormatHeading2,
+        MenuCommand::FormatHeading3,
+        MenuCommand::FormatBulletList,
+        MenuCommand::FormatOrderedList,
+        MenuCommand::FormatTaskList,
+        MenuCommand::FormatBlockquote,
+        MenuCommand::FormatCodeBlock,
+        MenuCommand::FormatLink,
+        MenuCommand::FormatHorizontalRule,
+        MenuCommand::FormatTable,
     ];
 
     /// The command id, also the id of the menu item.
@@ -82,6 +151,29 @@ impl MenuCommand {
             MenuCommand::ZoomIn => "zoom.in",
             MenuCommand::ZoomOut => "zoom.out",
             MenuCommand::ZoomReset => "zoom.reset",
+            MenuCommand::EditUndo => "edit.undo",
+            MenuCommand::EditRedo => "edit.redo",
+            MenuCommand::FindShow => "find.show",
+            MenuCommand::ReplaceShow => "replace.show",
+            MenuCommand::EditorToggleSource => "editor.toggleSource",
+            MenuCommand::StatisticsShow => "statistics.show",
+            MenuCommand::FormatBold => "format.bold",
+            MenuCommand::FormatItalic => "format.italic",
+            MenuCommand::FormatUnderline => "format.underline",
+            MenuCommand::FormatStrike => "format.strike",
+            MenuCommand::FormatCode => "format.code",
+            MenuCommand::FormatParagraph => "format.paragraph",
+            MenuCommand::FormatHeading1 => "format.heading1",
+            MenuCommand::FormatHeading2 => "format.heading2",
+            MenuCommand::FormatHeading3 => "format.heading3",
+            MenuCommand::FormatBulletList => "format.bulletList",
+            MenuCommand::FormatOrderedList => "format.orderedList",
+            MenuCommand::FormatTaskList => "format.taskList",
+            MenuCommand::FormatBlockquote => "format.blockquote",
+            MenuCommand::FormatCodeBlock => "format.codeBlock",
+            MenuCommand::FormatLink => "format.link",
+            MenuCommand::FormatHorizontalRule => "format.horizontalRule",
+            MenuCommand::FormatTable => "format.table",
         }
     }
 
@@ -163,7 +255,7 @@ fn item_label(locale: Locale, command: MenuCommand, state: &MenuItemState) -> St
 }
 
 /// Menu structure: (submenu label key, items; `None` is a separator).
-const LAYOUT: [(&str, &[Option<MenuCommand>]); 2] = [
+const LAYOUT: [(&str, &[Option<MenuCommand>]); 4] = [
     (
         "menu.file",
         &[
@@ -174,6 +266,44 @@ const LAYOUT: [(&str, &[Option<MenuCommand>]); 2] = [
             Some(MenuCommand::SettingsOpen),
             None,
             Some(MenuCommand::AppQuit),
+        ],
+    ),
+    (
+        "menu.edit",
+        &[
+            Some(MenuCommand::EditUndo),
+            Some(MenuCommand::EditRedo),
+            None,
+            Some(MenuCommand::FindShow),
+            Some(MenuCommand::ReplaceShow),
+            None,
+            Some(MenuCommand::EditorToggleSource),
+            Some(MenuCommand::StatisticsShow),
+        ],
+    ),
+    (
+        "menu.format",
+        &[
+            Some(MenuCommand::FormatBold),
+            Some(MenuCommand::FormatItalic),
+            Some(MenuCommand::FormatUnderline),
+            Some(MenuCommand::FormatStrike),
+            Some(MenuCommand::FormatCode),
+            None,
+            Some(MenuCommand::FormatParagraph),
+            Some(MenuCommand::FormatHeading1),
+            Some(MenuCommand::FormatHeading2),
+            Some(MenuCommand::FormatHeading3),
+            None,
+            Some(MenuCommand::FormatBulletList),
+            Some(MenuCommand::FormatOrderedList),
+            Some(MenuCommand::FormatTaskList),
+            Some(MenuCommand::FormatBlockquote),
+            Some(MenuCommand::FormatCodeBlock),
+            None,
+            Some(MenuCommand::FormatLink),
+            Some(MenuCommand::FormatHorizontalRule),
+            Some(MenuCommand::FormatTable),
         ],
     ),
     (

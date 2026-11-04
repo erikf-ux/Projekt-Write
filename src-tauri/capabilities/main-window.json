@@ -27,6 +27,7 @@
     "allow-document-rename",
     "allow-document-import",
     "allow-theme-import",
-    "allow-theme-remove"
+    "allow-theme-remove",
+    "allow-link-open"
   ]
 }

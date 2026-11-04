@@ -5,8 +5,9 @@ import { useUi } from '@/modules/settings/uiStore';
 import type { MenuCommand } from '@/types/generated/MenuCommand';
 import type { UiState } from '@/types/generated/UiState';
 import { createAppCommands } from './commands';
+import { createFormatCommands } from './formatCommands';
 
-const commands = createAppCommands();
+const commands = [...createAppCommands(), ...createFormatCommands()];
 const available = () =>
   commands
     .filter((command) => command.isAvailable())
@@ -129,6 +130,29 @@ describe('command availability (the palette shows only working commands)', () =>
       'zoom.in': true,
       'zoom.out': true,
       'zoom.reset': true,
+      'edit.undo': true,
+      'edit.redo': true,
+      'find.show': true,
+      'replace.show': true,
+      'editor.toggleSource': true,
+      'statistics.show': true,
+      'format.bold': true,
+      'format.italic': true,
+      'format.underline': true,
+      'format.strike': true,
+      'format.code': true,
+      'format.paragraph': true,
+      'format.heading1': true,
+      'format.heading2': true,
+      'format.heading3': true,
+      'format.bulletList': true,
+      'format.orderedList': true,
+      'format.taskList': true,
+      'format.blockquote': true,
+      'format.codeBlock': true,
+      'format.link': true,
+      'format.horizontalRule': true,
+      'format.table': true,
     };
     const ids = new Set(commands.map((command) => command.id));
     for (const id of Object.keys(menu)) {

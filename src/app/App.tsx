@@ -23,12 +23,13 @@ import type { MenuCommand } from '@/types/generated/MenuCommand';
 import type { MenuItemState } from '@/types/generated/MenuItemState';
 import { currentBindings } from './bindings';
 import { ClosePrompt } from './ClosePrompt';
+import { createFormatCommands } from './formatCommands';
 import { createAppCommands } from './commands';
 import { requestQuit } from './lifecycle';
 import { StartScreen } from './StartScreen';
 import { Workbench } from './Workbench';
 
-registerCommands(createAppCommands());
+registerCommands([...createAppCommands(), ...createFormatCommands()]);
 
 /** Whether this session started without an open library (first start). */
 const useFirstStart = create<{ seen: boolean }>(() => ({ seen: false }));
@@ -51,6 +52,29 @@ const MENU_COMMANDS: Record<MenuCommand, true> = {
   'zoom.in': true,
   'zoom.out': true,
   'zoom.reset': true,
+  'edit.undo': true,
+  'edit.redo': true,
+  'find.show': true,
+  'replace.show': true,
+  'editor.toggleSource': true,
+  'statistics.show': true,
+  'format.bold': true,
+  'format.italic': true,
+  'format.underline': true,
+  'format.strike': true,
+  'format.code': true,
+  'format.paragraph': true,
+  'format.heading1': true,
+  'format.heading2': true,
+  'format.heading3': true,
+  'format.bulletList': true,
+  'format.orderedList': true,
+  'format.taskList': true,
+  'format.blockquote': true,
+  'format.codeBlock': true,
+  'format.link': true,
+  'format.horizontalRule': true,
+  'format.table': true,
 };
 
 const categoryKeys = {
@@ -61,8 +85,14 @@ const categoryKeys = {
   app: 'category.app',
 } as const satisfies Record<CommandCategory, string>;
 
+/** Text editing the webview does itself (reserved chords, ADR 0012). */
+const FIXED_SHORTCUTS: Partial<Record<MenuCommand, string>> = {
+  'edit.undo': 'Ctrl+Z',
+  'edit.redo': 'Ctrl+Y',
+};
+
 function shortcutText(id: string): string | undefined {
-  const chord = currentBindings().get(id as MenuCommand)?.[0];
+  const chord = currentBindings().get(id as MenuCommand)?.[0] ?? FIXED_SHORTCUTS[id as MenuCommand];
   const platform = useUi.getState().state?.platform ?? 'windows';
   return chord ? formatChord(chord, useLocale.getState().locale, platform) : undefined;
 }

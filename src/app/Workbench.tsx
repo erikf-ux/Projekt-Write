@@ -27,6 +27,7 @@ import type { CommandId } from '@/modules/commands/types';
 import { Explorer } from '@/modules/documents/Explorer';
 import { activeDocument, useWorkspace } from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
+import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
 import { useStatistics } from '@/modules/editor/statisticsStore';
@@ -247,6 +248,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           {t('focus.hint', { shortcut: shortcut('focus.toggle') ?? 'F11' })}
         </p>
       )}
+      <LinkDialog />
       {statisticsOpen && statistics ? (
         <StatisticsDialog
           statistics={statistics}

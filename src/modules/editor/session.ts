@@ -59,6 +59,8 @@ export interface SessionOptions {
   onChange: () => void;
   /** The writing surface lost the focus. */
   onBlur: () => void;
+  /** Ctrl+click on a web link (opened by Rust in the system browser). */
+  onOpenLink?: (href: string) => void;
 }
 
 export interface ViewSwitch {
@@ -380,6 +382,33 @@ export class EditorSession {
               },
             }
           : {
+              // Ctrl+click opens a web link; a plain click only places the cursor.
+              handleClick: (view, position, event) => {
+                if (!(event.ctrlKey || event.metaKey)) {
+                  return false;
+                }
+                const href = linkAt(view.state.doc, position);
+                if (href === null) {
+                  return false;
+                }
+                this.options.onOpenLink?.(href);
+                return true;
+              },
+              // The webview never follows a link in the text itself.
+              handleDOMEvents: {
+                click: (_view, event) => {
+                  if (event.target instanceof Element && event.target.closest('a') !== null) {
+                    event.preventDefault();
+                  }
+                  return false;
+                },
+                auxclick: (_view, event) => {
+                  if (event.target instanceof Element && event.target.closest('a') !== null) {
+                    event.preventDefault();
+                  }
+                  return false;
+                },
+              },
               handlePaste: (view, event) =>
                 handleRichPaste(view, event, (content) => {
                   this.rich?.commands.insertContent(content);
@@ -401,6 +430,21 @@ export class EditorSession {
       },
     });
   }
+}
+
+/** The address of the link at a position, if there is one. */
+export function linkAt(document: ProseMirrorNode, position: number): string | null {
+  for (const at of [position, position - 1]) {
+    if (at < 0 || at >= document.content.size) {
+      continue;
+    }
+    const link = document.nodeAt(at)?.marks.find((mark) => mark.type.name === 'link');
+    const href: unknown = link?.attrs['href'];
+    if (typeof href === 'string' && href !== '') {
+      return href;
+    }
+  }
+  return null;
 }
 
 /** Find and replace (section 12); highlights styled in `editor.css` (no inline style, CSP). */
