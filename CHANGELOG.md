@@ -16,6 +16,7 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 - Einfügen: HTML durch das Editor-Schema, Markdown-Text als Markdown, `Strg + Umschalt + V` als reiner Text.
 - Menüs Bearbeiten und Format, Formatierungsbefehle mit Kürzeln (`Strg + B/I/U/E/K` …), Link-Dialog (nur `http`, `https`, `mailto` und relative Adressen).
 - Weblinks öffnen mit `Strg + Klick` im Systembrowser: Rust prüft die Adresse (`link_open`) und übergibt sie dem System als ein Argument, nie durch eine Shell. Beim Tippen werden nur Adressen mit `http://`, `https://`, `mailto:` oder `www.` und E-Mail-Adressen von selbst zu Links; ein fehlendes Leerzeichen nach einem Punkt („im.Am“) bleibt Text.
+- E2E-Tests des Editors (`tests/e2e/specs/editor.e2e.ts`): getippte Webadressen werden Links und als Markdown gespeichert, `Strg + Klick` erreicht `link_open` (ein einfacher Klick nicht), `Strg + B` formatiert und speichert.
 - Leistungsmessung im echten Programm (`tests/e2e/specs/performance.e2e.ts`): Ein Manuskript mit 50.000 Wörtern öffnet unter Linux in höchstens 463 ms, 95 % der Anschläge erscheinen nach höchstens 38 ms (Rich Text) bzw. 37 ms (Quelltext).
 
 #### Geändert

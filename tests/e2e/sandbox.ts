@@ -21,6 +21,9 @@ export const sandbox = path.join(root, 'tests', 'e2e', '.tmp');
  */
 export const appDirs = path.join(sandbox, 'OneDrive');
 
+/** Links the e2e build "opens" (`PW_E2E_OPENED_LINKS`), one per line. */
+export const openedLinks = path.join(sandbox, 'opened-links.txt');
+
 /** Answers of the folder dialog, in this order, at every app start. */
 export const pickedFolders = {
   local: path.join(sandbox, 'Lokal', 'Bibliothek'),

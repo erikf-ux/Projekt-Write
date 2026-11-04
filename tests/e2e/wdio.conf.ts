@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { appDirs, application, pickedFolders, root, sandbox } from './sandbox';
+import { appDirs, application, openedLinks, pickedFolders, root, sandbox } from './sandbox';
 
 if (!fs.existsSync(application)) {
   throw new Error(`App binary not found at ${application}. Run "npm run build:e2e" first.`);
@@ -32,6 +32,8 @@ process.env['WEBVIEW2_USER_DATA_FOLDER'] = path.join(sandbox, 'webview2');
 // (WebDriver cannot operate native dialogs; see ADR 0008).
 process.env['PW_E2E_APP_DIRS'] = appDirs;
 process.env['PW_E2E_PICK_FOLDERS'] = [pickedFolders.local, pickedFolders.moveTarget].join(path.delimiter);
+// Web links are recorded there instead of starting a browser.
+process.env['PW_E2E_OPENED_LINKS'] = openedLinks;
 
 const specs = path.join(root, 'tests', 'e2e', 'specs');
 
@@ -45,6 +47,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'library.e2e.ts'),
     path.join(specs, 'restart.e2e.ts'),
     path.join(specs, 'workbench.e2e.ts'),
+    path.join(specs, 'editor.e2e.ts'),
     path.join(specs, 'performance.e2e.ts'),
   ],
   maxInstances: 1,

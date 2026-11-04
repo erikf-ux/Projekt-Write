@@ -54,6 +54,7 @@ pub fn run() {
             let state = tauri::async_runtime::block_on(AppState::initialize(
                 dirs,
                 picker,
+                link_opener(),
                 Generators::system(),
             ))?;
             let menu =
@@ -158,6 +159,18 @@ fn app_dirs<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<AppDirs> {
 
 fn documents_folder_name() -> PathBuf {
     PathBuf::from("Documents")
+}
+
+/// The system browser; in `e2e` builds with `PW_E2E_OPENED_LINKS` a recorder
+/// that appends each address to that file.
+fn link_opener() -> Arc<dyn services::links::LinkOpener> {
+    #[cfg(feature = "e2e")]
+    if let Some(file) = std::env::var_os("PW_E2E_OPENED_LINKS") {
+        return Arc::new(services::links::RecordingOpener::with_file(PathBuf::from(
+            file,
+        )));
+    }
+    Arc::new(services::links::SystemOpener)
 }
 
 /// The native folder dialog; in `e2e` builds the answers listed in

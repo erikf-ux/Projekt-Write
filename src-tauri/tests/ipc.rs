@@ -14,6 +14,7 @@ use project_write_lib::clock::Generators;
 use project_write_lib::commands;
 use project_write_lib::database::Database;
 use project_write_lib::services::dialog::ScriptedPicker;
+use project_write_lib::services::links::RecordingOpener;
 use project_write_lib::services::session::AppDirs;
 use project_write_lib::state::AppState;
 use serde_json::{Value, json};
@@ -28,6 +29,7 @@ struct TestApp {
     base: PathBuf,
     _dir: Option<tempfile::TempDir>,
     picker: Arc<ScriptedPicker>,
+    links: Arc<RecordingOpener>,
     _app: App<MockRuntime>,
     webview: WebviewWindow<MockRuntime>,
 }
@@ -57,9 +59,11 @@ fn dirs(base: &Path) -> AppDirs {
 /// `base`.
 fn app_at(base: &Path, dir: Option<tempfile::TempDir>) -> TestApp {
     let picker = Arc::new(ScriptedPicker::default());
+    let links = Arc::new(RecordingOpener::default());
     let state = tauri::async_runtime::block_on(AppState::initialize(
         dirs(base),
         picker.clone(),
+        links.clone(),
         Generators::system(),
     ))
     .unwrap();
@@ -75,6 +79,7 @@ fn app_at(base: &Path, dir: Option<tempfile::TempDir>) -> TestApp {
         base: base.to_path_buf(),
         _dir: dir,
         picker,
+        links,
         _app: app,
         webview,
     }
@@ -214,6 +219,57 @@ fn invalid_requests_return_the_uniform_error_format() {
             .expect_err(&format!("must fail: {body}"));
         assert_uniform_error(&error, field);
     }
+}
+
+#[test]
+fn link_open_hands_web_and_mail_addresses_to_the_system() {
+    let app = app();
+    for url in [
+        "https://example.org/seite?x=1#teil",
+        "http://example.org",
+        "mailto:anna@example.org",
+    ] {
+        assert_eq!(
+            call(&app, "link_open", json!({ "url": url })),
+            Ok(Value::Null),
+            "{url}"
+        );
+    }
+    assert_eq!(
+        app.links.opened(),
+        [
+            "https://example.org/seite?x=1#teil",
+            "http://example.org",
+            "mailto:anna@example.org"
+        ]
+    );
+}
+
+#[test]
+fn link_open_refuses_other_addresses_and_malformed_requests() {
+    let app = app();
+    for url in [
+        "javascript:alert(1)",
+        "file:///etc/passwd",
+        "ftp://example.org",
+        "pwrite://dokument",
+        "https://example.org/mit leerzeichen",
+    ] {
+        let error = call(&app, "link_open", json!({ "url": url })).unwrap_err();
+        assert_error_code(&error, "LINK_NOT_ALLOWED");
+    }
+    let too_long = format!("https://example.org/{}", "a".repeat(2048));
+    for request in [
+        json!({ "url": "" }),
+        json!({ "url": too_long }),
+        json!({}),
+        json!({ "url": 7 }),
+        json!({ "url": "https://example.org", "target": "_self" }),
+    ] {
+        let error = call(&app, "link_open", request.clone()).unwrap_err();
+        assert_eq!(error["code"], "INVALID_INPUT", "{request}: {error}");
+    }
+    assert!(app.links.opened().is_empty());
 }
 
 #[test]

@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::clock::{Generators, Timestamp};
 use crate::database::{Database, DatabaseError};
 use crate::services::dialog::FolderPicker;
+use crate::services::links::LinkOpener;
 use crate::services::locale;
 use crate::services::session::{AppDirs, LibrarySession};
 use crate::services::settings::app::AppSettingsStore;
@@ -14,6 +15,8 @@ pub struct AppState {
     pub session: LibrarySession,
     pub ui: UiService,
     pub picker: Arc<dyn FolderPicker>,
+    /// Opens web links (`link_open`).
+    pub links: Arc<dyn LinkOpener>,
     /// In-memory database for the system check while no library is open
     /// (the bundled SQLite is checked either way).
     probe: Database,
@@ -24,6 +27,7 @@ impl AppState {
     pub async fn initialize(
         dirs: AppDirs,
         picker: Arc<dyn FolderPicker>,
+        links: Arc<dyn LinkOpener>,
         generators: Generators,
     ) -> Result<Self, DatabaseError> {
         let probe = Database::open_in_memory().await?;
@@ -37,6 +41,7 @@ impl AppState {
             session,
             ui,
             picker,
+            links,
             probe,
         })
     }

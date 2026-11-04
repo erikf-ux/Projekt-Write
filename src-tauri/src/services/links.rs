@@ -7,6 +7,10 @@
 //! `unsafe` code), `xdg-open` on Linux, `open` on macOS. The app itself loads
 //! nothing.
 
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
 use crate::error::{CommandError, ErrorCode};
 
 /// Longest address that can be opened.
@@ -31,10 +35,68 @@ pub fn check(url: &str) -> Result<(), CommandError> {
     }
 }
 
-/// Opens a checked address in the system browser or mail program.
-pub fn open(url: &str) -> Result<(), CommandError> {
+/// Hands a checked address to the system.
+pub trait LinkOpener: Send + Sync {
+    fn open(&self, url: &str) -> std::io::Result<()>;
+}
+
+/// The system browser or mail program.
+pub struct SystemOpener;
+
+impl LinkOpener for SystemOpener {
+    fn open(&self, url: &str) -> std::io::Result<()> {
+        platform_open(url)
+    }
+}
+
+/// Keeps the addresses instead of opening them. Rust tests use it, and debug
+/// builds with the `e2e` feature when `PW_E2E_OPENED_LINKS` names a file:
+/// each address is appended to it as a line, because WebDriver cannot see a
+/// browser (ADR 0008).
+#[derive(Default)]
+pub struct RecordingOpener {
+    opened: Mutex<Vec<String>>,
+    file: Option<PathBuf>,
+}
+
+impl RecordingOpener {
+    pub fn with_file(file: PathBuf) -> Self {
+        Self {
+            opened: Mutex::default(),
+            file: Some(file),
+        }
+    }
+
+    /// The addresses handed over so far, in order.
+    pub fn opened(&self) -> Vec<String> {
+        self.opened
+            .lock()
+            .map(|opened| opened.clone())
+            .unwrap_or_default()
+    }
+}
+
+impl LinkOpener for RecordingOpener {
+    fn open(&self, url: &str) -> std::io::Result<()> {
+        if let Some(file) = &self.file {
+            let mut out = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(file)?;
+            writeln!(out, "{url}")?;
+        }
+        if let Ok(mut opened) = self.opened.lock() {
+            opened.push(url.to_owned());
+        }
+        Ok(())
+    }
+}
+
+/// Checks an address and hands it to `opener`. The log names the error,
+/// never the address (ADR 0009).
+pub fn open(opener: &dyn LinkOpener, url: &str) -> Result<(), CommandError> {
     check(url)?;
-    platform_open(url).map_err(|error| {
+    opener.open(url).map_err(|error| {
         log::warn!("link could not be opened: {error}");
         CommandError::new(ErrorCode::LinkOpenFailed)
     })
@@ -114,5 +176,16 @@ mod tests {
             check("").map_err(|error| error.code),
             Err(ErrorCode::InvalidInput)
         );
+    }
+
+    #[test]
+    fn only_checked_addresses_reach_the_opener() {
+        let opener = RecordingOpener::default();
+        assert_eq!(open(&opener, "https://example.org"), Ok(()));
+        assert_eq!(
+            open(&opener, "javascript:alert(1)").map_err(|error| error.code),
+            Err(ErrorCode::LinkNotAllowed)
+        );
+        assert_eq!(opener.opened(), ["https://example.org"]);
     }
 }
