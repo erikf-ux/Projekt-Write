@@ -1,14 +1,16 @@
 /**
- * Explorer (sections 11 and 13): the documents of the library. Subnets,
- * favourites and the other sections of section 13 follow with their phases;
- * Phase 3 lists the documents by title.
+ * Explorer (sections 11 and 13): a tree of the library's documents with the
+ * entries "Favoriten", "Zuletzt verwendet" and "Alle Dokumente". Subnets
+ * join the tree with Phase 7; an element in several entries stays one
+ * element.
  *
- * The list is virtualised ("Lange Listen werden virtualisiert"): only the
- * visible rows exist in the DOM. It is one tab stop (ARIA listbox with
- * `aria-activedescendant`): arrow keys move, Enter opens, F2 renames, the
- * context menu key or Shift+F10 opens the context menu.
+ * The tree is virtualised ("Lange Listen werden virtualisiert"): only the
+ * visible rows exist in the DOM, as a flat list with `aria-level`. It is one
+ * tab stop (ARIA tree with `aria-activedescendant`): arrow keys move, Right
+ * and Left open and close an entry, Enter opens, F2 renames, the context
+ * menu key or Shift+F10 opens the context menu.
  */
-import { FilePlus, FileText, Hash } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus, FileText, Hash, Star } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   ContextMenu,
@@ -23,6 +25,49 @@ import { useWorkspace } from './workspaceStore';
 export const EXPLORER_LIST_ID = 'pw-explorer-list';
 const ROW_HEIGHT = 26;
 const OVERSCAN = 8;
+/** Entries of "Zuletzt verwendet". */
+export const RECENT_LIMIT = 10;
+const MAX_TITLE = 300;
+
+export type ExplorerGroup = 'favorites' | 'recent' | 'all';
+const GROUPS: readonly ExplorerGroup[] = ['favorites', 'recent', 'all'];
+
+type Row =
+  | { kind: 'group'; key: string; group: ExplorerGroup; count: number; expanded: boolean }
+  | {
+      kind: 'document';
+      key: string;
+      group: ExplorerGroup;
+      document: DocumentSummary;
+      position: number;
+      size: number;
+    };
+
+/** The documents of each entry: favourites and all by title, recent by last opening. */
+export function explorerGroups(
+  documents: readonly DocumentSummary[],
+  locale: string,
+): Record<ExplorerGroup, DocumentSummary[]> {
+  const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
+  const byTitle = [...documents].sort(
+    (a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id),
+  );
+  const recent = documents
+    .filter((document) => document.lastOpenedAt !== null)
+    .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? '') || a.id.localeCompare(b.id))
+    .slice(0, RECENT_LIMIT);
+  return {
+    favorites: byTitle.filter((document) => document.favoritedAt !== null),
+    recent,
+    all: byTitle,
+  };
+}
+
+/** Title of a copy: "Titel (Kopie)", shortened to fit. */
+export function copyTitle(title: string, suffix: string): string {
+  const room = MAX_TITLE - suffix.length;
+  return `${title.length > room ? title.slice(0, room).trimEnd() : title}${suffix}`;
+}
 
 interface ExplorerProps {
   onNewDocument: () => void;
@@ -40,13 +85,34 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const openDocument = useWorkspace((state) => state.openDocument);
   const setRenaming = useWorkspace((state) => state.setRenaming);
   const rename = useWorkspace((state) => state.rename);
+  const copyDocument = useWorkspace((state) => state.copyDocument);
+  const setFavorite = useWorkspace((state) => state.setFavorite);
 
-  const sorted = useMemo(() => {
-    const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
-    return [...documents].sort((a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id));
-  }, [documents, locale]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<ExplorerGroup>>(() => new Set());
+  const groups = useMemo(() => explorerGroups(documents, locale), [documents, locale]);
+  const rows = useMemo(() => {
+    const result: Row[] = [];
+    for (const group of GROUPS) {
+      const members = groups[group];
+      const expanded = !collapsed.has(group) && members.length > 0;
+      result.push({ kind: 'group', key: group, group, count: members.length, expanded });
+      if (expanded) {
+        members.forEach((document, index) => {
+          result.push({
+            kind: 'document',
+            key: `${group}:${document.id}`,
+            group,
+            document,
+            position: index + 1,
+            size: members.length,
+          });
+        });
+      }
+    }
+    return result;
+  }, [groups, collapsed]);
 
-  const [selected, setSelected] = useState<string | null>(active);
+  const [selected, setSelected] = useState<string | null>(active ? `all:${active}` : null);
   const [followed, setFollowed] = useState(active);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -56,11 +122,31 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   if (active !== followed) {
     setFollowed(active);
     if (active) {
-      setSelected(active);
+      const row =
+        rows.find(
+          (entry) => entry.kind === 'document' && entry.document.id === active && entry.group === 'all',
+        ) ?? rows.find((entry) => entry.kind === 'document' && entry.document.id === active);
+      if (row) {
+        setSelected(row.key);
+      }
     }
   }
 
-  const selectedIndex = sorted.findIndex((document) => document.id === selected);
+  // Renaming (F2, menu, palette) happens in the selected row of the document.
+  const [renamed, setRenamed] = useState(renaming);
+  if (renaming !== renamed) {
+    setRenamed(renaming);
+    const shown = rows.find((row) => row.key === selected);
+    if (renaming && !(shown?.kind === 'document' && shown.document.id === renaming)) {
+      if (collapsed.has('all')) {
+        setCollapsed((previous) => new Set([...previous].filter((group) => group !== 'all')));
+      }
+      setSelected(`all:${renaming}`);
+    }
+  }
+
+  const selectedIndex = rows.findIndex((row) => row.key === selected);
+  const current = rows[selectedIndex];
 
   // Keep the selected row visible (and therefore rendered).
   useEffect(() => {
@@ -93,18 +179,32 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   }, []);
 
   const first = Math.max(0, Math.floor(scroll.top / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(sorted.length, Math.ceil((scroll.top + scroll.height) / ROW_HEIGHT) + OVERSCAN);
-  const visible = sorted.slice(first, last);
+  const last = Math.min(rows.length, Math.ceil((scroll.top + scroll.height) / ROW_HEIGHT) + OVERSCAN);
+  const visible = rows.slice(first, last);
 
   const select = (index: number) => {
-    const document = sorted[Math.max(0, Math.min(sorted.length - 1, index))];
-    if (document) {
-      setSelected(document.id);
+    const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
+    if (row) {
+      setSelected(row.key);
     }
   };
 
-  const openMenu = (document: DocumentSummary, position: { x: number; y: number }) => {
-    setSelected(document.id);
+  const toggle = (group: ExplorerGroup, open?: boolean) => {
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (open ?? next.has(group)) {
+        next.delete(group);
+      } else {
+        next.add(group);
+      }
+      return next;
+    });
+  };
+
+  const openMenu = (row: Extract<Row, { kind: 'document' }>, position: { x: number; y: number }) => {
+    const { document } = row;
+    setSelected(row.key);
+    const favorite = document.favoritedAt !== null;
     setMenu({
       ...position,
       label: document.title,
@@ -118,6 +218,16 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
             setRenaming(document.id);
           },
         },
+        {
+          id: 'copy',
+          label: t('explorer.copy'),
+          onSelect: () => void copyDocument(document.id, copyTitle(document.title, t('explorer.copySuffix'))),
+        },
+        {
+          id: 'favorite',
+          label: favorite ? t('explorer.unfavorite') : t('explorer.favorite'),
+          onSelect: () => void setFavorite(document.id, !favorite),
+        },
       ],
     });
   };
@@ -127,43 +237,60 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
       return;
     }
     const page = Math.max(1, Math.floor(scroll.height / ROW_HEIGHT) - 1);
-    const current = selectedIndex < 0 ? -1 : selectedIndex;
-    const document = sorted[current];
+    const index = selectedIndex < 0 ? -1 : selectedIndex;
     if (isContextMenuKey(event)) {
-      if (document) {
-        const row = window.document.getElementById(optionId(document.id));
-        openMenu(document, row ? positionBelow(row) : { x: 40, y: 80 });
+      if (current?.kind === 'document') {
+        const element = window.document.getElementById(rowId(current.key));
+        openMenu(current, element ? positionBelow(element) : { x: 40, y: 80 });
       }
       event.preventDefault();
       return;
     }
     switch (event.key) {
       case 'ArrowDown':
-        select(current + 1);
+        select(index + 1);
         break;
       case 'ArrowUp':
-        select(current <= 0 ? 0 : current - 1);
+        select(index <= 0 ? 0 : index - 1);
+        break;
+      case 'ArrowRight':
+        if (current?.kind === 'group') {
+          if (current.expanded) {
+            select(index + 1);
+          } else if (current.count > 0) {
+            toggle(current.group, true);
+          }
+        }
+        break;
+      case 'ArrowLeft':
+        if (current?.kind === 'group' && current.expanded) {
+          toggle(current.group, false);
+        } else if (current?.kind === 'document') {
+          setSelected(current.group);
+        }
         break;
       case 'Home':
         select(0);
         break;
       case 'End':
-        select(sorted.length - 1);
+        select(rows.length - 1);
         break;
       case 'PageDown':
-        select(current + page);
+        select(index + page);
         break;
       case 'PageUp':
-        select(current - page);
+        select(index - page);
         break;
       case 'Enter':
-        if (document) {
-          void openDocument(document.id);
+        if (current?.kind === 'document') {
+          void openDocument(current.document.id);
+        } else if (current?.kind === 'group' && current.count > 0) {
+          toggle(current.group);
         }
         break;
       case 'F2':
-        if (document) {
-          setRenaming(document.id);
+        if (current?.kind === 'document') {
+          setRenaming(current.document.id);
         }
         break;
       default:
@@ -172,6 +299,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     event.preventDefault();
     event.stopPropagation();
   };
+
+  const groupLabel = (group: ExplorerGroup) => t(`explorer.group.${group}`);
 
   return (
     <section aria-labelledby="explorer-title" className="flex h-full min-h-0 flex-col" data-testid="explorer">
@@ -197,10 +326,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
       <div
         ref={list}
         id={EXPLORER_LIST_ID}
-        role="listbox"
+        role="tree"
         tabIndex={0}
         aria-label={t('explorer.documents')}
-        aria-activedescendant={selected && selectedIndex >= 0 ? optionId(selected) : undefined}
+        aria-activedescendant={current ? rowId(current.key) : undefined}
         className="relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-offset-[-2px]"
         onScroll={(event) => {
           setScroll({ top: event.currentTarget.scrollTop, height: event.currentTarget.clientHeight || 400 });
@@ -212,29 +341,67 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           }
         }}
       >
-        <div style={{ height: sorted.length * ROW_HEIGHT }} className="relative">
-          {visible.map((document, offset) => {
+        <div style={{ height: rows.length * ROW_HEIGHT }} className="relative">
+          {visible.map((row, offset) => {
             const index = first + offset;
-            const isSelected = document.id === selected;
+            const isSelected = row.key === selected;
+            const style = { top: index * ROW_HEIGHT, height: ROW_HEIGHT };
+            const base = `text-ui absolute inset-x-0 flex cursor-default items-center gap-1.5 ${
+              isSelected ? 'bg-surface text-fg' : 'text-fg'
+            }`;
+            if (row.kind === 'group') {
+              const Chevron = row.expanded ? ChevronDown : ChevronRight;
+              return (
+                <div
+                  key={row.key}
+                  id={rowId(row.key)}
+                  role="treeitem"
+                  aria-level={1}
+                  aria-setsize={GROUPS.length}
+                  aria-posinset={GROUPS.indexOf(row.group) + 1}
+                  aria-expanded={row.count > 0 ? row.expanded : undefined}
+                  aria-selected={isSelected}
+                  data-group={row.group}
+                  className={`${base} px-1.5 font-semibold`}
+                  style={style}
+                  onClick={() => {
+                    setSelected(row.key);
+                    if (row.count > 0) {
+                      toggle(row.group);
+                    }
+                  }}
+                >
+                  <Chevron
+                    aria-hidden="true"
+                    className={`size-3.5 shrink-0 text-muted ${row.count > 0 ? '' : 'invisible'}`}
+                  />
+                  <span className="truncate">{groupLabel(row.group)}</span>
+                  <span className="ml-auto pr-2 font-normal text-muted">{row.count}</span>
+                </div>
+              );
+            }
+            const { document } = row;
             return (
               <div
-                key={document.id}
-                id={optionId(document.id)}
-                role="option"
+                key={row.key}
+                id={rowId(row.key)}
+                role="treeitem"
+                aria-level={2}
+                aria-setsize={row.size}
+                aria-posinset={row.position}
                 aria-selected={isSelected}
                 data-document={document.id}
+                data-group-member={row.group}
                 title={document.originalName ?? undefined}
-                className={`text-ui absolute inset-x-0 flex cursor-default items-center gap-2 px-3 ${
-                  isSelected ? 'bg-surface text-fg' : 'text-fg'
-                } ${document.id === active ? 'font-semibold' : ''}`}
-                style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT }}
+                className={`${base} pr-3 pl-7 ${document.id === active ? 'font-semibold' : ''}`}
+                style={style}
                 onClick={() => {
-                  setSelected(document.id);
+                  setSelected(row.key);
                   void openDocument(document.id);
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  openMenu(document, { x: event.clientX, y: event.clientY });
+                  openMenu(row, { x: event.clientX, y: event.clientY });
                 }}
               >
                 {document.format === 'md' ? (
@@ -242,7 +409,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                 ) : (
                   <FileText aria-hidden="true" className="size-3.5 shrink-0 text-muted" />
                 )}
-                {renaming === document.id ? (
+                {renaming === document.id && isSelected ? (
                   <RenameInput
                     initial={document.title}
                     label={t('explorer.renameLabel')}
@@ -258,11 +425,18 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                 ) : (
                   <span className="truncate">{document.title}</span>
                 )}
+                {document.favoritedAt !== null && row.group !== 'favorites' ? (
+                  <Star
+                    role="img"
+                    aria-label={t('explorer.isFavorite')}
+                    className="ml-auto size-3 shrink-0 text-muted"
+                  />
+                ) : null}
               </div>
             );
           })}
         </div>
-        {listLoaded && sorted.length === 0 ? (
+        {listLoaded && documents.length === 0 ? (
           <p className="text-ui px-3 py-2 text-muted" data-testid="explorer-empty">
             {t('explorer.empty')}
           </p>
@@ -280,8 +454,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   );
 }
 
-function optionId(id: string): string {
-  return `pw-explorer-${id}`;
+function rowId(key: string): string {
+  return `pw-explorer-${key.replace(':', '-')}`;
 }
 
 interface RenameInputProps {

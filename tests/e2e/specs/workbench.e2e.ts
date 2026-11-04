@@ -52,6 +52,29 @@ async function activeEditor() {
   throw new Error('no visible writing surface');
 }
 
+/**
+ * Focuses the Explorer tree and moves with the arrow keys to the document
+ * `title` in "Alle Dokumente" (the last entry).
+ */
+async function selectInExplorer(title: string) {
+  await browser.execute(() => {
+    document.getElementById('pw-explorer-list')?.focus();
+  });
+  await browser.keys('End');
+  for (let step = 0; step < 30; step += 1) {
+    const current = await browser.execute(() => {
+      const tree = document.getElementById('pw-explorer-list');
+      const row = document.getElementById(tree?.getAttribute('aria-activedescendant') ?? '');
+      return { title: row?.textContent ?? '', group: row?.getAttribute('data-group-member') ?? '' };
+    });
+    if (current.group === 'all' && current.title === title) {
+      return;
+    }
+    await browser.keys('ArrowUp');
+  }
+  throw new Error(`"${title}" is not in the Explorer`);
+}
+
 async function tabTitles(): Promise<string[]> {
   const tabs = await $$('[data-testid="tabs"] [role="tab"]').getElements();
   const titles: string[] = [];
@@ -63,7 +86,7 @@ async function tabTitles(): Promise<string[]> {
 
 /** Opens documents from the Explorer until at least `count` tabs are open. */
 async function ensureTabs(count: number) {
-  const options = await $$('[data-testid="explorer"] [role="option"]').getElements();
+  const options = await $$('[data-testid="explorer"] [data-group-member="all"]').getElements();
   for (const option of options) {
     if ((await tabTitles()).length >= count) {
       return;
@@ -118,13 +141,13 @@ describe('Project Write – Phase 3 workbench', () => {
     }
     expect(commands).toEqual(['explorer.focus', 'editor.focus', 'settings.open']);
     // The document of the first start is in the Explorer.
-    await expect($('[data-testid="explorer"] [role="option"]')).toHaveText(
+    await expect($('[data-testid="explorer"] [data-group-member="all"]')).toHaveText(
       expect.stringContaining('Unbenannt'),
     );
   });
 
   it('creates a document with Ctrl+N and saves the text 1 s after typing', async () => {
-    await $('[data-testid="explorer"] [role="listbox"]').click();
+    await $('[data-testid="explorer"] [role="tree"]').click();
     await browser.keys(['Control', 'n']);
     await browser.waitUntil(async () => (await tabTitles()).includes('Unbenannt 2'), {
       timeoutMsg: 'Ctrl+N did not open a new document',
@@ -199,7 +222,7 @@ describe('Project Write – Phase 3 workbench', () => {
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
     await expect($('[data-testid="status-conflicts"]')).toHaveText(expect.stringContaining('1'));
     const tabsBefore = (await tabTitles()).length;
-    await $('[data-testid="explorer"] [role="listbox"]').click();
+    await $('[data-testid="explorer"] [role="tree"]').click();
     await browser.keys(['Control', 'n']);
     await expect($('[data-testid="notice"]')).toHaveText(expect.stringContaining('mehreren Befehlen'));
     expect((await tabTitles()).length).toBe(tabsBefore);
@@ -288,16 +311,21 @@ describe('Project Write – Phase 3 workbench', () => {
   });
 
   it('operates Explorer and tabs with the keyboard', async () => {
-    const list = $('#pw-explorer-list');
-    await list.click();
-    await browser.keys('Home');
+    // The tree: Favoriten, Zuletzt verwendet, Alle Dokumente (by title).
+    await selectInExplorer('Unbenannt');
     await browser.keys('Enter');
     await browser.waitUntil(async () => (await tabTitles()).includes('Unbenannt'), {
       timeoutMsg: 'Enter did not open the document',
     });
+    // Left goes to the entry, Left again closes it, Right opens it.
+    await browser.keys('ArrowLeft');
+    await expect($('[data-group="all"]')).toHaveAttribute('aria-selected', 'true');
+    await browser.keys('ArrowLeft');
+    await expect($('[data-group="all"]')).toHaveAttribute('aria-expanded', 'false');
+    await browser.keys('ArrowRight');
+    await expect($('[data-group="all"]')).toHaveAttribute('aria-expanded', 'true');
     // F2 renames in place.
-    await list.click();
-    await browser.keys('Home');
+    await selectInExplorer('Unbenannt');
     await browser.keys('F2');
     const input = $('[data-testid="explorer-rename"]');
     await input.waitForDisplayed();
@@ -306,7 +334,7 @@ describe('Project Write – Phase 3 workbench', () => {
     await browser.keys('Enter');
     await expect($('[data-testid="explorer"]')).toHaveText(expect.stringContaining('Erstes Kapitel'));
     // Context menu with Shift+F10, closed with Escape.
-    await list.click();
+    await selectInExplorer('Erstes Kapitel');
     await browser.keys(['Shift', 'F10']);
     await expect($('[data-testid="context-menu"]')).toBeDisplayed();
     await browser.keys('Escape');

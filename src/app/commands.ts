@@ -6,6 +6,7 @@
  */
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
+import { copyTitle } from '@/modules/documents/Explorer';
 import { activeDocument, freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
 import { useFind } from '@/modules/editor/find/findStore';
 import { getSession } from '@/modules/editor/session';
@@ -107,6 +108,32 @@ export function createAppCommands(): CommandDefinition[] {
           await ui().update({ sidebar: { ...current.sidebar, visible: true } });
         }
         workspace().setRenaming(workspace().active);
+      },
+    },
+    {
+      id: 'document.copy',
+      category: 'document',
+      titleKey: 'command.document.copy',
+      isAvailable: () => workspace().active !== null,
+      run: async () => {
+        const document = activeDocument(workspace());
+        if (document) {
+          const suffix = translate(useLocale.getState().locale, 'explorer.copySuffix');
+          await workspace().copyDocument(document.id, copyTitle(document.title, suffix));
+        }
+      },
+    },
+    {
+      id: 'document.toggleFavorite',
+      category: 'document',
+      titleKey: 'command.document.toggleFavorite',
+      isAvailable: () => workspace().active !== null,
+      run: async () => {
+        const { active, documents } = workspace();
+        const summary = documents.find((entry) => entry.id === active);
+        if (summary) {
+          await workspace().setFavorite(summary.id, summary.favoritedAt === null);
+        }
       },
     },
     {

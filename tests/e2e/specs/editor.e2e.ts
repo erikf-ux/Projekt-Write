@@ -108,7 +108,7 @@ describe('Project Write – Phase 4 editor', () => {
     await closeSettings();
     // The app may start with the tabs of the last session: wait for the new one.
     const before = await tabIds();
-    await $('[data-testid="explorer"] [role="listbox"]').click();
+    await $('[data-testid="explorer"] [role="tree"]').click();
     await browser.keys(['Control', 'n']);
     await browser.waitUntil(
       async () => {

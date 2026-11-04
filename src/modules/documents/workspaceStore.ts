@@ -90,6 +90,9 @@ interface WorkspaceStore {
   moveTab: (id: string, index: number) => void;
   rename: (id: string, title: string) => Promise<boolean>;
   setRenaming: (id: string | null) => void;
+  /** Copies a document (saved first) and opens the copy. */
+  copyDocument: (id: string, title: string) => Promise<string | null>;
+  setFavorite: (id: string, favorite: boolean) => Promise<boolean>;
   /** Another library was opened: forget everything (after saving). */
   reset: () => Promise<void>;
   /** Adds a document created elsewhere (import) to the list. */
@@ -414,6 +417,31 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
 
     setRenaming: (id) => {
       set({ renaming: id });
+    },
+
+    copyDocument: async (id, title) => {
+      // The copy takes what is on disk: unsaved text is saved first.
+      if (get().open[id] && !(await get().flush(id))) {
+        return null;
+      }
+      const result = await call('document_copy', { id, title });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return null;
+      }
+      set((state) => ({ documents: upsert(state.documents, result.value) }));
+      await get().openDocument(result.value.id);
+      return result.value.id;
+    },
+
+    setFavorite: async (id, favorite) => {
+      const result = await call('document_set_favorite', { id, favorite });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      set((state) => ({ documents: upsert(state.documents, result.value) }));
+      return true;
     },
 
     reset: async () => {

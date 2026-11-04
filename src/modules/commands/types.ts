@@ -10,6 +10,8 @@ export type CommandId =
   | 'document.new'
   | 'document.save'
   | 'document.rename'
+  | 'document.copy'
+  | 'document.toggleFavorite'
   | 'tab.close'
   | 'tab.closeOthers'
   | 'tab.closeAll'
