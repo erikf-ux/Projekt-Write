@@ -8,4 +8,12 @@ export type DocumentSummary = { id: string, title: string, format: DocumentForma
 /**
  * File name at import, for imported documents.
  */
-originalName: string | null, };
+originalName: string | null, 
+/**
+ * Favourite since, if it is one.
+ */
+favoritedAt: string | null, 
+/**
+ * Last opened in a tab ("Zuletzt verwendet").
+ */
+lastOpenedAt: string | null, };

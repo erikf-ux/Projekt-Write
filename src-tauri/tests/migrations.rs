@@ -43,6 +43,16 @@ const FIXTURES: &[(i64, &str, &str)] = &[
         "SELECT count(*) FROM documents \
          WHERE id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f' AND original_name = 'Notiz.txt'",
     ),
+    (
+        4,
+        "UPDATE documents SET favorited_at = '2026-11-04T10:00:00.000Z', \
+                              last_opened_at = '2026-11-04T10:01:00.000Z' \
+         WHERE id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f'",
+        "SELECT count(*) FROM documents \
+         WHERE id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f' \
+           AND favorited_at = '2026-11-04T10:00:00.000Z' \
+           AND last_opened_at = '2026-11-04T10:01:00.000Z'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -62,6 +72,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         3,
         "document import",
         "f5a8e5b46bdd724029e64b2c3d4c49bb5c643b0bd2b666df0472f830da5d9195d945ecebe43f59e4de45dcf6deb726cb",
+    ),
+    (
+        4,
+        "favorites and recent",
+        "522b96e675abf0d081cbe541dd41eb5044c322af46435b69d1265f7147f255461a43c4222b949270c379cf5c877a4aba",
     ),
 ];
 

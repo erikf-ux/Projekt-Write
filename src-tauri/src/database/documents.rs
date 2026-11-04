@@ -1,4 +1,4 @@
-//! SQL for the `documents` table (migrations 0002 and 0003). Only the
+//! SQL for the `documents` table (migrations 0002 to 0004). Only the
 //! document repository (`services::documents`) calls these functions.
 
 use sqlx::sqlite::SqliteRow;
@@ -18,12 +18,16 @@ pub struct DocumentRow {
     pub deleted_at: Option<String>,
     /// File name at import (migration 0003).
     pub original_name: Option<String>,
+    /// Favourite since (migration 0004).
+    pub favorited_at: Option<String>,
+    /// Last opened in a tab (migration 0004).
+    pub last_opened_at: Option<String>,
 }
 
 macro_rules! select_documents {
     ($tail:literal) => {
         concat!(
-            "SELECT id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name FROM documents ",
+            "SELECT id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name, favorited_at, last_opened_at FROM documents ",
             $tail
         )
     };
@@ -41,13 +45,15 @@ fn from_row(row: &SqliteRow) -> Result<DocumentRow, sqlx::Error> {
         archived_at: row.try_get("archived_at")?,
         deleted_at: row.try_get("deleted_at")?,
         original_name: row.try_get("original_name")?,
+        favorited_at: row.try_get("favorited_at")?,
+        last_opened_at: row.try_get("last_opened_at")?,
     })
 }
 
 pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name, favorited_at, last_opened_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
     )
     .bind(&row.id)
     .bind(&row.title)
@@ -59,6 +65,8 @@ pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Er
     .bind(&row.archived_at)
     .bind(&row.deleted_at)
     .bind(&row.original_name)
+    .bind(&row.favorited_at)
+    .bind(&row.last_opened_at)
     .execute(pool)
     .await?;
     Ok(())
@@ -168,6 +176,39 @@ pub async fn set_deleted(
         sqlx::query("UPDATE documents SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL")
             .bind(id)
             .bind(deleted_at)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
+}
+
+/// Marks a document as a favourite (`Some`) or not (`None`). Returns the number
+/// of changed rows.
+pub async fn set_favorited(
+    pool: &SqlitePool,
+    id: &str,
+    favorited_at: Option<&str>,
+) -> Result<u64, sqlx::Error> {
+    Ok(
+        sqlx::query("UPDATE documents SET favorited_at = ?2 WHERE id = ?1")
+            .bind(id)
+            .bind(favorited_at)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
+}
+
+/// Records that a document was opened ("Zuletzt verwendet").
+pub async fn set_last_opened(
+    pool: &SqlitePool,
+    id: &str,
+    last_opened_at: &str,
+) -> Result<u64, sqlx::Error> {
+    Ok(
+        sqlx::query("UPDATE documents SET last_opened_at = ?2 WHERE id = ?1")
+            .bind(id)
+            .bind(last_opened_at)
             .execute(pool)
             .await?
             .rows_affected(),

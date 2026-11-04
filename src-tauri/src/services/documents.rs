@@ -120,6 +120,10 @@ pub struct DocumentMeta {
     pub deleted_at: Option<String>,
     /// File name at import, for imported documents.
     pub original_name: Option<String>,
+    /// Favourite since (section 13).
+    pub favorited_at: Option<String>,
+    /// Last opened in a tab ("Zuletzt verwendet", section 13).
+    pub last_opened_at: Option<String>,
 }
 
 /// Result of [`DocumentRepository::save`].
@@ -276,6 +280,8 @@ impl DocumentRepository {
             archived_at: None,
             deleted_at: None,
             original_name,
+            favorited_at: None,
+            last_opened_at: None,
         };
         if let Err(error) = rows::insert(self.database.writer(), &row).await {
             // Without a row the new file would be an orphan.
@@ -394,6 +400,51 @@ impl DocumentRepository {
         self.get(id).await?.ok_or(DocumentError::NotFound)
     }
 
+    /// Copies a document (section 13): a new id and `title`, the same format
+    /// and content. The history is not copied (Phase 6); tags and subnets
+    /// follow with Phase 7.
+    pub async fn copy(&self, id: Uuid, title: &str) -> Result<DocumentMeta, DocumentError> {
+        let (meta, content) = self.read(id).await?;
+        if meta.deleted_at.is_some() {
+            return Err(DocumentError::InTrash);
+        }
+        self.insert_new(title, meta.format, &content, None).await
+    }
+
+    /// Makes a document a favourite or not. Changes neither content nor
+    /// `updated_at`.
+    pub async fn set_favorite(
+        &self,
+        id: Uuid,
+        favorite: bool,
+    ) -> Result<DocumentMeta, DocumentError> {
+        let _guard = self.write_lock.lock().await;
+        let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
+        if meta.favorited_at.is_some() != favorite {
+            let now = self.generators.now().to_iso();
+            rows::set_favorited(
+                self.database.writer(),
+                &id.hyphenated().to_string(),
+                favorite.then_some(now.as_str()),
+            )
+            .await?;
+        }
+        self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// Records that a document was opened ("Zuletzt verwendet").
+    pub async fn mark_opened(&self, id: Uuid) -> Result<DocumentMeta, DocumentError> {
+        let _guard = self.write_lock.lock().await;
+        let now = self.generators.now().to_iso();
+        let changed =
+            rows::set_last_opened(self.database.writer(), &id.hyphenated().to_string(), &now)
+                .await?;
+        if changed == 0 {
+            return Err(DocumentError::NotFound);
+        }
+        self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
     /// Moves a document to the trash. Row and file stay (section 13).
     pub async fn move_to_trash(&self, id: Uuid) -> Result<DocumentMeta, DocumentError> {
         let _guard = self.write_lock.lock().await;
@@ -454,6 +505,8 @@ fn meta_from_row(row: DocumentRow) -> Result<DocumentMeta, DocumentError> {
         archived_at: row.archived_at,
         deleted_at: row.deleted_at,
         original_name: row.original_name,
+        favorited_at: row.favorited_at,
+        last_opened_at: row.last_opened_at,
     })
 }
 

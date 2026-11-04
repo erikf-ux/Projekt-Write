@@ -26,6 +26,8 @@
     "allow-document-save",
     "allow-document-rename",
     "allow-document-import",
+    "allow-document-copy",
+    "allow-document-set-favorite",
     "allow-theme-import",
     "allow-theme-remove",
     "allow-link-open"

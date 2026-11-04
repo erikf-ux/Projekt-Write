@@ -32,6 +32,10 @@ pub struct DocumentSummary {
     pub updated_at: String,
     /// File name at import, for imported documents.
     pub original_name: Option<String>,
+    /// Favourite since, if it is one.
+    pub favorited_at: Option<String>,
+    /// Last opened in a tab ("Zuletzt verwendet").
+    pub last_opened_at: Option<String>,
 }
 
 impl From<&DocumentMeta> for DocumentSummary {
@@ -44,6 +48,8 @@ impl From<&DocumentMeta> for DocumentSummary {
             created_at: meta.created_at.clone(),
             updated_at: meta.updated_at.clone(),
             original_name: meta.original_name.clone(),
+            favorited_at: meta.favorited_at.clone(),
+            last_opened_at: meta.last_opened_at.clone(),
         }
     }
 }
@@ -157,6 +163,38 @@ impl Validate for RenameDocumentRequest {
     }
 }
 
+/// Request of `document_copy`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct CopyDocumentRequest {
+    pub id: String,
+    /// Title of the copy (the interface proposes "… (Kopie)").
+    pub title: String,
+}
+
+impl Validate for CopyDocumentRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id)?;
+        check_title(&self.title)
+    }
+}
+
+/// Request of `document_set_favorite`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SetFavoriteRequest {
+    pub id: String,
+    pub favorite: bool,
+}
+
+impl Validate for SetFavoriteRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id).map(|_| ())
+    }
+}
+
 /// Request of `document_import`.
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -245,7 +283,9 @@ pub async fn document_read(
     state
         .session
         .with_documents(|documents| async move {
-            let (meta, content) = documents.read(id).await.map_err(document_error)?;
+            let (_, content) = documents.read(id).await.map_err(document_error)?;
+            // Opening in a tab is what "Zuletzt verwendet" lists.
+            let meta = documents.mark_opened(id).await.map_err(document_error)?;
             if meta.format == DocumentFormat::Pwrite {
                 return Err(CommandError::new(ErrorCode::DocumentFormatUnsupported));
             }
@@ -303,6 +343,47 @@ pub async fn document_rename(
         .with_documents(|documents| async move {
             let meta = documents
                 .rename(id, &request.title)
+                .await
+                .map_err(document_error)?;
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// Copies a document: new id, same format and content (section 13).
+#[tauri::command]
+pub async fn document_copy(
+    state: State<'_, AppState>,
+    request: Input<CopyDocumentRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let request = request.into_inner();
+    let id = parse_id(&request.id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .copy(id, &request.title)
+                .await
+                .map_err(document_error)?;
+            log::info!("document {id} copied to {}", meta.id);
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// Makes a document a favourite or not (section 13).
+#[tauri::command]
+pub async fn document_set_favorite(
+    state: State<'_, AppState>,
+    request: Input<SetFavoriteRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let request = request.into_inner();
+    let id = parse_id(&request.id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .set_favorite(id, request.favorite)
                 .await
                 .map_err(document_error)?;
             Ok(DocumentSummary::from(&meta))

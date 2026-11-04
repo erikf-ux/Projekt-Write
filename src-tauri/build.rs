@@ -25,6 +25,8 @@ fn main() {
         "document_save",
         "document_rename",
         "document_import",
+        "document_copy",
+        "document_set_favorite",
         "theme_import",
         "theme_remove",
         "link_open",

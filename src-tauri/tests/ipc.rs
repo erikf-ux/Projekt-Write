@@ -975,6 +975,87 @@ fn documents_are_created_listed_read_saved_and_renamed() {
 }
 
 #[test]
+fn documents_are_copied_marked_as_favorites_and_recently_opened() {
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Kapitel", "format": "md" }),
+    )
+    .unwrap();
+    let id = created["id"].as_str().unwrap().to_owned();
+    assert_eq!(created["favoritedAt"], Value::Null);
+    assert_eq!(created["lastOpenedAt"], Value::Null);
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "# Kapitel\n" }),
+    )
+    .unwrap();
+
+    // Opening is what "Zuletzt verwendet" lists; it changes no content.
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert!(read["document"]["lastOpenedAt"].is_string(), "{read}");
+
+    let favorite = call(
+        &app,
+        "document_set_favorite",
+        json!({ "id": id, "favorite": true }),
+    )
+    .unwrap();
+    assert!(favorite["favoritedAt"].is_string());
+    assert_eq!(favorite["updatedAt"], read["document"]["updatedAt"]);
+    let again = call(
+        &app,
+        "document_set_favorite",
+        json!({ "id": id, "favorite": true }),
+    )
+    .unwrap();
+    assert_eq!(
+        again["favoritedAt"], favorite["favoritedAt"],
+        "stays a favourite since then"
+    );
+    let plain = call(
+        &app,
+        "document_set_favorite",
+        json!({ "id": id, "favorite": false }),
+    )
+    .unwrap();
+    assert_eq!(plain["favoritedAt"], Value::Null);
+
+    let copy = call(
+        &app,
+        "document_copy",
+        json!({ "id": id, "title": "Kapitel (Kopie)" }),
+    )
+    .unwrap();
+    assert_ne!(copy["id"], id.as_str());
+    assert_eq!(copy["title"], "Kapitel (Kopie)");
+    assert_eq!(copy["format"], "md");
+    let copied = call(&app, "document_read", json!({ "id": copy["id"] })).unwrap();
+    assert_eq!(copied["text"], "# Kapitel\n");
+    // The copy is a document of its own.
+    call(
+        &app,
+        "document_save",
+        json!({ "id": copy["id"], "text": "anders\n" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&app, "document_read", json!({ "id": id })).unwrap()["text"],
+        "# Kapitel\n"
+    );
+    let missing = call(
+        &app,
+        "document_copy",
+        json!({ "id": "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c", "title": "X" }),
+    )
+    .unwrap_err();
+    assert_error_code(&missing, "DOCUMENT_NOT_FOUND");
+    app.shut_down();
+}
+
+#[test]
 fn document_commands_need_an_open_library() {
     let app = app();
     let id = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
@@ -984,6 +1065,11 @@ fn document_commands_need_an_open_library() {
         ("document_read", json!({ "id": id })),
         ("document_save", json!({ "id": id, "text": "" })),
         ("document_rename", json!({ "id": id, "title": "B" })),
+        ("document_copy", json!({ "id": id, "title": "B" })),
+        (
+            "document_set_favorite",
+            json!({ "id": id, "favorite": true }),
+        ),
         (
             "document_import",
             json!({ "fileName": "a.txt", "contentBase64": "", "allowDuplicate": false }),
@@ -1043,6 +1129,20 @@ fn document_commands_reject_invalid_input_uniformly() {
             "document_rename",
             json!({ "id": id, "title": " " }),
             "title",
+        ),
+        ("document_copy", json!({ "id": id, "title": "" }), "title"),
+        ("document_copy", json!({ "id": "x", "title": "A" }), "id"),
+        ("document_copy", json!({ "id": id }), "request"),
+        (
+            "document_set_favorite",
+            json!({ "id": id, "favorite": "yes" }),
+            "request",
+        ),
+        ("document_set_favorite", json!({ "id": id }), "request"),
+        (
+            "document_set_favorite",
+            json!({ "id": "../x", "favorite": true }),
+            "id",
         ),
         (
             "document_import",
