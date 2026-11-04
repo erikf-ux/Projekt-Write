@@ -261,8 +261,30 @@ impl DocumentRepository {
         content: &[u8],
         original_name: &str,
     ) -> Result<DocumentMeta, DocumentError> {
-        self.insert_new(title, format, content, Some(original_name.to_owned()))
-            .await
+        if format != DocumentFormat::Pwrite {
+            return self
+                .insert_new(title, format, content, Some(original_name.to_owned()))
+                .await;
+        }
+        let pwrite::Parsed::Current(mut file) =
+            pwrite::parse(content).map_err(|_| DocumentError::InvalidPwrite)?
+        else {
+            return Err(DocumentError::ReadOnly);
+        };
+        // In the library the envelope names the library document.
+        self.insert_new_with(
+            title,
+            DocumentFormat::Pwrite,
+            Some(original_name.to_owned()),
+            move |id, now, title| {
+                file.id = id.to_owned();
+                file.title = title.to_owned();
+                file.created_at = now.to_owned();
+                file.updated_at = now.to_owned();
+                Ok(pwrite::to_bytes(&file))
+            },
+        )
+        .await
     }
 
     /// A document not in the trash with exactly `content`, if any.

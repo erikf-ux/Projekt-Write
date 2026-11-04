@@ -2,13 +2,15 @@
 //! Bibliothek"; section 20: "Prüfe importierte Dateitypen über den Inhalt,
 //! nicht nur über die Endung. Es gilt eine Positivliste.").
 //!
-//! Phase 3 imports text documents dropped onto the window: `.txt`, `.md`
-//! and `.markdown` in UTF-8 (with or without byte order mark). Library
-//! documents are stored in UTF-8 with LF line ends; the original file is
-//! never touched, only its content arrives here. Other encodings follow with
-//! external files (Phase 5), media with the media library (Phase 8).
+//! Text documents dropped onto the window or taken into the library:
+//! `.txt`, `.md` and `.markdown` in UTF-8, UTF-16 or Windows-1252 (Phase 5,
+//! `encoding.rs`), and `.pwrite`. Library documents are stored in UTF-8
+//! with LF line ends; the original file is never touched, only its content
+//! arrives here. Media follow with the media library (Phase 8).
 
 use crate::services::documents::{DocumentFormat, validate_title};
+use crate::services::encoding::{self, EncodingError};
+use crate::services::pwrite;
 
 /// Largest file accepted for import (10 MiB; section 9 warns from 10 MB).
 pub const MAX_IMPORT_BYTES: usize = 10 * 1024 * 1024;
@@ -19,7 +21,7 @@ pub const MAX_FILE_NAME_CHARS: usize = 255;
 pub enum ImportError {
     #[error("file type not on the positive list")]
     UnsupportedType,
-    #[error("content is not UTF-8 text ({0})")]
+    #[error("content is not text of its type ({0})")]
     NotText(&'static str),
     #[error("file larger than {MAX_IMPORT_BYTES} bytes")]
     TooLarge,
@@ -32,7 +34,8 @@ pub enum ImportError {
 pub struct CheckedImport {
     pub title: String,
     pub format: DocumentFormat,
-    /// UTF-8 without byte order mark, LF line ends.
+    /// Text: UTF-8 without byte order mark, LF line ends. `.pwrite`: the
+    /// file as it was (the library gives it a new envelope).
     pub content: Vec<u8>,
 }
 
@@ -61,11 +64,19 @@ pub fn check(file_name: &str, data: &[u8]) -> Result<CheckedImport, ImportError>
     if data.len() > MAX_IMPORT_BYTES {
         return Err(ImportError::TooLarge);
     }
-    let text = text_content(data)?;
+    let content = if format == DocumentFormat::Pwrite {
+        match pwrite::parse(data) {
+            Ok(pwrite::Parsed::Current(_)) => data.to_vec(),
+            Ok(pwrite::Parsed::Newer { .. }) => return Err(ImportError::NotText("newer .pwrite")),
+            Err(_) => return Err(ImportError::NotText("not .pwrite")),
+        }
+    } else {
+        text_content(data)?.into_bytes()
+    };
     Ok(CheckedImport {
         title: title_of(stem, file_name),
         format,
-        content: text.into_bytes(),
+        content,
     })
 }
 
@@ -78,26 +89,22 @@ fn format_of(file_name: &str) -> Result<(&str, DocumentFormat), ImportError> {
     let format = match extension.to_ascii_lowercase().as_str() {
         "txt" => DocumentFormat::Txt,
         "md" | "markdown" => DocumentFormat::Md,
+        "pwrite" => DocumentFormat::Pwrite,
         _ => return Err(ImportError::UnsupportedType),
     };
     Ok((stem, format))
 }
 
-/// UTF-8 text without NUL or other control characters (except tab, line
-/// feed, carriage return and form feed); LF line ends.
+/// Text in one of the known encodings without NUL or other control
+/// characters (except tab, line feed, carriage return and form feed); LF
+/// line ends.
 fn text_content(data: &[u8]) -> Result<String, ImportError> {
-    if data.starts_with(&[0xFF, 0xFE]) || data.starts_with(&[0xFE, 0xFF]) {
-        return Err(ImportError::NotText("UTF-16"));
+    match encoding::decode(data) {
+        Ok(decoded) => Ok(decoded.text),
+        Err(EncodingError::Binary | EncodingError::Unencodable(_)) => {
+            Err(ImportError::NotText("binary"))
+        }
     }
-    let data = data.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(data);
-    let text = std::str::from_utf8(data).map_err(|_| ImportError::NotText("not UTF-8"))?;
-    if text
-        .chars()
-        .any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r' | '\u{0C}'))
-    {
-        return Err(ImportError::NotText("binary"));
-    }
-    Ok(text.replace("\r\n", "\n").replace('\r', "\n"))
 }
 
 /// The title: the file name without extension; the whole name if the stem
@@ -144,13 +151,7 @@ mod tests {
 
     #[test]
     fn other_types_are_rejected_by_extension_and_content() {
-        for name in [
-            "bild.png",
-            "README",
-            "skript.md.exe",
-            "dokument.pwrite",
-            "notiz.txt.zip",
-        ] {
+        for name in ["bild.png", "README", "skript.md.exe", "notiz.txt.zip"] {
             assert_eq!(
                 check(name, b"text"),
                 Err(ImportError::UnsupportedType),
@@ -160,7 +161,7 @@ mod tests {
         // A binary file renamed to .txt.
         assert_eq!(
             check("getarnt.txt", b"\x89PNG\r\n\x1a\n\0\0\0"),
-            Err(ImportError::NotText("not UTF-8"))
+            Err(ImportError::NotText("binary"))
         );
         assert_eq!(
             check("nul.txt", b"a\0b"),
@@ -171,16 +172,46 @@ mod tests {
             Err(ImportError::NotText("binary"))
         );
         assert_eq!(
-            check("utf16.txt", b"\xFF\xFEa\0"),
-            Err(ImportError::NotText("UTF-16"))
-        );
-        assert_eq!(
-            check("latin1.txt", b"Gr\xF6\xDFe"),
-            Err(ImportError::NotText("not UTF-8"))
+            check("kein.pwrite", b"{\"format\": \"other\"}"),
+            Err(ImportError::NotText("not .pwrite"))
         );
         assert_eq!(
             check("gross.txt", &vec![b'a'; MAX_IMPORT_BYTES + 1]),
             Err(ImportError::TooLarge)
+        );
+    }
+
+    #[test]
+    fn utf_16_and_windows_1252_become_utf_8() {
+        assert_eq!(
+            check("utf16.txt", b"\xFF\xFEa\0\r\0\n\0").unwrap().content,
+            b"a\n"
+        );
+        assert_eq!(
+            check("latin1.txt", b"Gr\xF6\xDFe \x80").unwrap().content,
+            "Größe €".as_bytes()
+        );
+    }
+
+    #[test]
+    fn pwrite_files_are_checked_as_pwrite() {
+        let file = pwrite::new_file(
+            "0b8f8f4e-6d0e-4f3e-9a3c-2a1d3c4b5e6f",
+            "Roman",
+            "2026-11-04T10:00:00Z",
+            "de-DE",
+            pwrite::empty_content(),
+        );
+        let data = pwrite::to_bytes(&file);
+        let checked = check("Roman.pwrite", &data).unwrap();
+        assert_eq!(checked.format, DocumentFormat::Pwrite);
+        assert_eq!(checked.content, data);
+        let newer = String::from_utf8(data)
+            .unwrap()
+            .replace("\"formatVersion\":1", "\"formatVersion\":2");
+        assert_eq!(
+            check("Neu.pwrite", newer.as_bytes()),
+            Err(ImportError::NotText("newer .pwrite"))
         );
     }
 
