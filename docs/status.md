@@ -10,7 +10,7 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur 
 
 Umfangsentscheidungen (ADR 0015): Löschen, Papierkorb und Archiv in Phase 6 (Abschnitt 25; ADR 0011 nannte Phase 5), Verschieben und Tags in Phase 7, Ordnerimport in Phase 8. Kodierungen ohne neue Abhängigkeit, Änderungen von außen per Abfrage statt Dateiwächter.
 
-CI: Seit Lauf 78 startet kein Job (alle Jobs enden nach 2–3 s ohne einen Schritt, zuletzt Lauf 93); vermutlich ist das Actions-Kontingent des Kontos erschöpft. Bis zur Klärung wird lokal geprüft: alle Schritte des CI-Jobs unter Linux, Clippy zusätzlich für das Windows-Ziel. Windows-Tests und die Audits laufen erst wieder in CI.
+CI: Seit Lauf 78 startet kein Job (alle Jobs enden nach 2–3 s ohne einen Schritt, zuletzt Lauf 94); vermutlich ist das Actions-Kontingent des Kontos erschöpft. Bis zur Klärung wird lokal geprüft: alle Schritte des CI-Jobs unter Linux, Clippy zusätzlich für das Windows-Ziel. Windows-Tests und die Audits laufen erst wieder in CI.
 
 ## Stand Phase 5
 
