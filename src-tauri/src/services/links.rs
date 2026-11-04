@@ -3,8 +3,9 @@
 //! `mailto`.").
 //!
 //! The address goes to the system as one argument, never through a shell:
-//! `ShellExecuteW` on Windows, `xdg-open` on Linux, `open` on macOS. The app
-//! itself loads nothing.
+//! `ShellExecuteW` on Windows (`filesystem/windows.rs`, the crate's only
+//! `unsafe` code), `xdg-open` on Linux, `open` on macOS. The app itself loads
+//! nothing.
 
 use crate::error::{CommandError, ErrorCode};
 
@@ -41,33 +42,7 @@ pub fn open(url: &str) -> Result<(), CommandError> {
 
 #[cfg(windows)]
 fn platform_open(url: &str) -> std::io::Result<()> {
-    use windows_sys::Win32::UI::Shell::ShellExecuteW;
-
-    /// `SW_SHOWNORMAL` (WinUser.h).
-    const SHOW_NORMAL: i32 = 1;
-    let operation: Vec<u16> = "open\0".encode_utf16().collect();
-    let target: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
-    // SAFETY: both strings are NUL-terminated UTF-16 that live until the
-    // call returns; no window handle, parameters or directory are passed.
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            operation.as_ptr(),
-            target.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            SHOW_NORMAL,
-        )
-    };
-    // ShellExecuteW reports success with a value greater than 32.
-    let code = result as isize;
-    if code > 32 {
-        Ok(())
-    } else {
-        Err(std::io::Error::other(format!(
-            "ShellExecuteW returned {code}"
-        )))
-    }
+    crate::filesystem::windows::shell_open(url)
 }
 
 #[cfg(not(windows))]

@@ -20,6 +20,7 @@ use windows_sys::Win32::Storage::FileSystem::{
     MoveFileExW,
 };
 use windows_sys::Win32::System::WindowsProgramming::DRIVE_REMOTE;
+use windows_sys::Win32::UI::Shell::ShellExecuteW;
 
 /// NUL-terminated UTF-16 form of `text`.
 fn wide(text: &OsStr) -> Vec<u16> {
@@ -139,4 +140,32 @@ pub fn user_ui_primary_language() -> u16 {
     // SAFETY: no arguments, returns a LANGID.
     let language_id = unsafe { GetUserDefaultUILanguage() };
     language_id & 0x3ff
+}
+
+/// Hands `target` (a checked web or mail address) to the program Windows
+/// opens it with, as one argument: no shell, no parameters, no directory.
+pub fn shell_open(target: &str) -> io::Result<()> {
+    /// `SW_SHOWNORMAL` (WinUser.h).
+    const SHOW_NORMAL: i32 = 1;
+    let operation = wide(OsStr::new("open"));
+    let target = wide(OsStr::new(target));
+    // SAFETY: both strings are NUL-terminated UTF-16 that live until the
+    // call returns; no window handle, parameters or directory are passed.
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SHOW_NORMAL,
+        )
+    };
+    // ShellExecuteW reports success with a value greater than 32.
+    let code = result as isize;
+    if code > 32 {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("ShellExecuteW returned {code}")))
+    }
 }
