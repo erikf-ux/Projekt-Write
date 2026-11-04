@@ -29,3 +29,16 @@ export const pickedFolders = {
   local: path.join(sandbox, 'Lokal', 'Bibliothek'),
   moveTarget: path.join(appDirs, 'Umzug'),
 };
+
+/** Files outside the library and the answers of the file dialog, in this order. */
+const ownFiles = path.join(sandbox, 'Eigene Dateien');
+export const pickedFiles = {
+  utf8: path.join(ownFiles, 'utf8.txt'),
+  utf8Bom: path.join(ownFiles, 'utf8-bom.txt'),
+  utf16le: path.join(ownFiles, 'utf16le.txt'),
+  utf16be: path.join(ownFiles, 'utf16be.txt'),
+  windows1252: path.join(ownFiles, 'windows-1252.txt'),
+  unchanged: path.join(ownFiles, 'unveraendert.txt'),
+  outside: path.join(ownFiles, 'aussen.txt'),
+  draft: path.join(ownFiles, 'entwurf.txt'),
+};
