@@ -30,18 +30,18 @@ Plan Phase 4 (Reihenfolge):
 
 ## Stand Phase 4
 
-| Schritt | Inhalt                                                                                                 | Stand                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt                                                                                                 |
-| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt                                                                                                 |
-| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt                                                                                                 |
-| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt                                                                                                 |
-| 5       | Schreibstatistik                                                                                       | erledigt                                                                                                 |
-| 6       | Suchen und Ersetzen                                                                                    | erledigt                                                                                                 |
-| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt                                                                                                 |
-| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt                                                                                                 |
-| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt                                                                                                 |
-| 10      | Tests, Doku, CI, Bericht                                                                               | erledigt; CI-Lauf 77 Windows grün, Linux bis auf F-17; Lauf 78 startete keinen Job (Actions-Kontingent?) |
+| Schritt | Inhalt                                                                                                 | Stand                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt                                                                                                          |
+| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt                                                                                                          |
+| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt                                                                                                          |
+| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt                                                                                                          |
+| 5       | Schreibstatistik                                                                                       | erledigt                                                                                                          |
+| 6       | Suchen und Ersetzen                                                                                    | erledigt                                                                                                          |
+| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt                                                                                                          |
+| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt                                                                                                          |
+| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt                                                                                                          |
+| 10      | Tests, Doku, CI, Bericht                                                                               | erledigt; CI-Lauf 77 Windows grün, Linux bis auf F-17; Läufe 78 und 79 starteten keinen Job (Actions-Kontingent?) |
 
 ## Stand Phase 3
 
