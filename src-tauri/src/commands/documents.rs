@@ -394,6 +394,23 @@ pub async fn document_convert(
         .await
 }
 
+/// The documents that link to a document ("Verbindungen", ADR 0015,
+/// decision 14), by title.
+#[tauri::command]
+pub async fn document_backlinks(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<Vec<DocumentSummary>, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let list = documents.backlinks(id).await.map_err(document_error)?;
+            Ok(list.iter().map(DocumentSummary::from).collect())
+        })
+        .await
+}
+
 /// Changes the title (only the title, section 13).
 #[tauri::command]
 pub async fn document_rename(

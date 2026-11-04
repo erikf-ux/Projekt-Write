@@ -1,8 +1,13 @@
-//! SQL for the `documents` table (migrations 0002 to 0004). Only the
-//! document repository (`services::documents`) calls these functions.
+//! SQL for the `documents` and `document_links` tables (migrations 0002 to
+//! 0005). Only the document repository (`services::documents`) calls these
+//! functions.
+//!
+//! Content changes write the row and the links of the document in one
+//! transaction (ADR 0015, decision 14): the links never describe another
+//! content than the row.
 
 use sqlx::sqlite::SqliteRow;
-use sqlx::{Row, SqlitePool};
+use sqlx::{Row, SqliteConnection, SqlitePool};
 
 /// One row of `documents`, as stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,7 +55,22 @@ fn from_row(row: &SqliteRow) -> Result<DocumentRow, sqlx::Error> {
     })
 }
 
-pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Error> {
+/// Inserts a new document and its links.
+pub async fn insert(
+    pool: &SqlitePool,
+    row: &DocumentRow,
+    links: &[String],
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    insert_row(&mut transaction, row).await?;
+    replace_links(&mut transaction, &row.id, links).await?;
+    transaction.commit().await
+}
+
+async fn insert_row(
+    connection: &mut SqliteConnection,
+    row: &DocumentRow,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at, archived_at, deleted_at, original_name, favorited_at, last_opened_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
@@ -67,9 +87,53 @@ pub async fn insert(pool: &SqlitePool, row: &DocumentRow) -> Result<(), sqlx::Er
     .bind(&row.original_name)
     .bind(&row.favorited_at)
     .bind(&row.last_opened_at)
-    .execute(pool)
+    .execute(&mut *connection)
     .await?;
     Ok(())
+}
+
+/// Replaces the outgoing links of `source`.
+async fn replace_links(
+    connection: &mut SqliteConnection,
+    source: &str,
+    targets: &[String],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM document_links WHERE source_id = ?1")
+        .bind(source)
+        .execute(&mut *connection)
+        .await?;
+    for target in targets.iter().filter(|target| target.as_str() != source) {
+        sqlx::query("INSERT OR IGNORE INTO document_links (source_id, target_id) VALUES (?1, ?2)")
+            .bind(source)
+            .bind(target)
+            .execute(&mut *connection)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Documents not in the trash that link to `target`, by title.
+pub async fn backlinks(pool: &SqlitePool, target: &str) -> Result<Vec<DocumentRow>, sqlx::Error> {
+    sqlx::query(select_documents!(
+        "WHERE id IN (SELECT source_id FROM document_links WHERE target_id = ?1) \
+         AND deleted_at IS NULL ORDER BY title, id"
+    ))
+    .bind(target)
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(from_row)
+    .collect()
+}
+
+/// The link targets of `source` (for tests and checks).
+pub async fn links_of(pool: &SqlitePool, source: &str) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT target_id FROM document_links WHERE source_id = ?1 ORDER BY target_id",
+    )
+    .bind(source)
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn get(pool: &SqlitePool, id: &str) -> Result<Option<DocumentRow>, sqlx::Error> {
@@ -129,26 +193,35 @@ pub async fn all_file_keys(pool: &SqlitePool) -> Result<Vec<(String, String)>, s
 }
 
 /// Records new content metadata. Returns the number of changed rows.
+/// New content of a document: size, checksum, time and links.
 pub async fn update_content(
     pool: &SqlitePool,
     id: &str,
     size_bytes: i64,
     content_sha256: &str,
     updated_at: &str,
+    links: &[String],
 ) -> Result<u64, sqlx::Error> {
-    Ok(sqlx::query(
+    let mut transaction = pool.begin().await?;
+    let changed = sqlx::query(
         "UPDATE documents SET size_bytes = ?2, content_sha256 = ?3, updated_at = ?4 WHERE id = ?1",
     )
     .bind(id)
     .bind(size_bytes)
     .bind(content_sha256)
     .bind(updated_at)
-    .execute(pool)
+    .execute(&mut *transaction)
     .await?
-    .rows_affected())
+    .rows_affected();
+    if changed > 0 {
+        replace_links(&mut transaction, id, links).await?;
+    }
+    transaction.commit().await?;
+    Ok(changed)
 }
 
-/// Converts a document (ADR 0015, decision 13): new format and content.
+/// Converts a document (ADR 0015, decision 13): new format, content and
+/// links.
 pub async fn update_format(
     pool: &SqlitePool,
     id: &str,
@@ -156,8 +229,10 @@ pub async fn update_format(
     size_bytes: i64,
     content_sha256: &str,
     updated_at: &str,
+    links: &[String],
 ) -> Result<u64, sqlx::Error> {
-    Ok(sqlx::query(
+    let mut transaction = pool.begin().await?;
+    let changed = sqlx::query(
         "UPDATE documents SET format = ?2, size_bytes = ?3, content_sha256 = ?4, updated_at = ?5 \
          WHERE id = ?1 AND deleted_at IS NULL",
     )
@@ -166,9 +241,14 @@ pub async fn update_format(
     .bind(size_bytes)
     .bind(content_sha256)
     .bind(updated_at)
-    .execute(pool)
+    .execute(&mut *transaction)
     .await?
-    .rows_affected())
+    .rows_affected();
+    if changed > 0 {
+        replace_links(&mut transaction, id, links).await?;
+    }
+    transaction.commit().await?;
+    Ok(changed)
 }
 
 pub async fn update_title(

@@ -1880,3 +1880,77 @@ fn files_from_start_arguments_open_as_library_documents_or_external_files() {
     assert_uniform_error(&error, "request");
     app.shut_down();
 }
+
+#[test]
+fn internal_links_are_derived_on_save_and_listed_as_backlinks() {
+    let app = app_with_library();
+    let create = |title: &str, format: &str| -> String {
+        call(
+            &app,
+            "document_create",
+            json!({ "title": title, "format": format }),
+        )
+        .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let target = create("Ziel", "md");
+    let source = create("Quelle", "md");
+    let rich = create("Reich", "pwrite");
+    let backlinks = |id: &str| -> Vec<String> {
+        call(&app, "document_backlinks", json!({ "id": id }))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|summary| summary["title"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert!(backlinks(&target).is_empty());
+
+    call(
+        &app,
+        "document_save",
+        json!({ "id": source, "text": format!("Siehe [Ziel](pwrite://{target}).\n") }),
+    )
+    .unwrap();
+    let content = json!({ "type": "doc", "content": [{ "type": "paragraph", "content": [
+        { "type": "text", "text": "Ziel", "marks": [{ "type": "link", "attrs": { "href": format!("pwrite://{target}"), "title": null } }] }
+    ] }] });
+    call(
+        &app,
+        "document_save",
+        json!({ "id": rich, "text": content.to_string() }),
+    )
+    .unwrap();
+    assert_eq!(backlinks(&target), ["Quelle", "Reich"]);
+
+    // A copy links as well; removing the link removes the backlink.
+    call(
+        &app,
+        "document_copy",
+        json!({ "id": source, "title": "Quelle (Kopie)" }),
+    )
+    .unwrap();
+    assert_eq!(backlinks(&target), ["Quelle", "Quelle (Kopie)", "Reich"]);
+    call(
+        &app,
+        "document_save",
+        json!({ "id": source, "text": "Kein Link mehr.\n" }),
+    )
+    .unwrap();
+    assert_eq!(backlinks(&target), ["Quelle (Kopie)", "Reich"]);
+    // Converting keeps the links of the new content.
+    call(
+        &app,
+        "document_convert",
+        json!({ "id": rich, "format": "txt", "text": "Ziel" }),
+    )
+    .unwrap();
+    assert_eq!(backlinks(&target), ["Quelle (Kopie)"]);
+
+    let error = call(&app, "document_backlinks", json!({ "id": "x" })).unwrap_err();
+    assert_uniform_error(&error, "id");
+    app.shut_down();
+}

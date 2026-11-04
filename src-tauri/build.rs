@@ -28,6 +28,7 @@ fn main() {
         "document_copy",
         "document_set_favorite",
         "document_convert",
+        "document_backlinks",
         "external_open",
         "external_read",
         "external_check",

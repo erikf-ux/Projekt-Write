@@ -352,7 +352,8 @@ impl DocumentRepository {
             favorited_at: None,
             last_opened_at: None,
         };
-        if let Err(error) = rows::insert(self.database.writer(), &row).await {
+        let links = links_in(format, content);
+        if let Err(error) = rows::insert(self.database.writer(), &row, &links).await {
             // Without a row the new file would be an orphan.
             let _ = std::fs::remove_file(&path);
             return Err(error.into());
@@ -413,6 +414,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
+            &links_in(meta.format, &content),
         )
         .await?;
         let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
@@ -445,6 +447,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
+            &links_in(meta.format, content),
         )
         .await?;
         let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
@@ -578,6 +581,7 @@ impl DocumentRepository {
         let old_path = self.prepare_path(meta.format, &meta.format.relative_path(meta.id))?;
         let size = i64::try_from(data.len()).map_err(|_| DocumentError::TooLarge)?;
         let sha = sha256_hex(&data);
+        let links = links_in(format, &data);
         let target = new_path.clone();
         blocking(move || atomic::write_atomic(&target, &data)).await?;
         let updated = rows::update_format(
@@ -587,6 +591,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
+            &links,
         )
         .await;
         match updated {
@@ -615,6 +620,26 @@ impl DocumentRepository {
             format.as_str()
         );
         self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// Documents that link to `id` ("Verbindungen", ADR 0015, decision 14).
+    pub async fn backlinks(&self, id: Uuid) -> Result<Vec<DocumentMeta>, DocumentError> {
+        rows::backlinks(self.database.reader(), &id.hyphenated().to_string())
+            .await?
+            .into_iter()
+            .map(meta_from_row)
+            .collect()
+    }
+
+    /// The documents `id` links to, as stored.
+    pub async fn links_of(&self, id: Uuid) -> Result<Vec<Uuid>, DocumentError> {
+        Ok(
+            rows::links_of(self.database.reader(), &id.hyphenated().to_string())
+                .await?
+                .iter()
+                .filter_map(|target| Uuid::try_parse(target).ok())
+                .collect(),
+        )
     }
 
     /// The library document stored in `path`, if the file lies in this
@@ -698,6 +723,62 @@ impl DocumentRepository {
     }
 }
 
+/// Prefix of internal links (ADR 0015, decision 14).
+pub const INTERNAL_LINK_PREFIX: &str = "pwrite://";
+
+/// The documents a content links to (`pwrite://<id>`), sorted and without
+/// repeats. Plain text has no links; Markdown is searched as text, `.pwrite`
+/// through the link marks of its content.
+pub fn links_in(format: DocumentFormat, content: &[u8]) -> Vec<String> {
+    let mut targets = std::collections::BTreeSet::new();
+    match format {
+        DocumentFormat::Txt => {}
+        DocumentFormat::Md => {
+            let text = String::from_utf8_lossy(content);
+            for (index, _) in text.match_indices(INTERNAL_LINK_PREFIX) {
+                if let Some(id) = link_target(&text[index..]) {
+                    targets.insert(id);
+                }
+            }
+        }
+        DocumentFormat::Pwrite => {
+            if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
+                collect_link_marks(&file.content, &mut targets);
+            }
+        }
+    }
+    targets.into_iter().collect()
+}
+
+/// The id of `pwrite://<id>` at the start of `text`.
+fn link_target(text: &str) -> Option<String> {
+    let candidate = text.strip_prefix(INTERNAL_LINK_PREFIX)?.get(..36)?;
+    let id = Uuid::try_parse(candidate).ok()?;
+    (id.hyphenated().to_string() == candidate).then(|| candidate.to_owned())
+}
+
+fn collect_link_marks(node: &serde_json::Value, targets: &mut std::collections::BTreeSet<String>) {
+    if let Some(marks) = node.get("marks").and_then(serde_json::Value::as_array) {
+        for mark in marks {
+            if mark.get("type").and_then(serde_json::Value::as_str) == Some("link")
+                && let Some(href) = mark
+                    .get("attrs")
+                    .and_then(|attrs| attrs.get("href"))
+                    .and_then(serde_json::Value::as_str)
+                && href.len() == INTERNAL_LINK_PREFIX.len() + 36
+                && let Some(id) = link_target(href)
+            {
+                targets.insert(id);
+            }
+        }
+    }
+    if let Some(children) = node.get("content").and_then(serde_json::Value::as_array) {
+        for child in children {
+            collect_link_marks(child, targets);
+        }
+    }
+}
+
 fn check_size(content: &[u8]) -> Result<(), DocumentError> {
     if content.len() as u64 > MAX_DOCUMENT_BYTES {
         return Err(DocumentError::TooLarge);
@@ -738,6 +819,37 @@ fn meta_from_row(row: DocumentRow) -> Result<DocumentMeta, DocumentError> {
         favorited_at: row.favorited_at,
         last_opened_at: row.last_opened_at,
     })
+}
+
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+
+    const A: &str = "0b8f8f4e-6d0e-4f3e-9a3c-2a1d3c4b5e6f";
+    const B: &str = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
+
+    #[test]
+    fn internal_links_are_found_in_markdown_and_pwrite() {
+        let markdown = format!(
+            "[A](pwrite://{A}) und <pwrite://{B}> und [A wieder](pwrite://{A}) \
+             und [kaputt](pwrite://{}) und [groß](pwrite://{})",
+            &A[..30],
+            A.to_uppercase()
+        );
+        assert_eq!(links_in(DocumentFormat::Md, markdown.as_bytes()), [A, B]);
+        assert!(links_in(DocumentFormat::Txt, markdown.as_bytes()).is_empty());
+
+        let content = serde_json::json!({ "type": "doc", "content": [{ "type": "paragraph", "content": [
+            { "type": "text", "text": "A", "marks": [{ "type": "link", "attrs": { "href": format!("pwrite://{A}") } }] },
+            { "type": "text", "text": "Web", "marks": [{ "type": "link", "attrs": { "href": "https://example.org" } }] },
+            { "type": "text", "text": format!("pwrite://{B}") }
+        ] }] });
+        let file = pwrite::new_file(B, "B", "2026-11-04T10:00:00Z", "de-DE", content);
+        assert_eq!(
+            links_in(DocumentFormat::Pwrite, &pwrite::to_bytes(&file)),
+            [A]
+        );
+    }
 }
 
 #[cfg(test)]

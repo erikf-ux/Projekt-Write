@@ -29,6 +29,7 @@
     "allow-document-copy",
     "allow-document-set-favorite",
     "allow-document-convert",
+    "allow-document-backlinks",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",

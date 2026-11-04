@@ -53,6 +53,14 @@ const FIXTURES: &[(i64, &str, &str)] = &[
            AND favorited_at = '2026-11-04T10:00:00.000Z' \
            AND last_opened_at = '2026-11-04T10:01:00.000Z'",
     ),
+    (
+        5,
+        "INSERT INTO document_links (source_id, target_id) \
+         VALUES ('5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11')",
+        "SELECT count(*) FROM document_links \
+         WHERE source_id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f' \
+           AND target_id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -77,6 +85,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         4,
         "favorites and recent",
         "522b96e675abf0d081cbe541dd41eb5044c322af46435b69d1265f7147f255461a43c4222b949270c379cf5c877a4aba",
+    ),
+    (
+        5,
+        "document links",
+        "e584d60dfe05ea529c3fb0602cf57ea10b1c32c91cdd321819a2cea6d3735f593e3ed685f669ddd3b7c96871c4ee07e7",
     ),
 ];
 

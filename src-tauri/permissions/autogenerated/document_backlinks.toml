@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-backlinks"
+description = "Enables the document_backlinks command without any pre-configured scope."
+commands.allow = ["document_backlinks"]
+
+[[permission]]
+identifier = "deny-document-backlinks"
+description = "Denies the document_backlinks command without any pre-configured scope."
+commands.deny = ["document_backlinks"]
