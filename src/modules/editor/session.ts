@@ -60,8 +60,10 @@ export interface SessionOptions {
   onChange: () => void;
   /** The writing surface lost the focus. */
   onBlur: () => void;
-  /** Ctrl+click on a web link (opened by Rust in the system browser). */
+  /** Ctrl+click on a link: web links open in the system browser, internal ones in the app. */
   onOpenLink?: (href: string) => void;
+  /** `[[` was typed in rich text: ask which document to link (ADR 0015). */
+  onInternalLinkRequest?: () => void;
 }
 
 export interface ViewSwitch {
@@ -189,6 +191,30 @@ export class EditorSession {
       return serializeMarkdown({ frontMatter: this.frontMatter, body: this.rich.getJSON() });
     }
     return this.plain ? plainText(this.plain.state.doc) : '';
+  }
+
+  /**
+   * Inserts a link to a document with its title as text, in place of the
+   * `[[` before the cursor (rich text only).
+   */
+  insertInternalLink(id: string, title: string): void {
+    const editor = this.rich;
+    if (!editor || (this.isMarkdown && this.view !== 'rich')) {
+      return;
+    }
+    const { from } = editor.state.selection;
+    const start = from >= 2 && editor.state.doc.textBetween(from - 2, from) === '[[' ? from - 2 : from;
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: start, to: from })
+      .insertContent({
+        type: 'text',
+        text: title,
+        marks: [{ type: 'link', attrs: { href: `pwrite://${id}` } }],
+      })
+      .unsetMark('link')
+      .run();
   }
 
   /** What a conversion starts from: the rich text if it is shown, else the text. */
@@ -419,7 +445,25 @@ export class EditorSession {
               },
             }
           : {
-              // Ctrl+click opens a web link; a plain click only places the cursor.
+              // The second `[` of `[[` is typed, then the picker asks for the document.
+              handleTextInput: (view, from, _to, text) => {
+                const { $from } = view.state.selection;
+                const inCode =
+                  $from.parent.type.spec.code === true ||
+                  $from.marks().some((mark) => mark.type.name === 'code');
+                if (
+                  text === '[' &&
+                  from > 0 &&
+                  !inCode &&
+                  view.state.doc.textBetween(from - 1, from) === '['
+                ) {
+                  setTimeout(() => {
+                    this.options.onInternalLinkRequest?.();
+                  }, 0);
+                }
+                return false;
+              },
+              // Ctrl+click opens a link; a plain click only places the cursor.
               handleClick: (view, position, event) => {
                 if (!(event.ctrlKey || event.metaKey)) {
                   return false;

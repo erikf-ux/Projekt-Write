@@ -24,6 +24,7 @@ import { useT } from '@/i18n';
 import { findConflicts } from '@/modules/commands/keymap';
 import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
+import { Connections } from '@/modules/documents/Connections';
 import { Explorer } from '@/modules/documents/Explorer';
 import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
 import {
@@ -33,6 +34,7 @@ import {
   useWorkspace,
 } from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
+import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
@@ -208,11 +210,16 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               }
             }}
           >
-            <Explorer
-              onNewDocument={run('document.new')}
-              newDocumentShortcut={shortcut('document.new')}
-              renameShortcut={shortcut('document.rename')}
-            />
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="min-h-0 flex-1">
+                <Explorer
+                  onNewDocument={run('document.new')}
+                  newDocumentShortcut={shortcut('document.new')}
+                  renameShortcut={shortcut('document.rename')}
+                />
+              </div>
+              <Connections />
+            </div>
           </Sidebar>
         ) : null}
         <main className="flex min-w-0 flex-1 flex-col" aria-label={t('main.label')}>
@@ -305,6 +312,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
         </p>
       )}
       <LinkDialog />
+      <InternalLinkPicker />
       {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (
         <StatisticsDialog

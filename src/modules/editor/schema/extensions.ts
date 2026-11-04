@@ -29,6 +29,17 @@ import { Footnotes, RawBlock, RawInline } from './raw';
 /** Web links the app may open (section 12). */
 export const LINK_PROTOCOLS = ['http', 'https', 'mailto'] as const;
 
+/** Internal links point to a document id (ADR 0015, decision 14). */
+export const INTERNAL_LINK_PREFIX = 'pwrite://';
+
+/** The document id of an internal link, or null. */
+export function internalLinkTarget(href: string): string | null {
+  const match = /^pwrite:\/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(
+    href.trim(),
+  );
+  return match?.[1] ?? null;
+}
+
 /**
  * Text that becomes a link by itself, while typing or pasting: addresses
  * with `http://`, `https://`, `mailto:` or `www.`, and e-mail addresses.
@@ -70,7 +81,7 @@ export function markdownExtensions(): AnyExtension[] {
       autolink: true,
       linkOnPaste: true,
       shouldAutoLink: isWebAddress,
-      protocols: [...LINK_PROTOCOLS],
+      protocols: [...LINK_PROTOCOLS, 'pwrite'],
       HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: null },
     }),
     LinkedImages,

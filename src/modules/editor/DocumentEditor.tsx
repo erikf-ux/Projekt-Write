@@ -23,11 +23,26 @@ import { useUi } from '@/modules/settings/uiStore';
 import { call } from '@/services/ipc';
 import { FindBar } from './find/FindBar';
 import { useFind } from './find/findStore';
+import { useInternalLinkPicker } from './InternalLinkPicker';
+import { internalLinkTarget } from './schema/extensions';
 import { getSession, openSession } from './session';
 import './editor.css';
 
-/** Opens a web link in the system browser; only http, https and mailto (Rust checks). */
+/**
+ * Opens a link: an internal one (`pwrite://<id>`) as a tab of the app, a web
+ * link in the system browser (only http, https and mailto; Rust checks).
+ */
 async function openLink(href: string): Promise<void> {
+  const target = internalLinkTarget(href);
+  if (target !== null) {
+    const workspace = useWorkspace.getState();
+    if (!workspace.documents.some((document) => document.id === target)) {
+      useUi.getState().showNotice({ tone: 'error', key: 'links.missing' });
+      return;
+    }
+    await workspace.openDocument(target);
+    return;
+  }
   const result = await call('link_open', { url: href });
   if (!result.ok) {
     useUi.getState().showNotice({ tone: 'error', key: 'error.linkOpenFailed', error: result.error });
@@ -148,6 +163,9 @@ function DocumentPanel({
       },
       onOpenLink: (href) => {
         void openLink(href);
+      },
+      onInternalLinkRequest: () => {
+        useInternalLinkPicker.getState().open(id);
       },
     });
     setDocumentSource(id, session);

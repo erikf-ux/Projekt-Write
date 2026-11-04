@@ -79,6 +79,7 @@ export interface Commands {
   document_copy: { request: CopyDocumentRequest; response: DocumentSummary };
   document_set_favorite: { request: SetFavoriteRequest; response: DocumentSummary };
   document_convert: { request: ConvertDocumentRequest; response: DocumentSummary };
+  document_backlinks: { request: DocumentRequest; response: DocumentSummary[] };
   link_open: { request: OpenLinkRequest; response: null };
   document_import: { request: ImportDocumentRequest; response: ImportResult };
   theme_import: { request: ImportThemeRequest; response: UiState };

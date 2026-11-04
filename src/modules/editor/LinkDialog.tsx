@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { Dialog } from '@/components/Dialog';
 import { useT } from '@/i18n';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
+import { internalLinkTarget } from './schema/extensions';
 import { getSession } from './session';
 
 interface LinkDialogStore {
@@ -27,11 +28,14 @@ export const useLinkDialog = create<LinkDialogStore>((set) => ({
   },
 }));
 
-/** True for http, https and mailto addresses and for relative ones. */
+/** True for http, https and mailto addresses, internal links and relative ones. */
 export function isAllowedLink(href: string): boolean {
   const value = href.trim();
   if (value === '' || /[\s<>\p{Cc}]/u.test(value)) {
     return false;
+  }
+  if (value.toLowerCase().startsWith('pwrite:')) {
+    return internalLinkTarget(value) !== null;
   }
   const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(value)?.[1]?.toLowerCase();
   return scheme === undefined || scheme === 'http' || scheme === 'https' || scheme === 'mailto';
