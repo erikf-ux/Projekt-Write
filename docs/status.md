@@ -4,7 +4,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 4 – Editor** (Abschnitte 10 und 12): freigegeben am 3. November 2026, in Arbeit.
+**Phase 4 – Editor** (Abschnitte 10 und 12): freigegeben am 3. November 2026, abgeschlossen am 4. November 2026. Bericht: `docs/bericht-phase-4.md`. Wartet auf die Freigabe von Phase 5.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
@@ -30,18 +30,18 @@ Plan Phase 4 (Reihenfolge):
 
 ## Stand Phase 4
 
-| Schritt | Inhalt                                                                                                 | Stand     |
-| ------- | ------------------------------------------------------------------------------------------------------ | --------- |
-| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt  |
-| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt  |
-| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt  |
-| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt  |
-| 5       | Schreibstatistik                                                                                       | erledigt  |
-| 6       | Suchen und Ersetzen                                                                                    | erledigt  |
-| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt  |
-| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt  |
-| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt  |
-| 10      | Tests, Doku, CI, Bericht                                                                               | in Arbeit |
+| Schritt | Inhalt                                                                                                 | Stand    |
+| ------- | ------------------------------------------------------------------------------------------------------ | -------- |
+| 1       | Abhängigkeiten, ADR 0014                                                                               | erledigt |
+| 2       | Markdown-Adapter mit Round-Trip-Probe                                                                  | erledigt |
+| 3       | 69 Round-Trip-Fälle, 15 Normalisierungen, Stabilitätstest (300 Dokumente)                              | erledigt |
+| 4       | Editor: Rich Text, Reintext, Quelltextansicht, Laden und Speichern, Autosave, Verlustschutz            | erledigt |
+| 5       | Schreibstatistik                                                                                       | erledigt |
+| 6       | Suchen und Ersetzen                                                                                    | erledigt |
+| 7       | Einfügen (HTML durch das Schema, Markdown, reiner Text)                                                | erledigt |
+| 8       | Menüs Bearbeiten und Format, Formatierungsbefehle, Weblinks mit `Strg + Klick`                         | erledigt |
+| 9       | Leistung bei 50.000 Wörtern (E2E-Messung), Lesen in linearer Zeit, Statistik unabhängig von der Engine | erledigt |
+| 10      | Tests, Doku, CI, Bericht                                                                               | erledigt |
 
 ## Stand Phase 3
 
@@ -106,15 +106,20 @@ Plan Phase 4 (Reihenfolge):
 | F-13 | CI-Läufe 72 und 73 (Windows): Clippy lehnte `unsafe` in `services/links.rs` ab                                                                                                                                                     | `#![deny(unsafe_code)]` gilt für die ganze Crate; lokal war nur Clippy für Linux gelaufen, der Windows-Zweig wird dort nicht übersetzt. `ShellExecuteW` liegt jetzt in `filesystem/windows.rs`, dem einzigen Modul mit `unsafe`; lokal mit `--target x86_64-pc-windows-gnu` geprüft                                                                                                                                          |
 | F-14 | E2E (Leistung): Tippen hinter einem Punkt ohne Leerzeichen machte aus „im.Am“ einen Link auf `http://im.Am`                                                                                                                        | Tiptaps Autolink verlinkt jede Domain mit bekannter Endung (`.am`, `.so` …). Von selbst werden jetzt nur Adressen mit `http://`, `https://`, `mailto:` oder `www.` und E-Mail-Adressen zu Links; Unit-Test                                                                                                                                                                                                                   |
 | F-15 | E2E (Leistung): Die Statusleiste zählte unter Linux 49.940 statt 50.000 Wörter                                                                                                                                                     | JavaScriptCore meldet Zahlen in `Intl.Segmenter` als nicht wortartig, V8 als wortartig; es fehlten die 60 Kapitelnummern. Ein Wort ist jetzt ein Wortsegment mit Buchstabe oder Ziffer; Unit-Test mit nachgebildetem WebKit-Verhalten                                                                                                                                                                                        |
-| F-16 | E2E (Leistung): Ein Dokument mit 50.000 Wörtern öffnete unter Linux in 16 s statt ≤ 500 ms                                                                                                                                         | Quadratisches Lesen: Drei Tokenizer teilten oder durchsuchten den ganzen Resttext, und JavaScriptCore führt einige Ausdrücke von marked im Interpreter aus, der trotz `^` jede Startposition probiert. Eigene marked-Instanz mit Schnellprüfungen und ausgerollter Trennlinien-Regel (ADR 0014, Punkt 16); Vergleichstests der Tokens. Danach 309–463 ms                                                                     |
+| F-16 | E2E (Leistung): Ein Dokument mit 50.000 Wörtern öffnete unter Linux in 16 s statt ≤ 500 ms                                                                                                                                         | Quadratisches Lesen: Drei Tokenizer teilten oder durchsuchten den ganzen Resttext, und JavaScriptCore führt einige Ausdrücke von marked im Interpreter aus, der trotz `^` jede Startposition probiert. Eigene marked-Instanz mit Schnellprüfungen und ausgerollter Trennlinien-Regel (ADR 0014, Punkt 16); Vergleichstests der Tokens. Danach 269–469 ms                                                                     |
 
 ## Offene Aufgaben
 
-### In Phase 4
+### In Phase 5
 
-- Tiptap ersetzt die Schreibfläche; Bearbeiten-Menü und Editor-Kürzel (Rückgängig, Suchen, Ersetzen, Quelltextansicht) als Befehle; die heute unterdrückten Browser-Kürzel werden dann echte Befehle (ADR 0012).
+- Verlustschutz: „Als `.pwrite` speichern“ in der Warnung und Umwandeln zwischen den Formaten (Abschnitt 10).
+- Interne Links (`[[`, `pwrite://`) und Rückverweise (Abschnitt 12).
 
 ### Später
+
+- Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
+- Bilder einfügen und importieren, PDF-Verweise (Phase 8); Drucken (Phase 10); Wiederherstellen aus den Tabs (Phase 6).
+- Eingabe mit Komposition (IME, Tottasten) und `Strg + Umschalt + V` mit echten Programmen von Hand prüfen; der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003).
 
 - Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
@@ -142,4 +147,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Phase 4, Schritt 2: Markdown-Adapter.
+Nach Freigabe: Phase 5 (Dokumente und externe Dateien, Abschnitte 9, 10, 12, 13).

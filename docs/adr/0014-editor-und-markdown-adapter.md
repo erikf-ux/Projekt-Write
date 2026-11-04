@@ -51,7 +51,7 @@ Die Stichprobe mit Tiptap 3.32.2 ergab sechs Verlustfälle. Die eigene Prüfung 
 
 ## Folgen
 
-- Gemessen im E2E-Test `performance.e2e.ts` (Linux-Container, WebKitGTK 2.52.6, Xvfb ohne GPU, 4 vCPU Xeon 2,1 GHz; kein Referenzgerät): Ein Manuskript mit 50.000 Wörtern öffnet in 309–463 ms (Ziel ≤ 500 ms), 95 % der Anschläge erscheinen nach höchstens 35–38 ms im Rich Text und 37 ms in der Quelltextansicht (Ziel ≤ 50 ms, ohne Sprachprüfung). Vor Punkt 16 dauerte das Öffnen dort 16 s; in V8 (Windows) war es nie so langsam, weil V8 diese Ausdrücke kompiliert.
+- Gemessen im E2E-Test `performance.e2e.ts` (Linux-Container, WebKitGTK 2.52.6, Xvfb ohne GPU, 4 vCPU Xeon 2,1 GHz; kein Referenzgerät): Ein Manuskript mit 50.000 Wörtern öffnet in 269–469 ms (16 Messungen, Ziel ≤ 500 ms), 95 % der Anschläge erscheinen nach höchstens 30–38 ms im Rich Text und 35–37 ms in der Quelltextansicht (Ziel ≤ 50 ms, ohne Sprachprüfung). Vor Punkt 16 dauerte das Öffnen dort 16 s; in V8 (Windows) war es nie so langsam, weil V8 diese Ausdrücke kompiliert.
 - Neue Regeln für marked oder neue Tokenizer müssen in JavaScriptCore linear bleiben; der Vergleichstest (`manager.test.ts`, `stability.test.ts`) und der E2E-Test zeigen es.
 - Bekannte Grenzen, alle durch Probe oder Verlustschutz abgefangen statt still verändert: marked liest manche dicht gepackten `*`-Folgen anders als CommonMark (im Stabilitätslauf über 3000 Dokumente 5 Fälle); `$…$` ist für Markdown Text, ein `_` darin bekommt einen Backslash, wo es Betonung beginnen könnte; ein Fußnotenverweis direkt vor `(` wird als `[^1]\(` geschrieben.
 - Ein Tiptap-Update verlangt, die ersetzten Methoden und Regeln zu prüfen; Round-Trip- und Stabilitätstest sind dafür die Messlatte.
