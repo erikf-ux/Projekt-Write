@@ -63,6 +63,8 @@ export interface ExternalState {
   fileReadOnly: boolean;
   /** Changed or gone outside the app, not decided yet. */
   outside: 'changed' | 'missing' | null;
+  /** The user closed the question for now; a note in the tab reopens it. */
+  outsideDeferred: boolean;
   /** The tab text is not what the file holds although it equals `savedText`. */
   differsFromFile: boolean;
 }
@@ -155,6 +157,8 @@ interface WorkspaceStore {
   reloadExternal: (id: string) => Promise<boolean>;
   /** "Meine Fassung behalten": the next save writes the tab's text over the file. */
   keepMine: (id: string) => Promise<boolean>;
+  /** Hides or shows again the question about a change from outside. */
+  deferOutside: (id: string, deferred: boolean) => void;
   setEncoding: (id: string, encoding: TextEncoding) => void;
   setLineEnding: (id: string, lineEnding: LineEnding) => void;
   /** Asks Rust whether external files changed outside the app. */
@@ -232,6 +236,7 @@ function newExternalState(info: ExternalFileInfo): ExternalState {
     mixedLineEndings: false,
     fileReadOnly: false,
     outside: null,
+    outsideDeferred: false,
     differsFromFile: false,
   };
 }
@@ -246,6 +251,7 @@ function loadedExternal(text: ExternalText): Partial<ExternalState> {
     mixedLineEndings: text.mixedLineEndings,
     fileReadOnly: text.readOnly && !text.newerFormat,
     outside: null,
+    outsideDeferred: false,
     differsFromFile: false,
   };
 }
@@ -408,7 +414,10 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     if (!result.ok) {
       const { code } = result.error;
       if (code === 'FILE_CHANGED' || code === 'FILE_MISSING') {
-        patchExternal(id, { outside: code === 'FILE_CHANGED' ? 'changed' : 'missing' });
+        patchExternal(id, {
+          outside: code === 'FILE_CHANGED' ? 'changed' : 'missing',
+          outsideDeferred: false,
+        });
         patch(id, { state: 'pending', error: null });
       } else {
         patch(id, { state: 'error', error: result.error });
@@ -899,6 +908,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         mixedLineEndings: false,
         fileReadOnly: false,
         outside: null,
+        outsideDeferred: false,
         differsFromFile: false,
       });
       void get().refreshRecentFiles();
@@ -955,9 +965,13 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
           return false;
         }
       }
-      patchExternal(id, { outside: null, differsFromFile: true });
+      patchExternal(id, { outside: null, outsideDeferred: false, differsFromFile: true });
       touchExternal(id);
       return true;
+    },
+
+    deferOutside: (id, deferred) => {
+      patchExternal(id, { outsideDeferred: deferred });
     },
 
     setEncoding: (id, encoding) => {

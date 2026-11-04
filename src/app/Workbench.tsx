@@ -25,7 +25,8 @@ import { findConflicts } from '@/modules/commands/keymap';
 import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
 import { Explorer } from '@/modules/documents/Explorer';
-import { activeDocument, useWorkspace } from '@/modules/documents/workspaceStore';
+import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
+import { activeDocument, hasUnsavedChanges, useWorkspace } from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
@@ -34,6 +35,9 @@ import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { useBindings, useShortcutLabel } from './bindings';
+
+/** How often external files are compared with their state on disk. */
+export const EXTERNAL_CHECK_MS = 2000;
 
 interface WorkbenchProps {
   /** The first start just ended: open an empty document at once (section 11). */
@@ -75,6 +79,21 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
     })();
   }, [libraryKey, openEmptyDocument]);
 
+  // External files: changes from outside every 2 s and when the window
+  // gets the focus (ADR 0015, decision 7); the recent list once.
+  useEffect(() => {
+    const check = () => {
+      void useWorkspace.getState().checkExternalFiles();
+    };
+    void useWorkspace.getState().refreshRecentFiles();
+    const timer = setInterval(check, EXTERNAL_CHECK_MS);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', check);
+    };
+  }, []);
+
   // Save on focus loss of the window (section 9).
   useEffect(() => {
     const onBlur = () => {
@@ -109,16 +128,26 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const width = previewWidth ?? settings.sidebar.width;
   const tabs = workspace.tabs.flatMap((id) => {
     const document = workspace.open[id];
-    return document
-      ? [
-          {
-            id,
-            title: document.title,
-            marker:
-              document.state === 'error' || document.state === 'blocked' ? ('error' as const) : undefined,
-          },
-        ]
-      : [];
+    if (!document) {
+      return [];
+    }
+    const { external } = document;
+    const marker =
+      document.state === 'error' || document.state === 'blocked'
+        ? ('error' as const)
+        : external && hasUnsavedChanges(document)
+          ? ('unsaved' as const)
+          : undefined;
+    return [
+      {
+        id,
+        title: document.title,
+        marker,
+        tooltip: external
+          ? t('external.tabTooltip', { name: external.name, folder: external.folder })
+          : undefined,
+      },
+    ];
   });
 
   return (
@@ -230,6 +259,24 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
                 }
               : null
           }
+          external={
+            current?.loaded && current.external
+              ? {
+                  folder: current.external.folder,
+                  encoding: current.external.encoding,
+                  lineEnding: current.external.lineEnding,
+                  textFile: current.format !== 'pwrite' && !current.readOnly,
+                  fileReadOnly: current.external.fileReadOnly,
+                  unsaved: hasUnsavedChanges(current),
+                  onEncoding: (encoding) => {
+                    workspace.setEncoding(current.id, encoding);
+                  },
+                  onLineEnding: (lineEnding) => {
+                    workspace.setLineEnding(current.id, lineEnding);
+                  },
+                }
+              : null
+          }
           onShowStatistics={() => {
             useStatistics.getState().showDialog(true);
           }}
@@ -249,6 +296,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
         </p>
       )}
       <LinkDialog />
+      {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (
         <StatisticsDialog
           statistics={statistics}

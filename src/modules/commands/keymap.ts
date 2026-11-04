@@ -21,6 +21,8 @@ import type { CommandId } from './types';
 export const defaultKeybindings: Readonly<Partial<Record<CommandId, readonly string[]>>> = {
   'document.new': ['Ctrl+N'],
   'document.save': ['Ctrl+S'],
+  'document.openFile': ['Ctrl+O'],
+  'document.saveAs': ['Ctrl+Shift+S'],
   'document.rename': ['F2'],
   'tab.close': ['Ctrl+W'],
   'tab.next': ['Ctrl+PageDown', 'Ctrl+Tab'],

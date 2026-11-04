@@ -6,11 +6,15 @@
  *
  * Above the text: why a Markdown document opened in the source view
  * (round-trip probe), and what saving as Markdown would lose (loss check,
- * section 10), with "Trotzdem speichern" and "Abbrechen".
+ * section 10), with "Trotzdem speichern" and "Abbrechen". External files
+ * add notes for a postponed change from outside, a read-only file, mixed
+ * line endings and failed saves with the way out ("Speichern unter",
+ * "Als UTF-8 speichern").
  */
 import { FilePlus, X } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
-import { useT, type MessageKey } from '@/i18n';
+import { errorText } from '@/components/errorText';
+import { translate, useLocale, useT, type MessageKey } from '@/i18n';
 import { useWorkspace, setDocumentSource, type OpenDocument } from '@/modules/documents/workspaceStore';
 import type { Loss } from './markdown/losses';
 import type { ProbeIssue } from './markdown/probe';
@@ -120,7 +124,7 @@ function DocumentPanel({
 }: DocumentPanelProps) {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
-  const { id, loaded } = document;
+  const { id, loaded, generation } = document;
   // The library is not writable, or the file is of a newer format version.
   const readOnly = libraryReadOnly || document.readOnly;
   const find = useFind((state) => state.bars[document.id]);
@@ -166,7 +170,7 @@ function DocumentPanel({
     return () => {
       session.root.remove();
     };
-  }, [id, loaded]);
+  }, [id, loaded, generation]);
 
   useEffect(() => {
     getSession(id)?.setEditable(!readOnly);
@@ -193,6 +197,7 @@ function DocumentPanel({
           {t('editor.readOnlyNewer')}
         </p>
       ) : null}
+      {document.external ? <ExternalNotes document={document} /> : null}
       {document.viewIssues.length > 0 ? (
         <ViewIssues
           issues={document.viewIssues}
@@ -225,6 +230,78 @@ function DocumentPanel({
         </p>
       )}
     </div>
+  );
+}
+
+const NOTE = 'text-ui flex shrink-0 items-center gap-3 border-b border-muted/40 bg-sidebar px-4 py-2';
+const NOTE_BUTTON = 'inline-flex h-6 shrink-0 items-center rounded-pw border border-muted px-2';
+
+/** Notes of an external file above its text. */
+function ExternalNotes({ document }: { document: OpenDocument }) {
+  const t = useT();
+  const external = document.external;
+  if (!external) {
+    return null;
+  }
+  const { id } = document;
+  const workspace = useWorkspace.getState;
+  const saveAs = () => {
+    void workspace().saveAs(id, translate(useLocale.getState().locale, 'external.dialog.saveAs'));
+  };
+  const error = document.state === 'error' ? document.error : null;
+  return (
+    <>
+      {external.outside && external.outsideDeferred ? (
+        <div role="status" className={NOTE} data-testid="outside-note">
+          <p className="min-w-0 flex-1">
+            {t(external.outside === 'changed' ? 'external.changed.title' : 'external.missing.title')}
+          </p>
+          <button
+            type="button"
+            className={NOTE_BUTTON}
+            onClick={() => {
+              workspace().deferOutside(id, false);
+            }}
+          >
+            {t('external.decide')}
+          </button>
+        </div>
+      ) : null}
+      {error ? (
+        <div role="alert" className={`${NOTE} border-b-danger`} data-testid="external-save-error">
+          <p className="min-w-0 flex-1">{errorText(t, error)}</p>
+          {error.code === 'FILE_UNENCODABLE' ? (
+            <button
+              type="button"
+              className={NOTE_BUTTON}
+              onClick={() => {
+                workspace().setEncoding(id, 'utf8');
+                void workspace().save(id);
+              }}
+            >
+              {t('external.saveUtf8')}
+            </button>
+          ) : null}
+          {error.code === 'FILE_READ_ONLY' || error.code === 'FILE_MISSING' ? (
+            <button type="button" className={NOTE_BUTTON} onClick={saveAs}>
+              {t('external.saveAs')}
+            </button>
+          ) : null}
+        </div>
+      ) : external.fileReadOnly && !document.readOnly ? (
+        <div role="status" className={NOTE} data-testid="file-read-only-note">
+          <p className="min-w-0 flex-1">{t('external.readOnlyFile')}</p>
+          <button type="button" className={NOTE_BUTTON} onClick={saveAs}>
+            {t('external.saveAs')}
+          </button>
+        </div>
+      ) : null}
+      {external.mixedLineEndings ? (
+        <p role="status" className={NOTE} data-testid="mixed-line-endings">
+          {t('external.mixedLineEndings', { lineEnding: t(`lineEnding.${external.lineEnding}`) })}
+        </p>
+      ) : null}
+    </>
   );
 }
 

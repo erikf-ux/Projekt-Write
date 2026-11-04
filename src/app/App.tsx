@@ -44,6 +44,8 @@ useLibrary.subscribe((state) => {
 const MENU_COMMANDS: Record<MenuCommand, true> = {
   'document.new': true,
   'document.save': true,
+  'document.openFile': true,
+  'document.saveAs': true,
   'tab.close': true,
   'settings.open': true,
   'app.quit': true,

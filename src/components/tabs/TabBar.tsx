@@ -19,8 +19,10 @@ import { useT } from '@/i18n';
 export interface TabInfo {
   id: string;
   title: string;
-  /** Visible marker next to the title, e.g. for a failed save. */
-  marker?: 'error' | undefined;
+  /** Visible marker next to the title: a failed save, or unsaved changes. */
+  marker?: 'error' | 'unsaved' | undefined;
+  /** Shown on hover instead of the title (external files: the folder). */
+  tooltip?: string | undefined;
 }
 
 interface TabBarProps {
@@ -210,7 +212,8 @@ export function TabBar({
             tabIndex={tab.id === stop ? 0 : -1}
             draggable
             data-tab={tab.id}
-            title={tab.title}
+            data-unsaved={tab.marker === 'unsaved' ? true : undefined}
+            title={tab.tooltip ?? tab.title}
             className={`text-ui group relative flex max-w-56 min-w-24 cursor-default items-center gap-2 border-r border-muted/40 pr-1 pl-3 focus-visible:outline-offset-[-2px] ${
               selected ? 'bg-surface text-fg' : 'text-muted'
             } ${dropIndex === index ? 'border-l-2 border-l-accent' : ''}`}
@@ -245,6 +248,10 @@ export function TabBar({
             {tab.marker === 'error' ? (
               <span className="text-danger" title={t('status.saveError')}>
                 !<span className="sr-only">{t('status.saveError')}</span>
+              </span>
+            ) : tab.marker === 'unsaved' ? (
+              <span className="text-accent" title={t('tab.unsaved')} data-testid="tab-unsaved">
+                ●<span className="sr-only">{t('tab.unsaved')}</span>
               </span>
             ) : null}
             <button

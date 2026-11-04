@@ -33,6 +33,10 @@ pub enum MenuCommand {
     DocumentNew,
     #[serde(rename = "document.save")]
     DocumentSave,
+    #[serde(rename = "document.openFile")]
+    DocumentOpenFile,
+    #[serde(rename = "document.saveAs")]
+    DocumentSaveAs,
     #[serde(rename = "tab.close")]
     TabClose,
     #[serde(rename = "settings.open")]
@@ -100,9 +104,11 @@ pub enum MenuCommand {
 }
 
 impl MenuCommand {
-    pub const ALL: [MenuCommand; 34] = [
+    pub const ALL: [MenuCommand; 36] = [
         MenuCommand::DocumentNew,
         MenuCommand::DocumentSave,
+        MenuCommand::DocumentOpenFile,
+        MenuCommand::DocumentSaveAs,
         MenuCommand::TabClose,
         MenuCommand::SettingsOpen,
         MenuCommand::AppQuit,
@@ -142,6 +148,8 @@ impl MenuCommand {
         match self {
             MenuCommand::DocumentNew => "document.new",
             MenuCommand::DocumentSave => "document.save",
+            MenuCommand::DocumentOpenFile => "document.openFile",
+            MenuCommand::DocumentSaveAs => "document.saveAs",
             MenuCommand::TabClose => "tab.close",
             MenuCommand::SettingsOpen => "settings.open",
             MenuCommand::AppQuit => "app.quit",
@@ -260,7 +268,10 @@ const LAYOUT: [(&str, &[Option<MenuCommand>]); 4] = [
         "menu.file",
         &[
             Some(MenuCommand::DocumentNew),
+            Some(MenuCommand::DocumentOpenFile),
+            None,
             Some(MenuCommand::DocumentSave),
+            Some(MenuCommand::DocumentSaveAs),
             Some(MenuCommand::TabClose),
             None,
             Some(MenuCommand::SettingsOpen),

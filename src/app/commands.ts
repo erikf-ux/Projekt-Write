@@ -7,7 +7,12 @@
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
 import { copyTitle } from '@/modules/documents/Explorer';
-import { activeDocument, freeTitle, useWorkspace } from '@/modules/documents/workspaceStore';
+import {
+  activeDocument,
+  freeTitle,
+  hasUnsavedChanges,
+  useWorkspace,
+} from '@/modules/documents/workspaceStore';
 import { useFind } from '@/modules/editor/find/findStore';
 import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
@@ -33,6 +38,20 @@ async function newDocument(format: TextFormat = 'md'): Promise<void> {
     focusEditor();
   }
 }
+
+const text = (key: Parameters<typeof translate>[1]) => translate(useLocale.getState().locale, key);
+
+/** The active tab, if it shows a library document. */
+const activeLibraryDocument = () => {
+  const document = activeDocument(workspace());
+  return document && !document.external ? document : null;
+};
+
+/** The active tab, if it shows an external file. */
+const activeExternal = () => {
+  const document = activeDocument(workspace());
+  return document?.external && document.loaded ? document : null;
+};
 
 const activeSession = () => {
   const id = workspace().active;
@@ -90,13 +109,56 @@ export function createAppCommands(): CommandDefinition[] {
       run: () => newDocument('pwrite'),
     },
     {
+      id: 'document.openFile',
+      category: 'document',
+      titleKey: 'command.document.openFile',
+      isAvailable: () => true,
+      run: async () => {
+        if (await workspace().openFile(text('external.dialog.open'))) {
+          focusEditor();
+        }
+      },
+    },
+    {
+      id: 'document.saveAs',
+      category: 'document',
+      titleKey: 'command.document.saveAs',
+      isAvailable: () => {
+        const document = activeExternal();
+        return document !== null && !document.readOnly;
+      },
+      run: async () => {
+        const document = activeExternal();
+        if (document) {
+          await workspace().saveAs(document.id, text('external.dialog.saveAs'));
+        }
+      },
+    },
+    {
+      id: 'document.takeIntoLibrary',
+      category: 'document',
+      titleKey: 'command.document.takeIntoLibrary',
+      isAvailable: () => libraryOpen() && activeExternal() !== null,
+      run: async () => {
+        const document = activeExternal();
+        if (document) {
+          await workspace().takeIntoLibrary(document.id);
+        }
+      },
+    },
+    {
       id: 'document.save',
       category: 'document',
       titleKey: 'command.document.save',
       isAvailable: () => {
-        const { active, open } = workspace();
-        const state = active ? open[active]?.state : undefined;
-        return state === 'pending' || state === 'error';
+        const document = activeDocument(workspace());
+        if (!document) {
+          return false;
+        }
+        if (document.external) {
+          return document.state === 'error' || hasUnsavedChanges(document);
+        }
+        return document.state === 'pending' || document.state === 'error';
       },
       run: async () => {
         const { active } = workspace();
@@ -109,7 +171,7 @@ export function createAppCommands(): CommandDefinition[] {
       id: 'document.rename',
       category: 'document',
       titleKey: 'command.document.rename',
-      isAvailable: () => workspace().active !== null && !ui().focusMode,
+      isAvailable: () => activeLibraryDocument() !== null && !ui().focusMode,
       run: async () => {
         const current = settings();
         if (current && !current.sidebar.visible) {
@@ -122,9 +184,9 @@ export function createAppCommands(): CommandDefinition[] {
       id: 'document.copy',
       category: 'document',
       titleKey: 'command.document.copy',
-      isAvailable: () => workspace().active !== null,
+      isAvailable: () => activeLibraryDocument() !== null,
       run: async () => {
-        const document = activeDocument(workspace());
+        const document = activeLibraryDocument();
         if (document) {
           const suffix = translate(useLocale.getState().locale, 'explorer.copySuffix');
           await workspace().copyDocument(document.id, copyTitle(document.title, suffix));
@@ -135,7 +197,7 @@ export function createAppCommands(): CommandDefinition[] {
       id: 'document.toggleFavorite',
       category: 'document',
       titleKey: 'command.document.toggleFavorite',
-      isAvailable: () => workspace().active !== null,
+      isAvailable: () => activeLibraryDocument() !== null,
       run: async () => {
         const { active, documents } = workspace();
         const summary = documents.find((entry) => entry.id === active);
