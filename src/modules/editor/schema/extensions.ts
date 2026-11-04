@@ -20,6 +20,7 @@ import {
   MarkdownListItem,
   MarkdownOrderedList,
   MarkdownParagraph,
+  MarkdownTable,
   MarkdownTaskItem,
   MarkdownTaskList,
 } from './markdownRules';
@@ -27,6 +28,16 @@ import { Footnotes, RawBlock, RawInline } from './raw';
 
 /** Web links the app may open (section 12). */
 export const LINK_PROTOCOLS = ['http', 'https', 'mailto'] as const;
+
+/**
+ * Text that becomes a link by itself, while typing or pasting: addresses
+ * with `http://`, `https://`, `mailto:` or `www.`, and e-mail addresses.
+ * Not bare domains: in prose a missing space after a full stop ("im.Am",
+ * "geht.so") would become a link to a country domain.
+ */
+export function isWebAddress(text: string): boolean {
+  return /^(?:https?:\/\/|mailto:|www\.)\S/i.test(text) || /^[^\s@:/]+@[^\s@:/]+\.[^\s@:/]+$/.test(text);
+}
 
 export function markdownExtensions(): AnyExtension[] {
   return [
@@ -58,6 +69,7 @@ export function markdownExtensions(): AnyExtension[] {
       openOnClick: false,
       autolink: true,
       linkOnPaste: true,
+      shouldAutoLink: isWebAddress,
       protocols: [...LINK_PROTOCOLS],
       HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: null },
     }),
@@ -65,7 +77,8 @@ export function markdownExtensions(): AnyExtension[] {
     Entities,
     MarkdownTaskList,
     MarkdownTaskItem.configure({ nested: true }),
-    TableKit.configure({ table: { resizable: false } }),
+    TableKit.configure({ table: false }),
+    MarkdownTable.configure({ resizable: false }),
     Image,
     RawBlock,
     RawInline,

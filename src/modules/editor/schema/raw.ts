@@ -13,6 +13,7 @@
  */
 import { Extension, Node, type JSONContent } from '@tiptap/core';
 import { stringAttribute } from './attributes';
+import { startInParagraph } from './tokenizers';
 
 /** Raw inline HTML as CommonMark defines it: tags, comments, declarations. */
 const INLINE_HTML =
@@ -240,7 +241,7 @@ const FootnoteDefinition = Extension.create({
   markdownTokenizer: {
     name: 'pwFootnoteDefinition',
     level: 'block',
-    start: (src: string) => src.search(/^\[\^[^\]\s]+\]:/m),
+    start: (src: string) => startInParagraph(src, /^\[\^[^\]\s]+\]:/m),
     tokenize: (src: string) => {
       const match = FOOTNOTE_DEFINITION.exec(src);
       return match ? { type: 'pwFootnoteDefinition', raw: match[0], text: match[0] } : undefined;

@@ -3,6 +3,7 @@ import { runCommand, registerCommands, findCommand } from '@/modules/commands/re
 import { useWorkspace, type OpenDocument } from '@/modules/documents/workspaceStore';
 import { isAllowedLink, useLinkDialog } from '@/modules/editor/LinkDialog';
 import { closeAllSessions, getSession, linkAt, openSession } from '@/modules/editor/session';
+import { isWebAddress } from '@/modules/editor/schema/extensions';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { createFormatCommands } from './formatCommands';
 
@@ -97,6 +98,40 @@ describe('format commands', () => {
     }
     for (const href of ['javascript:alert(1)', 'file:///etc/passwd', 'data:text/html,x', 'mit leer', '']) {
       expect(isAllowedLink(href), href).toBe(false);
+    }
+  });
+
+  it('turns only web and e-mail addresses into links while typing', () => {
+    const session = open('a', 'md', 'Text\n');
+    const editor = session.editor;
+    editor.commands.setTextSelection(5);
+    // A missing space after a full stop must not link to a country domain (.am, .so).
+    for (const word of ['im.Am', 'geht.so', 'https://example.org', 'www.example.org', 'anna@example.org']) {
+      editor.commands.insertContent(` ${word}`);
+      editor.commands.insertContent(' ');
+    }
+    const links: string[] = [];
+    editor.state.doc.descendants((node) => {
+      const link = node.marks.find((mark) => mark.type.name === 'link');
+      if (link) {
+        links.push(`${node.text ?? ''} → ${String(link.attrs['href'])}`);
+      }
+    });
+    expect(links).toEqual([
+      'https://example.org → https://example.org',
+      'www.example.org → http://www.example.org',
+      'anna@example.org → mailto:anna@example.org',
+    ]);
+    for (const text of [
+      'https://example.org',
+      'HTTP://EXAMPLE.ORG',
+      'mailto:anna@example.org',
+      'www.example.org',
+    ]) {
+      expect(isWebAddress(text), text).toBe(true);
+    }
+    for (const text of ['im.Am', 'geht.so', 'z.B.', 'www.', 'ftp://example.org', 'a@b', 'anna@example']) {
+      expect(isWebAddress(text), text).toBe(false);
     }
   });
 

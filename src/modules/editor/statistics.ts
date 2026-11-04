@@ -3,9 +3,13 @@
  * characters, characters without spaces, paragraphs and reading time; for
  * the selection if there is one.
  *
- * * Words: word segments of UAX #29 (`Intl.Segmenter`, `isWordLike`), so
- *   "geht's" and "2,50" are one word, "E-Mail" and "z. B." are two.
+ * * Words: word segments of UAX #29 (`Intl.Segmenter`) with a letter or a
+ *   digit, so "geht's" and "2,50" are one word, "E-Mail" and "z. B." are
+ *   two. Not `isWordLike`: WebKit reports numbers as not word-like, V8 as
+ *   word-like, and the count must not depend on the platform.
  * * Characters: grapheme clusters, as people see them ("é", "👍🏽" are one).
+ *   Text of Latin letters and common punctuation only has one grapheme per
+ *   UTF-16 unit; it is counted without the segmenter.
  *   A hard break is one character; the boundary between two paragraphs or
  *   lines is none.
  * * Characters without spaces: graphemes that are not Unicode white space.
@@ -37,6 +41,16 @@ let wordSegmenter: Intl.Segmenter | null = null;
 let graphemeSegmenter: Intl.Segmenter | null = null;
 
 const WHITE_SPACE = /^\p{White_Space}+$/u;
+const WHITE_SPACE_CHARACTERS = /\p{White_Space}/gu;
+/** A word segment is a word if it holds a letter or a digit (ICU's letter, number, kana and ideograph segments). */
+const WORD_CHARACTER = /[\p{L}\p{Nl}\p{Nd}]/u;
+/**
+ * Characters that never join a neighbour into one grapheme: tab, line
+ * feed, printable ASCII, Latin-1 and Latin Extended up to U+02FF (combining
+ * marks start at U+0300), dashes, quotation marks and the ellipsis, €.
+ * Not CR (CR LF is one grapheme).
+ */
+const SINGLE_UNIT_GRAPHEMES = /^[\t\n\u0020-\u007E\u00A0-\u02FF\u2010-\u2027\u2030-\u205E\u20AC]*$/;
 
 /** Words and characters of a piece of text (paragraphs are counted by the caller). */
 export function countText(text: string): Omit<TextStatistics, 'paragraphs'> {
@@ -44,13 +58,17 @@ export function countText(text: string): Omit<TextStatistics, 'paragraphs'> {
     return { words: 0, characters: 0, charactersWithoutSpaces: 0 };
   }
   wordSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'word' });
-  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   let words = 0;
-  for (const segment of wordSegmenter.segment(text)) {
-    if (segment.isWordLike === true) {
+  for (const { segment } of wordSegmenter.segment(text)) {
+    if (WORD_CHARACTER.test(segment)) {
       words += 1;
     }
   }
+  if (SINGLE_UNIT_GRAPHEMES.test(text)) {
+    const spaces = text.match(WHITE_SPACE_CHARACTERS)?.length ?? 0;
+    return { words, characters: text.length, charactersWithoutSpaces: text.length - spaces };
+  }
+  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   let characters = 0;
   let withoutSpaces = 0;
   for (const { segment } of graphemeSegmenter.segment(text)) {

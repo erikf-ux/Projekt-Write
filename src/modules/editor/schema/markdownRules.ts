@@ -37,8 +37,10 @@ import Heading from '@tiptap/extension-heading';
 import Link from '@tiptap/extension-link';
 import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
 import Paragraph from '@tiptap/extension-paragraph';
+import { Table } from '@tiptap/extension-table';
 import { escapeLineStarts, linkDestination, linkTitle } from '../markdown/escape';
 import { tokenString } from './attributes';
+import { fastTableTokenizer, guardedTaskListTokenizer } from './tokenizers';
 
 /** Written for an empty paragraph; read back as an empty paragraph. */
 export const EMPTY_PARAGRAPH = '&nbsp;';
@@ -315,11 +317,23 @@ export const MarkdownBulletList = BulletList.extend({
   },
 });
 
+const taskListTokenizer = TaskList.config.markdownTokenizer;
+
 export const MarkdownTaskList = TaskList.extend({
+  // Same tokens; Tiptap's tokenizer is only asked where a task list can start.
+  ...(taskListTokenizer ? { markdownTokenizer: guardedTaskListTokenizer(taskListTokenizer) } : {}),
+
   renderMarkdown(node, helpers, context) {
     return withBulletMarker(this.parent?.(node, helpers, context) ?? '', node);
   },
 });
+
+const tableTokenizer = Table.config.markdownTokenizer;
+
+/** Tiptap's table, read in linear time (`tokenizers.ts`). */
+export const MarkdownTable = Table.extend(
+  tableTokenizer ? { markdownTokenizer: fastTableTokenizer(tableTokenizer) } : {},
+);
 
 export const MarkdownOrderedList = OrderedList.extend({
   // Tiptap's own tokenizer also reads `a.`, `iv.` and `Dr.` as list markers,

@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseMarkdown } from './markdown/adapter';
 import { plainDocument, plainExtensions } from './plain/schema';
 import { markdownExtensions } from './schema/extensions';
@@ -43,9 +43,59 @@ describe('countText (German texts, Unicode rules)', () => {
     ['GROẞBUCHSTABE und Mädchen', 3, 25, 23],
     ['Daumen 👍🏽 und Akzent é', 4, 21, 17],
     ['  Leerzeichen\tund Tab  ', 3, 23, 17],
+    ['Kapitel 12 hat 3,5 Seiten.', 5, 26, 22],
+    // Combining accents: counted by the grapheme segmenter.
+    ['Cafe\u0301 und Re\u0301sume\u0301', 3, 15, 13],
     ['', 0, 0, 0],
   ])('%j', (text, words, characters, withoutSpaces) => {
     expect(countText(text)).toEqual({ words, characters, charactersWithoutSpaces: withoutSpaces });
+  });
+
+  it('counts numbers as words on every engine', async () => {
+    // WebKit's Intl.Segmenter reports numbers as not word-like.
+    const Segmenter = Intl.Segmenter;
+    class WebKitSegmenter extends Segmenter {
+      override segment(input: string): Intl.Segments {
+        const segments = [...super.segment(input)].map((segment) => ({
+          ...segment,
+          isWordLike: /\p{L}/u.test(segment.segment),
+        }));
+        return segments as unknown as Intl.Segments;
+      }
+    }
+    vi.stubGlobal('Intl', { ...Intl, Segmenter: WebKitSegmenter });
+    vi.resetModules();
+    try {
+      const statistics = await import('./statistics');
+      expect(statistics.countText('Kapitel 12 hat 3,5 Seiten.').words).toBe(5);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
+  it('counts the characters of Latin text without the segmenter, with the same result', () => {
+    // Every character of the fast path, next to each other and to spaces.
+    const ranges: [number, number][] = [
+      [0x09, 0x0a],
+      [0x20, 0x7e],
+      [0xa0, 0x2ff],
+      [0x2010, 0x2027],
+      [0x2030, 0x205e],
+      [0x20ac, 0x20ac],
+    ];
+    let text = '';
+    for (const [from, to] of ranges) {
+      for (let code = from; code <= to; code += 1) {
+        text += String.fromCharCode(code);
+      }
+    }
+    text += ` ${text.split('').join(' ')}`;
+    const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)];
+    const withoutSpaces = graphemes.filter(({ segment }) => !/^\p{White_Space}+$/u.test(segment)).length;
+    const counts = countText(text);
+    expect(counts.characters).toBe(graphemes.length);
+    expect(counts.charactersWithoutSpaces).toBe(withoutSpaces);
   });
 });
 
