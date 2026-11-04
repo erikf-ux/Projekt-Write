@@ -71,6 +71,23 @@ export interface ViewSwitch {
 
 const SURFACE_CLASS = 'pw-surface';
 
+/** An empty `.pwrite` document (one empty paragraph). */
+const EMPTY_PWRITE: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
+
+/**
+ * The content of a `.pwrite` document as Rust hands it over (JSON of the
+ * editor document), or null if it does not fit the schema.
+ */
+export function pwriteContent(text: string): JSONContent | null {
+  try {
+    const content = JSON.parse(text) as JSONContent;
+    markdownSchema().nodeFromJSON(content).check();
+    return content;
+  } catch {
+    return null;
+  }
+}
+
 export class EditorSession {
   readonly id: string;
   readonly format: DocumentFormat;
@@ -109,6 +126,12 @@ export class EditorSession {
         this.view = 'source';
         this.plain = this.createPlain(options.text);
       }
+    } else if (options.format === 'pwrite') {
+      // `.pwrite` holds what the editor holds: no probe, no source view.
+      const content = pwriteContent(options.text);
+      this.openIssues = content ? [] : [{ kind: 'invalid' }];
+      this.view = 'rich';
+      this.rich = this.createRich(content ?? EMPTY_PWRITE);
     } else {
       this.openIssues = [];
       this.view = 'source';
@@ -156,8 +179,11 @@ export class EditorSession {
     return editor;
   }
 
-  /** The text of the current view, as it would be saved. */
+  /** The text of the current view, as it would be saved (`.pwrite`: the content as JSON). */
   text(): string {
+    if (this.format === 'pwrite') {
+      return this.rich ? JSON.stringify(this.rich.getJSON()) : '';
+    }
     if (this.view === 'rich' && this.rich) {
       return serializeMarkdown({ frontMatter: this.frontMatter, body: this.rich.getJSON() });
     }
@@ -166,7 +192,7 @@ export class EditorSession {
 
   /** The text to save, or the losses the user has not accepted yet. */
   saveRequest(): SaveRequest {
-    if (this.view === 'rich' && this.rich) {
+    if (this.isMarkdown && this.view === 'rich' && this.rich) {
       const losses = this.losses().filter((loss) => !this.accepted.has(loss.kind));
       if (losses.length > 0) {
         return { kind: 'blocked', losses };
@@ -185,7 +211,7 @@ export class EditorSession {
   /** Everything Markdown would lose, block by block (section 10). */
   losses(): Loss[] {
     const losses: Loss[] = [];
-    if (!this.rich) {
+    if (!this.rich || !this.isMarkdown) {
       return losses;
     }
     this.rich.state.doc.forEach((block, _offset, index) => {

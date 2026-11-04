@@ -16,6 +16,7 @@ use crate::services::documents::{
     DocumentError, DocumentFormat, DocumentMeta, MAX_DOCUMENT_BYTES, validate_title,
 };
 use crate::services::import::{self, ImportError, MAX_IMPORT_BYTES};
+use crate::services::pwrite;
 use crate::state::AppState;
 
 /// What the interface shows of a document.
@@ -54,23 +55,25 @@ impl From<&DocumentMeta> for DocumentSummary {
     }
 }
 
-/// A document with its text.
+/// A document with its text (`.pwrite`: the content as editor JSON).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct DocumentText {
     pub document: DocumentSummary,
     pub text: String,
+    /// A `.pwrite` file of a newer format version: shown, never written.
+    pub read_only: bool,
 }
 
-/// Formats the writing surface of Phase 3 edits (`.pwrite` follows with the
-/// editor, Phase 4).
+/// Formats a new document can have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
 pub enum TextFormat {
     Txt,
     Md,
+    Pwrite,
 }
 
 impl From<TextFormat> for DocumentFormat {
@@ -78,6 +81,7 @@ impl From<TextFormat> for DocumentFormat {
         match format {
             TextFormat::Txt => DocumentFormat::Txt,
             TextFormat::Md => DocumentFormat::Md,
+            TextFormat::Pwrite => DocumentFormat::Pwrite,
         }
     }
 }
@@ -261,13 +265,20 @@ pub async fn document_create(
     request: Input<CreateDocumentRequest>,
 ) -> Result<DocumentSummary, CommandError> {
     let request = request.into_inner();
+    let language = pwrite::language_tag(state.ui.locale());
     state
         .session
         .with_documents(|documents| async move {
-            let meta = documents
-                .create(&request.title, request.format.into(), b"")
-                .await
-                .map_err(document_error)?;
+            let meta = if request.format == TextFormat::Pwrite {
+                documents
+                    .create_pwrite(&request.title, language, pwrite::empty_content())
+                    .await
+            } else {
+                documents
+                    .create(&request.title, request.format.into(), b"")
+                    .await
+            }
+            .map_err(document_error)?;
             Ok(DocumentSummary::from(&meta))
         })
         .await
@@ -287,13 +298,20 @@ pub async fn document_read(
             // Opening in a tab is what "Zuletzt verwendet" lists.
             let meta = documents.mark_opened(id).await.map_err(document_error)?;
             if meta.format == DocumentFormat::Pwrite {
-                return Err(CommandError::new(ErrorCode::DocumentFormatUnsupported));
+                let parsed = pwrite::parse(&content)
+                    .map_err(|_| CommandError::new(ErrorCode::PwriteInvalid))?;
+                return Ok(DocumentText {
+                    document: DocumentSummary::from(&meta),
+                    text: parsed.content().to_string(),
+                    read_only: parsed.read_only(),
+                });
             }
             let text = String::from_utf8(content)
                 .map_err(|_| CommandError::new(ErrorCode::DocumentNotText))?;
             Ok(DocumentText {
                 document: DocumentSummary::from(&meta),
                 text,
+                read_only: false,
             })
         })
         .await
@@ -311,20 +329,19 @@ pub async fn document_save(
         .session
         .with_documents(|documents| async move {
             let meta = documents.get(id).await.map_err(document_error)?;
-            match meta {
-                Some(meta) if meta.format == DocumentFormat::Pwrite => {
-                    return Err(CommandError::new(ErrorCode::DocumentFormatUnsupported));
-                }
+            let outcome = match meta {
                 Some(meta) if meta.deleted_at.is_some() => {
                     return Err(CommandError::new(ErrorCode::DocumentNotFound));
                 }
-                Some(_) => {}
+                Some(meta) if meta.format == DocumentFormat::Pwrite => {
+                    let content: serde_json::Value = serde_json::from_str(&request.text)
+                        .map_err(|_| CommandError::invalid_input("text", "not JSON"))?;
+                    documents.save_pwrite(id, content).await
+                }
+                Some(_) => documents.save(id, request.text.as_bytes()).await,
                 None => return Err(CommandError::new(ErrorCode::DocumentNotFound)),
             }
-            let outcome = documents
-                .save(id, request.text.as_bytes())
-                .await
-                .map_err(document_error)?;
+            .map_err(document_error)?;
             Ok(DocumentSummary::from(outcome.meta()))
         })
         .await
@@ -466,5 +483,7 @@ fn document_error(error: DocumentError) -> CommandError {
             log::error!("document database error: {error}");
             CommandError::new(ErrorCode::Database)
         }
+        DocumentError::InvalidPwrite => CommandError::new(ErrorCode::PwriteInvalid),
+        DocumentError::ReadOnly => CommandError::new(ErrorCode::DocumentReadOnly),
     }
 }

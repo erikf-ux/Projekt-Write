@@ -24,6 +24,7 @@ function openDocument(
     view: format === 'md' ? 'rich' : 'plain',
     viewIssues: [],
     loaded: true,
+    readOnly: false,
     ...extra,
   };
 }

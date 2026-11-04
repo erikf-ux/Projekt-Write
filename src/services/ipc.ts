@@ -122,6 +122,8 @@ const errorCodes: Record<ErrorCode, true> = {
   THEME_NOT_FOUND: true,
   LINK_NOT_ALLOWED: true,
   LINK_OPEN_FAILED: true,
+  PWRITE_INVALID: true,
+  DOCUMENT_READ_ONLY: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

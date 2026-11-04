@@ -2,6 +2,10 @@
 import type { DocumentSummary } from "./DocumentSummary";
 
 /**
- * A document with its text.
+ * A document with its text (`.pwrite`: the content as editor JSON).
  */
-export type DocumentText = { document: DocumentSummary, text: string, };
+export type DocumentText = { document: DocumentSummary, text: string, 
+/**
+ * A `.pwrite` file of a newer format version: shown, never written.
+ */
+readOnly: boolean, };

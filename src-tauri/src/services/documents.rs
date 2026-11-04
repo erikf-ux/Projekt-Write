@@ -30,6 +30,7 @@ use crate::database::Database;
 use crate::database::documents::{self as rows, DocumentRow};
 use crate::filesystem::atomic;
 use crate::security::paths::{PathError, SafeRoot};
+use crate::services::pwrite;
 
 /// Largest document content accepted (64 MiB). A 50,000-word text is about
 /// 400 KB; the limit only protects memory.
@@ -161,6 +162,10 @@ pub enum DocumentError {
     Io(#[from] io::Error),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+    #[error("not a valid .pwrite file")]
+    InvalidPwrite,
+    #[error("document is read only")]
+    ReadOnly,
 }
 
 /// Trims a title and checks length and characters.
@@ -223,6 +228,28 @@ impl DocumentRepository {
         self.insert_new(title, format, content, None).await
     }
 
+    /// Creates a `.pwrite` document with `content` (an editor document); the
+    /// envelope gets the new id, the title and the time (section 10).
+    pub async fn create_pwrite(
+        &self,
+        title: &str,
+        language: &str,
+        content: serde_json::Value,
+    ) -> Result<DocumentMeta, DocumentError> {
+        let language = language.to_owned();
+        self.insert_new_with(
+            title,
+            DocumentFormat::Pwrite,
+            None,
+            move |id, now, title| {
+                Ok(pwrite::to_bytes(&pwrite::new_file(
+                    id, title, now, &language, content,
+                )))
+            },
+        )
+        .await
+    }
+
     /// Creates a document from an imported file (section 9, "Import in die
     /// Bibliothek"). The caller has checked the type; `original_name` is the
     /// file name at import. The original file is never touched: only its
@@ -257,11 +284,27 @@ impl DocumentRepository {
         content: &[u8],
         original_name: Option<String>,
     ) -> Result<DocumentMeta, DocumentError> {
+        let content = content.to_vec();
+        self.insert_new_with(title, format, original_name, move |_, _, _| Ok(content))
+            .await
+    }
+
+    /// As [`Self::insert_new`], with the content built from the new id, the
+    /// time and the checked title (`.pwrite` carries them in its envelope).
+    async fn insert_new_with(
+        &self,
+        title: &str,
+        format: DocumentFormat,
+        original_name: Option<String>,
+        build: impl FnOnce(&str, &str, &str) -> Result<Vec<u8>, DocumentError>,
+    ) -> Result<DocumentMeta, DocumentError> {
         let title = validate_title(title)?;
-        check_size(content)?;
         let _guard = self.write_lock.lock().await;
         let id = self.generators.new_id();
         let now = self.generators.now().to_iso();
+        let content = build(&id.hyphenated().to_string(), &now, &title)?;
+        let content = content.as_slice();
+        check_size(content)?;
         let relative = format.relative_path(id);
 
         let path = self.prepare_path(format, &relative)?;
@@ -408,7 +451,55 @@ impl DocumentRepository {
         if meta.deleted_at.is_some() {
             return Err(DocumentError::InTrash);
         }
-        self.insert_new(title, meta.format, &content, None).await
+        if meta.format != DocumentFormat::Pwrite {
+            return self.insert_new(title, meta.format, &content, None).await;
+        }
+        // The envelope of the copy names the copy.
+        let pwrite::Parsed::Current(mut file) =
+            pwrite::parse(&content).map_err(|_| DocumentError::InvalidPwrite)?
+        else {
+            return Err(DocumentError::ReadOnly);
+        };
+        self.insert_new_with(
+            title,
+            DocumentFormat::Pwrite,
+            None,
+            move |id, now, title| {
+                file.id = id.to_owned();
+                file.title = title.to_owned();
+                file.created_at = now.to_owned();
+                file.updated_at = now.to_owned();
+                Ok(pwrite::to_bytes(&file))
+            },
+        )
+        .await
+    }
+
+    /// Saves new content of a `.pwrite` document (an editor document). The
+    /// envelope keeps its unknown fields and gets the title and the time;
+    /// unchanged content and title are not written again.
+    pub async fn save_pwrite(
+        &self,
+        id: Uuid,
+        content: serde_json::Value,
+    ) -> Result<SaveOutcome, DocumentError> {
+        pwrite::check_content(&content).map_err(|_| DocumentError::InvalidPwrite)?;
+        let (meta, stored) = self.read(id).await?;
+        if meta.format != DocumentFormat::Pwrite {
+            return Err(DocumentError::InvalidPwrite);
+        }
+        let pwrite::Parsed::Current(mut file) =
+            pwrite::parse(&stored).map_err(|_| DocumentError::InvalidPwrite)?
+        else {
+            return Err(DocumentError::ReadOnly);
+        };
+        if file.content == content && file.title == meta.title {
+            return Ok(SaveOutcome::Unchanged(meta));
+        }
+        file.content = content;
+        file.title.clone_from(&meta.title);
+        file.updated_at = self.generators.now().to_iso();
+        self.save(id, &pwrite::to_bytes(&file)).await
     }
 
     /// Makes a document a favourite or not. Changes neither content nor

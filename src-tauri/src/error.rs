@@ -101,11 +101,15 @@ pub enum ErrorCode {
     LinkNotAllowed,
     /// The system could not open a link.
     LinkOpenFailed,
+    /// A `.pwrite` file that is not valid (format, version or content).
+    PwriteInvalid,
+    /// The document is read only (a newer `.pwrite` format version).
+    DocumentReadOnly,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 40] = [
+    pub const ALL: [ErrorCode; 42] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -146,6 +150,8 @@ impl ErrorCode {
         ErrorCode::ThemeNotFound,
         ErrorCode::LinkNotAllowed,
         ErrorCode::LinkOpenFailed,
+        ErrorCode::PwriteInvalid,
+        ErrorCode::DocumentReadOnly,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -191,6 +197,8 @@ impl ErrorCode {
             ErrorCode::ThemeNotFound => "error.themeNotFound",
             ErrorCode::LinkNotAllowed => "error.linkNotAllowed",
             ErrorCode::LinkOpenFailed => "error.linkOpenFailed",
+            ErrorCode::PwriteInvalid => "error.pwriteInvalid",
+            ErrorCode::DocumentReadOnly => "error.documentReadOnly",
         }
     }
 }

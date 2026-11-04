@@ -8,6 +8,7 @@ import type { MenuCommand } from '@/types/generated/MenuCommand';
 
 export type CommandId =
   | 'document.new'
+  | 'document.newRichText'
   | 'document.save'
   | 'document.rename'
   | 'document.copy'

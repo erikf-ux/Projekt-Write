@@ -13,6 +13,7 @@ import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
+import type { TextFormat } from '@/types/generated/TextFormat';
 import type { UiSettings } from '@/types/generated/UiSettings';
 import { focusEditor, focusExplorer } from './focus';
 import { requestQuit } from './lifecycle';
@@ -26,9 +27,9 @@ const activeIndex = () => {
   return active ? tabs.indexOf(active) : -1;
 };
 
-async function newDocument(): Promise<void> {
+async function newDocument(format: TextFormat = 'md'): Promise<void> {
   const title = freeTitle(translate(useLocale.getState().locale, 'document.untitled'), workspace().documents);
-  if (await workspace().createDocument(title)) {
+  if (await workspace().createDocument(title, format)) {
     focusEditor();
   }
 }
@@ -79,7 +80,14 @@ export function createAppCommands(): CommandDefinition[] {
       category: 'document',
       titleKey: 'command.document.new',
       isAvailable: libraryOpen,
-      run: newDocument,
+      run: () => newDocument(),
+    },
+    {
+      id: 'document.newRichText',
+      category: 'document',
+      titleKey: 'command.document.newRichText',
+      isAvailable: libraryOpen,
+      run: () => newDocument('pwrite'),
     },
     {
       id: 'document.save',

@@ -116,11 +116,13 @@ function DocumentPanel({
   labelledBy,
   limitLineWidth,
   focusMode,
-  readOnly,
+  readOnly: libraryReadOnly,
 }: DocumentPanelProps) {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
   const { id, loaded } = document;
+  // The library is not writable, or the file is of a newer format version.
+  const readOnly = libraryReadOnly || document.readOnly;
   const find = useFind((state) => state.bars[document.id]);
   const label = t('editor.label', { title: document.title });
 
@@ -182,6 +184,15 @@ function DocumentPanel({
       hidden={hidden}
       className="absolute inset-0 flex flex-col bg-surface"
     >
+      {document.readOnly ? (
+        <p
+          role="status"
+          className="text-ui border-b border-muted/40 bg-sidebar px-4 py-2 text-fg"
+          data-testid="read-only-note"
+        >
+          {t('editor.readOnlyNewer')}
+        </p>
+      ) : null}
       {document.viewIssues.length > 0 ? (
         <ViewIssues
           issues={document.viewIssues}

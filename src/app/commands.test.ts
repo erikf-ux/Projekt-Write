@@ -64,6 +64,7 @@ function openDocument(id: string, state: 'saved' | 'pending' = 'saved') {
         view: 'rich',
         viewIssues: [],
         loaded: true,
+        readOnly: false,
       },
     },
   }));

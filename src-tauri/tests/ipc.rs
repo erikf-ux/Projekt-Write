@@ -1056,6 +1056,105 @@ fn documents_are_copied_marked_as_favorites_and_recently_opened() {
 }
 
 #[test]
+fn pwrite_documents_keep_their_envelope_and_unknown_fields() {
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Roman", "format": "pwrite" }),
+    )
+    .unwrap();
+    assert_eq!(created["format"], "pwrite");
+    let id = created["id"].as_str().unwrap().to_owned();
+    let file = app.path(&format!(
+        "Dokumente/ProjectWrite/documents/richtext/{id}.pwrite"
+    ));
+    let envelope: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    assert_eq!(envelope["format"], "pwrite");
+    assert_eq!(envelope["formatVersion"], 1);
+    assert_eq!(envelope["id"], id.as_str());
+    assert_eq!(envelope["title"], "Roman");
+
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["readOnly"], false);
+    let content: Value = serde_json::from_str(read["text"].as_str().unwrap()).unwrap();
+    assert_eq!(content["type"], "doc");
+
+    // A field of a later version survives saving.
+    let mut stored = envelope.clone();
+    stored["future"] = json!({ "keep": true });
+    std::fs::write(&file, serde_json::to_vec(&stored).unwrap()).unwrap();
+    let text = json!({ "type": "doc", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Hallo" }] }] });
+    let saved = call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": text.to_string() }),
+    )
+    .unwrap();
+    let after: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    assert_eq!(after["content"], text);
+    assert_eq!(after["future"], json!({ "keep": true }));
+    // Unchanged content is not written again.
+    let bytes = std::fs::read(&file).unwrap();
+    let again = call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": text.to_string() }),
+    )
+    .unwrap();
+    assert_eq!(again["updatedAt"], saved["updatedAt"]);
+    assert_eq!(std::fs::read(&file).unwrap(), bytes);
+
+    // The copy has its own envelope.
+    let copy = call(
+        &app,
+        "document_copy",
+        json!({ "id": id, "title": "Roman (Kopie)" }),
+    )
+    .unwrap();
+    let copy_id = copy["id"].as_str().unwrap();
+    let copied: Value = serde_json::from_slice(
+        &std::fs::read(app.path(&format!(
+            "Dokumente/ProjectWrite/documents/richtext/{copy_id}.pwrite"
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(copied["id"], copy_id);
+    assert_eq!(copied["title"], "Roman (Kopie)");
+    assert_eq!(copied["content"], text);
+
+    for bad in ["kein JSON", "[1]", r#"{"type": "paragraph"}"#] {
+        let error = call(&app, "document_save", json!({ "id": id, "text": bad })).unwrap_err();
+        assert!(
+            error["code"] == "INVALID_INPUT" || error["code"] == "PWRITE_INVALID",
+            "{bad}: {error}"
+        );
+    }
+
+    // A newer format version opens read only and is never written.
+    let mut newer = after.clone();
+    newer["formatVersion"] = json!(2);
+    std::fs::write(&file, serde_json::to_vec(&newer).unwrap()).unwrap();
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["readOnly"], true);
+    let before = std::fs::read(&file).unwrap();
+    let error = call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": json!({ "type": "doc", "content": [] }).to_string() }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "DOCUMENT_READ_ONLY");
+    assert_eq!(std::fs::read(&file).unwrap(), before);
+
+    std::fs::write(&file, b"{\"format\": \"other\"}").unwrap();
+    let error = call(&app, "document_read", json!({ "id": id })).unwrap_err();
+    assert_error_code(&error, "PWRITE_INVALID");
+    app.shut_down();
+}
+
+#[test]
 fn document_commands_need_an_open_library() {
     let app = app();
     let id = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
@@ -1112,7 +1211,7 @@ fn document_commands_reject_invalid_input_uniformly() {
         ),
         (
             "document_create",
-            json!({ "title": "A", "format": "pwrite" }),
+            json!({ "title": "A", "format": "docx" }),
             "request",
         ),
         ("document_create", json!({ "title": "A" }), "request"),

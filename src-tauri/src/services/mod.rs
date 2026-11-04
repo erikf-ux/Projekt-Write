@@ -6,6 +6,7 @@ pub mod import;
 pub mod library;
 pub mod links;
 pub mod locale;
+pub mod pwrite;
 pub mod session;
 pub mod settings;
 pub mod system;

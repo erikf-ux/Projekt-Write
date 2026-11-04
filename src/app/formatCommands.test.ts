@@ -21,6 +21,7 @@ function document(id: string, format: 'md' | 'txt', view: OpenDocument['view']):
     view,
     viewIssues: [],
     loaded: true,
+    readOnly: false,
   };
 }
 

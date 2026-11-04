@@ -48,7 +48,9 @@ export function StatusBar({
       ? t(view === 'source' ? 'status.formatMarkdown' : 'status.formatMarkdownRich')
       : format === 'txt'
         ? t('status.formatText')
-        : null;
+        : format === 'pwrite'
+          ? t('status.formatPwrite')
+          : null;
   return (
     <footer
       aria-label={t('status.label')}

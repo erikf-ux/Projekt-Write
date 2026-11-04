@@ -10,7 +10,7 @@
  * and Left open and close an entry, Enter opens, F2 renames, the context
  * menu key or Shift+F10 opens the context menu.
  */
-import { ChevronDown, ChevronRight, FilePlus, FileText, Hash, Star } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus, FileText, Hash, PenLine, Star } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   ContextMenu,
@@ -406,6 +406,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
               >
                 {document.format === 'md' ? (
                   <Hash aria-hidden="true" className="size-3.5 shrink-0 text-muted" />
+                ) : document.format === 'pwrite' ? (
+                  <PenLine aria-hidden="true" className="size-3.5 shrink-0 text-muted" />
                 ) : (
                   <FileText aria-hidden="true" className="size-3.5 shrink-0 text-muted" />
                 )}

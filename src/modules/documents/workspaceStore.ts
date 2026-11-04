@@ -48,6 +48,8 @@ export interface OpenDocument {
   /** Why the rich view is not shown: at opening, or when switching to it. */
   viewIssues: ProbeIssue[];
   loaded: boolean;
+  /** Shown but never written (a `.pwrite` file of a newer format version). */
+  readOnly: boolean;
 }
 
 /** Where a tab's text comes from when it is saved: its editor session. */
@@ -123,11 +125,15 @@ function newOpenDocument(id: string, title: string, format: DocumentFormat, load
     state: 'saved',
     error: null,
     losses: [],
-    view: format === 'md' ? 'rich' : 'plain',
+    view: format === 'txt' ? 'plain' : 'rich',
     viewIssues: [],
     loaded,
+    readOnly: false,
   };
 }
+
+/** The content of a new `.pwrite` document, as Rust creates it. */
+export const EMPTY_PWRITE_TEXT = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] });
 
 function clearTimer(id: string): void {
   const timer = timers.get(id);
@@ -265,8 +271,9 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         format: document.format,
         loadedText: text,
         savedText: text,
-        view: document.format === 'md' ? 'rich' : 'plain',
+        view: document.format === 'txt' ? 'plain' : 'rich',
         loaded: true,
+        readOnly: result.value.readOnly,
       });
       set((state) => ({ documents: upsert(state.documents, document) }));
       return true;
@@ -279,12 +286,17 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return null;
       }
       const document = result.value;
+      const opened = newOpenDocument(document.id, document.title, document.format, true);
+      if (document.format === 'pwrite') {
+        opened.loadedText = EMPTY_PWRITE_TEXT;
+        opened.savedText = EMPTY_PWRITE_TEXT;
+      }
       set((state) => ({
         documents: upsert(state.documents, document),
         tabs: [...state.tabs, document.id],
         open: {
           ...state.open,
-          [document.id]: newOpenDocument(document.id, document.title, document.format, true),
+          [document.id]: opened,
         },
       }));
       get().activate(document.id);

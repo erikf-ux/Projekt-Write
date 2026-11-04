@@ -22,6 +22,7 @@ function document(id: string, format: 'md' | 'txt'): OpenDocument {
     view: format === 'md' ? 'rich' : 'plain',
     viewIssues: [],
     loaded: true,
+    readOnly: false,
   };
 }
 
