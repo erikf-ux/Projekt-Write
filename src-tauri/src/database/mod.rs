@@ -13,6 +13,7 @@ pub mod documents;
 pub mod fts;
 pub mod history;
 pub mod settings;
+pub mod structure;
 
 use std::path::Path;
 use std::str::FromStr;

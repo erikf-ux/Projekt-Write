@@ -11,6 +11,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::commands::input::{EmptyRequest, Input, Validate};
+use crate::commands::structure::{structure_error, take_tags};
 use crate::error::{CommandError, ErrorCode};
 use crate::services::documents::{
     DocumentError, DocumentFormat, DocumentMeta, MAX_DOCUMENT_BYTES, validate_title,
@@ -473,8 +474,17 @@ pub async fn document_delete(
     let id = parse_id(&request.into_inner().id)?;
     state
         .session
-        .with_documents(|documents| async move {
-            let meta = documents.move_to_trash(id).await.map_err(document_error)?;
+        .with_structure(|structure, documents| async move {
+            // A step of the structural undo (ADR 0017, decision 10).
+            structure
+                .set_deleted(id, true)
+                .await
+                .map_err(structure_error)?;
+            let meta = documents
+                .get(id)
+                .await
+                .map_err(document_error)?
+                .ok_or_else(|| CommandError::new(ErrorCode::DocumentNotFound))?;
             log::info!("document {} moved to the trash", meta.id);
             Ok(DocumentSummary::from(&meta))
         })
@@ -490,11 +500,16 @@ pub async fn document_restore(
     let id = parse_id(&request.into_inner().id)?;
     state
         .session
-        .with_documents(|documents| async move {
-            let meta = documents
-                .restore_from_trash(id)
+        .with_structure(|structure, documents| async move {
+            structure
+                .set_deleted(id, false)
                 .await
-                .map_err(document_error)?;
+                .map_err(structure_error)?;
+            let meta = documents
+                .get(id)
+                .await
+                .map_err(document_error)?
+                .ok_or_else(|| CommandError::new(ErrorCode::DocumentNotFound))?;
             log::info!("document {} restored from the trash", meta.id);
             Ok(DocumentSummary::from(&meta))
         })
@@ -511,11 +526,16 @@ pub async fn document_archive(
     let id = parse_id(&request.id)?;
     state
         .session
-        .with_documents(|documents| async move {
-            let meta = documents
+        .with_structure(|structure, documents| async move {
+            structure
                 .set_archived(id, request.archived)
                 .await
-                .map_err(document_error)?;
+                .map_err(structure_error)?;
+            let meta = documents
+                .get(id)
+                .await
+                .map_err(document_error)?
+                .ok_or_else(|| CommandError::new(ErrorCode::DocumentNotFound))?;
             Ok(DocumentSummary::from(&meta))
         })
         .await
@@ -726,11 +746,18 @@ pub async fn document_copy(
     let id = parse_id(&request.id)?;
     state
         .session
-        .with_documents(|documents| async move {
+        .with_structure(|structure, documents| async move {
             let meta = documents
                 .copy(id, &request.title)
                 .await
                 .map_err(document_error)?;
+            // Section 13: the copy keeps tags and subnets, not the history.
+            if let Err(error) = structure.copy_to(id, meta.id).await {
+                log::warn!(
+                    "subnets and tags of {id} not copied to {}: {error}",
+                    meta.id
+                );
+            }
             log::info!("document {id} copied to {}", meta.id);
             Ok(DocumentSummary::from(&meta))
         })
@@ -770,7 +797,7 @@ pub async fn document_import(
     let checked = import::check(&request.file_name, &data).map_err(import_error)?;
     state
         .session
-        .with_documents(|documents| async move {
+        .with_structure(|structure, documents| async move {
             if !request.allow_duplicate
                 && let Some(existing) = documents
                     .find_duplicate(&checked.content)
@@ -791,6 +818,7 @@ pub async fn document_import(
                 .await
                 .map_err(document_error)?;
             log::info!("document {} imported", meta.id);
+            take_tags(&structure, meta.id, checked.format, &checked.content).await;
             Ok(ImportResult::Imported {
                 document: DocumentSummary::from(&meta),
             })

@@ -190,6 +190,12 @@ const errorCodes: Record<ErrorCode, true> = {
   FILE_UNENCODABLE: true,
   VERSION_NOT_FOUND: true,
   VERSION_DAMAGED: true,
+  SUBNET_NOT_FOUND: true,
+  SUBNET_CYCLE: true,
+  SUBNET_NAME_TAKEN: true,
+  TAG_NOT_FOUND: true,
+  TAG_NAME_TAKEN: true,
+  STRUCTURE_CHANGED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

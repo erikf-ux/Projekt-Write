@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-structure-undo"
+description = "Enables the structure_undo command without any pre-configured scope."
+commands.allow = ["structure_undo"]
+
+[[permission]]
+identifier = "deny-structure-undo"
+description = "Denies the structure_undo command without any pre-configured scope."
+commands.deny = ["structure_undo"]

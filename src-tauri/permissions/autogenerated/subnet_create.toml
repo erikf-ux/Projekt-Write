@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-subnet-create"
+description = "Enables the subnet_create command without any pre-configured scope."
+commands.allow = ["subnet_create"]
+
+[[permission]]
+identifier = "deny-subnet-create"
+description = "Denies the subnet_create command without any pre-configured scope."
+commands.deny = ["subnet_create"]

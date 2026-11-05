@@ -31,6 +31,7 @@ use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, PathError, SafeRoot};
 use crate::services::documents::DocumentRepository;
 use crate::services::settings::library::{LibrarySettings, TrashRetentionDays};
+use crate::services::structure::{Journal, Structure};
 
 use layout::{
     DATABASE_FILE, GUARDED_PATHS, INITIAL_DIRS, KNOWN_TOP_LEVEL, LOCK_FILE, MANIFEST_FILE,
@@ -160,6 +161,8 @@ pub struct Library {
     database: Database,
     generators: Generators,
     write_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Undo journal of structural actions (ADR 0017), for this opening only.
+    journal: Arc<std::sync::Mutex<Journal>>,
     // Declared last: released after everything else.
     _lock: LibraryLock,
 }
@@ -340,6 +343,7 @@ impl Library {
             database,
             generators,
             write_lock: Arc::new(tokio::sync::Mutex::new(())),
+            journal: Arc::new(std::sync::Mutex::new(Journal::default())),
             _lock: lock,
         }
     }
@@ -380,6 +384,16 @@ impl Library {
             self.database.clone(),
             self.generators.clone(),
             self.write_lock.clone(),
+        )
+    }
+
+    /// Subnets, memberships and tags, with the structural undo journal.
+    pub fn structure(&self) -> Structure {
+        Structure::new(
+            self.database.clone(),
+            self.generators.clone(),
+            self.write_lock.clone(),
+            self.journal.clone(),
         )
     }
 

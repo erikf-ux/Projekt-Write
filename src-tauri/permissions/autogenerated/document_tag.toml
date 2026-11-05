@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-tag"
+description = "Enables the document_tag command without any pre-configured scope."
+commands.allow = ["document_tag"]
+
+[[permission]]
+identifier = "deny-document-tag"
+description = "Denies the document_tag command without any pre-configured scope."
+commands.deny = ["document_tag"]

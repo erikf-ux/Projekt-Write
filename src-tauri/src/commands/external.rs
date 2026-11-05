@@ -12,6 +12,7 @@ use ts_rs::TS;
 
 use crate::commands::documents::{DocumentSummary, ImportResult, document_error, import_error};
 use crate::commands::input::{EmptyRequest, Input, Validate};
+use crate::commands::structure::take_tags;
 use crate::error::{CommandError, ErrorCode};
 use crate::services::dialog::{FileDialog, FileFilter, FilePickRequest};
 use crate::services::documents::DocumentFormat;
@@ -303,7 +304,7 @@ pub async fn external_import(
     let allow_duplicate = request.allow_duplicate;
     state
         .session
-        .with_documents(|documents| async move {
+        .with_structure(|structure, documents| async move {
             if !allow_duplicate
                 && let Some(existing) = documents
                     .find_duplicate(&checked.content)
@@ -319,6 +320,7 @@ pub async fn external_import(
                 .await
                 .map_err(document_error)?;
             log::info!("external file taken into the library as {}", meta.id);
+            take_tags(&structure, meta.id, checked.format, &checked.content).await;
             Ok(ImportResult::Imported {
                 document: DocumentSummary::from(&meta),
             })

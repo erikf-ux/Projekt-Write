@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-subnet-update"
+description = "Enables the subnet_update command without any pre-configured scope."
+commands.allow = ["subnet_update"]
+
+[[permission]]
+identifier = "deny-subnet-update"
+description = "Denies the subnet_update command without any pre-configured scope."
+commands.deny = ["subnet_update"]

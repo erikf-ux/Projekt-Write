@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-structure-state"
+description = "Enables the structure_state command without any pre-configured scope."
+commands.allow = ["structure_state"]
+
+[[permission]]
+identifier = "deny-structure-state"
+description = "Denies the structure_state command without any pre-configured scope."
+commands.deny = ["structure_state"]

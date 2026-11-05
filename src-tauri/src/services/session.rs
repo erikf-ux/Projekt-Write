@@ -34,6 +34,7 @@ use crate::services::settings::app::{AppSettingsStore, LoadOutcome, SavedSession
 use crate::services::settings::library::{
     AcceptedLocation, HistoryDailyDays, HistoryKeepAllHours, HistoryWeeklyDays, TrashRetentionDays,
 };
+use crate::services::structure::Structure;
 
 /// Name of the library folder inside the documents folder (section 9:
 /// "Standard ist `Dokumente/ProjectWrite`").
@@ -360,6 +361,25 @@ impl LibrarySession {
             Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
         };
         let result = operation(repository).await;
+        drop(slot);
+        result
+    }
+
+    /// Runs `operation` with the structure (subnets, tags, structural undo)
+    /// and the document repository of the open library, locked like
+    /// [`Self::with_documents`].
+    pub async fn with_structure<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(Structure, DocumentRepository) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let (structure, documents) = match &*slot {
+            Slot::Open { library, .. } => (library.structure(), library.documents()),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(structure, documents).await;
         drop(slot);
         result
     }

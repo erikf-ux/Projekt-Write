@@ -119,11 +119,23 @@ pub enum ErrorCode {
     VersionNotFound,
     /// A stored version does not match its checksum.
     VersionDamaged,
+    /// No subnet with this id.
+    SubnetNotFound,
+    /// A subnet would lie below itself or one of its subnets.
+    SubnetCycle,
+    /// A sibling subnet has this name (`details.existing`: its id).
+    SubnetNameTaken,
+    /// No tag with this id.
+    TagNotFound,
+    /// A tag has this name (`details.existing`: its id).
+    TagNameTaken,
+    /// The structure changed since a step of the undo journal.
+    StructureChanged,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 49] = [
+    pub const ALL: [ErrorCode; 55] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -173,6 +185,12 @@ impl ErrorCode {
         ErrorCode::FileUnencodable,
         ErrorCode::VersionNotFound,
         ErrorCode::VersionDamaged,
+        ErrorCode::SubnetNotFound,
+        ErrorCode::SubnetCycle,
+        ErrorCode::SubnetNameTaken,
+        ErrorCode::TagNotFound,
+        ErrorCode::TagNameTaken,
+        ErrorCode::StructureChanged,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -227,6 +245,12 @@ impl ErrorCode {
             ErrorCode::FileUnencodable => "error.fileUnencodable",
             ErrorCode::VersionNotFound => "error.versionNotFound",
             ErrorCode::VersionDamaged => "error.versionDamaged",
+            ErrorCode::SubnetNotFound => "error.subnetNotFound",
+            ErrorCode::SubnetCycle => "error.subnetCycle",
+            ErrorCode::SubnetNameTaken => "error.subnetNameTaken",
+            ErrorCode::TagNotFound => "error.tagNotFound",
+            ErrorCode::TagNameTaken => "error.tagNameTaken",
+            ErrorCode::StructureChanged => "error.structureChanged",
         }
     }
 }

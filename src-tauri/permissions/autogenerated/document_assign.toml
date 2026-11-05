@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-assign"
+description = "Enables the document_assign command without any pre-configured scope."
+commands.allow = ["document_assign"]
+
+[[permission]]
+identifier = "deny-document-assign"
+description = "Denies the document_assign command without any pre-configured scope."
+commands.deny = ["document_assign"]

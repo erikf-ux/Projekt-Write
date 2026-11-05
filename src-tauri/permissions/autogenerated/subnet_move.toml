@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-subnet-move"
+description = "Enables the subnet_move command without any pre-configured scope."
+commands.allow = ["subnet_move"]
+
+[[permission]]
+identifier = "deny-subnet-move"
+description = "Denies the subnet_move command without any pre-configured scope."
+commands.deny = ["subnet_move"]

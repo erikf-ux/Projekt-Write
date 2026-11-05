@@ -70,6 +70,23 @@ const FIXTURES: &[(i64, &str, &str)] = &[
         "SELECT count(*) FROM document_history \
          WHERE id = '9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d' AND name = 'Erste Fassung' AND content = X'0300'",
     ),
+    (
+        7,
+        "INSERT INTO subnets (id, name, name_key, description, color, parent_id, created_at, updated_at) \
+         VALUES ('7a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d', 'Projekte', 'projekte', 'Alles Laufende', 'blue', NULL, \
+                 '2026-11-05T11:00:00.000Z', '2026-11-05T11:00:00.000Z'); \
+         INSERT INTO subnet_memberships (subnet_id, document_id, is_primary, created_at) \
+         VALUES ('7a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d', '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', 1, '2026-11-05T11:00:00.000Z'); \
+         INSERT INTO tags (id, name, name_key, created_at, updated_at) \
+         VALUES ('8b2c3d4e-5f6a-4b7c-9d8e-1f2a3b4c5d6e', 'Äpfel', 'äpfel', '2026-11-05T11:00:00.000Z', '2026-11-05T11:00:00.000Z'); \
+         INSERT INTO document_tags (document_id, tag_id, created_at) \
+         VALUES ('5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', '8b2c3d4e-5f6a-4b7c-9d8e-1f2a3b4c5d6e', '2026-11-05T11:00:00.000Z')",
+        "SELECT count(*) FROM subnet_memberships AS m \
+         JOIN subnets AS s ON s.id = m.subnet_id \
+         JOIN document_tags AS d ON d.document_id = m.document_id \
+         JOIN tags AS t ON t.id = d.tag_id \
+         WHERE s.name = 'Projekte' AND m.is_primary = 1 AND t.name = 'Äpfel'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -156,7 +173,8 @@ async fn every_earlier_schema_version_upgrades_to_the_current_one() {
         }
         assert_eq!(db.schema_version().await.unwrap(), start);
         for (version, insert, _) in FIXTURES.iter().filter(|f| f.0 <= start) {
-            sqlx::query(AssertSqlSafe(*insert))
+            // A fixture may hold several statements (raw_sql runs them all).
+            sqlx::raw_sql(AssertSqlSafe(*insert))
                 .execute(db.writer())
                 .await
                 .unwrap_or_else(|e| panic!("fixture {version} at schema {start}: {e}"));

@@ -537,11 +537,18 @@ impl DocumentRepository {
         else {
             return Err(DocumentError::ReadOnly);
         };
-        if file.content == content && file.title == meta.title {
+        // The library's tags go into the envelope (ADR 0017, decision 7).
+        let tags = crate::database::structure::tag_names_of(
+            self.database.reader(),
+            &id.hyphenated().to_string(),
+        )
+        .await?;
+        if file.content == content && file.title == meta.title && file.tags == tags {
             return Ok(SaveOutcome::Unchanged(meta));
         }
         file.content = content;
         file.title.clone_from(&meta.title);
+        file.tags = tags;
         file.updated_at = self.generators.now().to_iso();
         self.save(id, &pwrite::to_bytes(&file)).await
     }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-structure-redo"
+description = "Enables the structure_redo command without any pre-configured scope."
+commands.allow = ["structure_redo"]
+
+[[permission]]
+identifier = "deny-structure-redo"
+description = "Denies the structure_redo command without any pre-configured scope."
+commands.deny = ["structure_redo"]

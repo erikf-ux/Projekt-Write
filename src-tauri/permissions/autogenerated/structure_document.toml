@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-structure-document"
+description = "Enables the structure_document command without any pre-configured scope."
+commands.allow = ["structure_document"]
+
+[[permission]]
+identifier = "deny-structure-document"
+description = "Denies the structure_document command without any pre-configured scope."
+commands.deny = ["structure_document"]
