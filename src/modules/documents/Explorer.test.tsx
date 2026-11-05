@@ -16,6 +16,8 @@ function summary(id: string, title: string, extra: Partial<DocumentSummary> = {}
     originalName: null,
     favoritedAt: null,
     lastOpenedAt: null,
+    archivedAt: null,
+    deletedAt: null,
     ...extra,
   };
 }
@@ -59,6 +61,8 @@ describe('Explorer', () => {
       'Favoriten1',
       'Zuletzt verwendet2',
       'Alle Dokumente3',
+      'Archiv0',
+      'Papierkorb0',
     ]);
     expect(rowsOf('favorites')).toEqual(['Alpha']);
     expect(rowsOf('recent')).toEqual(['Gamma', 'Beta']);
@@ -108,6 +112,57 @@ describe('Explorer', () => {
     fireEvent.contextMenu(beta);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Zu den Favoriten' }));
     expect(setFavorite).toHaveBeenCalledWith('a', true);
+  });
+
+  it('shows archived documents only under "Archiv" and deleted ones in the trash', () => {
+    const archiveDocument = vi.fn(() => Promise.resolve(true));
+    const deleteDocument = vi.fn(() => Promise.resolve(true));
+    const restoreDocument = vi.fn(() => Promise.resolve(true));
+    const openDocument = vi.fn(() => Promise.resolve(true));
+    useWorkspace.setState({
+      documents: [
+        summary('a', 'Aktiv', { lastOpenedAt: '2026-11-04T10:05:00.000Z' }),
+        summary('b', 'Alt', {
+          archivedAt: '2026-11-04T09:00:00.000Z',
+          favoritedAt: '2026-11-04T09:00:00.000Z',
+          lastOpenedAt: '2026-11-04T10:06:00.000Z',
+        }),
+      ],
+      trash: [summary('t', 'Weg', { deletedAt: '2026-11-04T11:00:00.000Z' })],
+      archiveDocument,
+      deleteDocument,
+      restoreDocument,
+      openDocument,
+    });
+    render(<Explorer onNewDocument={() => undefined} />);
+    expect(rowsOf('favorites')).toEqual([]);
+    expect(rowsOf('recent')).toEqual(['Aktiv']);
+    expect(rowsOf('all')).toEqual(['Aktiv']);
+    // Archive and trash start closed.
+    expect(rowsOf('archive')).toEqual([]);
+    const list = tree();
+    list.focus();
+    fireEvent.click(within(list).getByText('Archiv'));
+    fireEvent.click(within(list).getByText('Papierkorb'));
+    expect(rowsOf('archive')).toEqual(['Alt']);
+    expect(rowsOf('trash')).toEqual(['Weg']);
+
+    // A document in the trash does not open; its menu restores it.
+    const trashed = list.querySelector<HTMLElement>('[data-group-member="trash"][data-document="t"]');
+    expect(trashed?.getAttribute('title')).toContain('Im Papierkorb seit');
+    fireEvent.click(trashed as HTMLElement);
+    expect(openDocument).not.toHaveBeenCalled();
+    fireEvent.contextMenu(trashed as HTMLElement);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wiederherstellen (Stufe 3)' }));
+    expect(restoreDocument).toHaveBeenCalledWith('t');
+
+    // Del moves the selected document to the trash; the menu archives.
+    const active = list.querySelector<HTMLElement>('[data-group-member="all"][data-document="a"]');
+    fireEvent.contextMenu(active as HTMLElement);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }));
+    expect(archiveDocument).toHaveBeenCalledWith('a', true);
+    fireEvent.keyDown(list, { key: 'Delete' });
+    expect(deleteDocument).toHaveBeenCalledWith('a');
   });
 
   it('lists the most recently opened documents only', () => {

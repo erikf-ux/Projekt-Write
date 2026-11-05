@@ -177,6 +177,18 @@ interface WorkspaceStore {
    * decision 15), once the workbench has loaded the library.
    */
   takeOpenRequests: () => Promise<void>;
+  /** Documents in the trash (stage 3), most recently deleted first. */
+  trash: DocumentSummary[];
+  refreshTrash: () => Promise<void>;
+  /** Moves a document to the trash; its tab closes after saving. */
+  deleteDocument: (id: string) => Promise<boolean>;
+  /** Takes a document out of the trash (stage 3). */
+  restoreDocument: (id: string) => Promise<boolean>;
+  archiveDocument: (id: string, archived: boolean) => Promise<boolean>;
+  /** "Endgültig löschen", after a question. */
+  purgeDocument: (id: string) => Promise<boolean>;
+  /** "Papierkorb leeren", after a question. */
+  emptyTrash: () => Promise<boolean>;
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -532,6 +544,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     renaming: null,
     lastError: null,
     recentFiles: [],
+    trash: [],
 
     refresh: async () => {
       const result = await call('documents_list', {});
@@ -789,6 +802,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       }
       set({
         documents: [],
+        trash: [],
         listLoaded: false,
         listError: null,
         tabs: kept,
@@ -1169,6 +1183,112 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         generation: current.generation + 1,
       });
       set((state) => ({ documents: upsert(state.documents, result.value) }));
+      return true;
+    },
+
+    refreshTrash: async () => {
+      const result = await call('documents_trash', {});
+      if (result.ok) {
+        set({ trash: result.value });
+      }
+    },
+
+    deleteDocument: async (id) => {
+      const document = get().open[id];
+      if (document) {
+        // What is open is saved first; a failed save keeps the tab.
+        if (!(await get().flush(id))) {
+          return false;
+        }
+        removeTab(id);
+      }
+      const result = await call('document_delete', { id });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      const deleted = result.value;
+      set((state) => ({
+        documents: state.documents.filter((entry) => entry.id !== id),
+        trash: [deleted, ...state.trash.filter((entry) => entry.id !== id)],
+      }));
+      return true;
+    },
+
+    restoreDocument: async (id) => {
+      const result = await call('document_restore', { id });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      const restored = result.value;
+      set((state) => ({
+        documents: upsert(state.documents, restored),
+        trash: state.trash.filter((entry) => entry.id !== id),
+      }));
+      return true;
+    },
+
+    archiveDocument: async (id, archived) => {
+      const result = await call('document_archive', { id, archived });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      set((state) => ({ documents: upsert(state.documents, result.value) }));
+      return true;
+    },
+
+    purgeDocument: async (id) => {
+      const entry = get().trash.find((document) => document.id === id);
+      const answer = await ask({
+        titleKey: 'trash.purge.title',
+        textKey: 'trash.purge.text',
+        params: { title: entry?.title ?? '' },
+        choices: [
+          { id: 'purge', labelKey: 'trash.purge.confirm', tone: 'danger' },
+          { id: 'cancel', labelKey: 'trash.cancel' },
+        ],
+        cancel: 'cancel',
+        testId: 'purge-prompt',
+      });
+      if (answer !== 'purge') {
+        return false;
+      }
+      const result = await call('document_purge', { id });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      set((state) => ({ trash: state.trash.filter((document) => document.id !== id) }));
+      return true;
+    },
+
+    emptyTrash: async () => {
+      const count = get().trash.length;
+      if (count === 0) {
+        return false;
+      }
+      const answer = await ask({
+        titleKey: 'trash.empty.title',
+        textKey: 'trash.empty.text',
+        params: { count },
+        choices: [
+          { id: 'empty', labelKey: 'trash.empty.confirm', tone: 'danger' },
+          { id: 'cancel', labelKey: 'trash.cancel' },
+        ],
+        cancel: 'cancel',
+        testId: 'empty-trash-prompt',
+      });
+      if (answer !== 'empty') {
+        return false;
+      }
+      const result = await call('trash_empty', {});
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      set({ trash: [] });
       return true;
     },
 

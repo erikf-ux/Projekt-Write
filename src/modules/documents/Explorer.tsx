@@ -4,6 +4,9 @@
  * join the tree with Phase 7; an element in several entries stays one
  * element. "Zuletzt verwendet" also lists external files opened last
  * (ADR 0015, decision 10); one that is gone is marked and can be removed.
+ * "Archiv" holds archived documents (hidden everywhere else), "Papierkorb"
+ * the deleted ones until they come back (stage 3) or go for good (ADR 0016).
+ * `Entf` moves a document to the trash, or removes it from the trash.
  *
  * The tree is virtualised ("Lange Listen werden virtualisiert"): only the
  * visible rows exist in the DOM, as a flat list with `aria-level`. It is one
@@ -32,8 +35,10 @@ const OVERSCAN = 8;
 export const RECENT_LIMIT = 10;
 const MAX_TITLE = 300;
 
-export type ExplorerGroup = 'favorites' | 'recent' | 'all';
-const GROUPS: readonly ExplorerGroup[] = ['favorites', 'recent', 'all'];
+export type ExplorerGroup = 'favorites' | 'recent' | 'all' | 'archive' | 'trash';
+const GROUPS: readonly ExplorerGroup[] = ['favorites', 'recent', 'all', 'archive', 'trash'];
+/** Entries closed until the user opens them. */
+const CLOSED_AT_START: readonly ExplorerGroup[] = ['archive', 'trash'];
 
 type Row =
   | { kind: 'group'; key: string; group: ExplorerGroup; count: number; expanded: boolean }
@@ -86,16 +91,22 @@ function FormatIcon({ format }: { format: DocumentFormat }) {
   return <FileText aria-hidden="true" className="size-3.5 shrink-0 text-muted" />;
 }
 
-/** The documents of each entry: favourites and all by title, recent by last opening. */
+/**
+ * The documents of each entry: favourites, all and archive by title, recent
+ * by last opening, the trash as Rust lists it (most recently deleted first).
+ * Archived documents appear only under "Archiv".
+ */
 export function explorerGroups(
   documents: readonly DocumentSummary[],
   locale: string,
+  trash: readonly DocumentSummary[] = [],
 ): Record<ExplorerGroup, DocumentSummary[]> {
   const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
-  const byTitle = [...documents].sort(
+  const sorted = [...documents].sort(
     (a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id),
   );
-  const recent = documents
+  const byTitle = sorted.filter((document) => document.archivedAt === null);
+  const recent = byTitle
     .filter((document) => document.lastOpenedAt !== null)
     .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? '') || a.id.localeCompare(b.id))
     .slice(0, RECENT_LIMIT);
@@ -103,6 +114,8 @@ export function explorerGroups(
     favorites: byTitle.filter((document) => document.favoritedAt !== null),
     recent,
     all: byTitle,
+    archive: sorted.filter((document) => document.archivedAt !== null),
+    trash: [...trash],
   };
 }
 
@@ -133,9 +146,15 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const recentFiles = useWorkspace((state) => state.recentFiles);
   const openRecentFile = useWorkspace((state) => state.openRecentFile);
   const forgetRecentFile = useWorkspace((state) => state.forgetRecentFile);
+  const trash = useWorkspace((state) => state.trash);
+  const deleteDocument = useWorkspace((state) => state.deleteDocument);
+  const restoreDocument = useWorkspace((state) => state.restoreDocument);
+  const archiveDocument = useWorkspace((state) => state.archiveDocument);
+  const purgeDocument = useWorkspace((state) => state.purgeDocument);
+  const emptyTrash = useWorkspace((state) => state.emptyTrash);
 
-  const [collapsed, setCollapsed] = useState<ReadonlySet<ExplorerGroup>>(() => new Set());
-  const groups = useMemo(() => explorerGroups(documents, locale), [documents, locale]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<ExplorerGroup>>(() => new Set(CLOSED_AT_START));
+  const groups = useMemo(() => explorerGroups(documents, locale, trash), [documents, locale, trash]);
   const recent = useMemo(() => recentEntries(groups.recent, recentFiles), [groups.recent, recentFiles]);
   const rows = useMemo(() => {
     const result: Row[] = [];
@@ -262,8 +281,35 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     });
   };
 
+  const groupLabel = (group: ExplorerGroup) => t(`explorer.group.${group}`);
+  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+
+  const openGroupMenu = (row: Extract<Row, { kind: 'group' }>, position: { x: number; y: number }) => {
+    if (row.group !== 'trash' || row.count === 0) {
+      return;
+    }
+    setSelected(row.key);
+    setMenu({
+      ...position,
+      label: groupLabel(row.group),
+      items: [{ id: 'emptyTrash', label: t('explorer.emptyTrash'), onSelect: () => void emptyTrash() }],
+    });
+  };
+
   const openMenu = (row: Extract<Row, { kind: 'document' | 'file' }>, position: { x: number; y: number }) => {
     setSelected(row.key);
+    if (row.kind === 'document' && row.group === 'trash') {
+      const { document } = row;
+      setMenu({
+        ...position,
+        label: document.title,
+        items: [
+          { id: 'restore', label: t('explorer.restore'), onSelect: () => void restoreDocument(document.id) },
+          { id: 'purge', label: t('explorer.purge'), onSelect: () => void purgeDocument(document.id) },
+        ],
+      });
+      return;
+    }
     if (row.kind === 'file') {
       const { file } = row;
       setMenu({
@@ -301,6 +347,17 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           label: favorite ? t('explorer.unfavorite') : t('explorer.favorite'),
           onSelect: () => void setFavorite(document.id, !favorite),
         },
+        {
+          id: 'archive',
+          label: document.archivedAt === null ? t('explorer.archive') : t('explorer.unarchive'),
+          onSelect: () => void archiveDocument(document.id, document.archivedAt === null),
+        },
+        {
+          id: 'delete',
+          label: t('explorer.delete'),
+          shortcut: t('keys.delete'),
+          onSelect: () => void deleteDocument(document.id),
+        },
       ],
     });
   };
@@ -312,9 +369,12 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     const page = Math.max(1, Math.floor(scroll.height / ROW_HEIGHT) - 1);
     const index = selectedIndex < 0 ? -1 : selectedIndex;
     if (isContextMenuKey(event)) {
+      const element = current ? window.document.getElementById(rowId(current.key)) : null;
+      const position = element ? positionBelow(element) : { x: 40, y: 80 };
       if (current?.kind === 'document' || current?.kind === 'file') {
-        const element = window.document.getElementById(rowId(current.key));
-        openMenu(current, element ? positionBelow(element) : { x: 40, y: 80 });
+        openMenu(current, position);
+      } else if (current?.kind === 'group') {
+        openGroupMenu(current, position);
       }
       event.preventDefault();
       return;
@@ -355,7 +415,11 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         select(index - page);
         break;
       case 'Enter':
-        if (current?.kind === 'document') {
+        if (current?.kind === 'document' && current.group === 'trash') {
+          // Documents in the trash do not open: their menu says what can be done.
+          const element = window.document.getElementById(rowId(current.key));
+          openMenu(current, element ? positionBelow(element) : { x: 40, y: 80 });
+        } else if (current?.kind === 'document') {
           void openDocument(current.document.id);
         } else if (current?.kind === 'file') {
           void openRecentFile(current.file.id, current.file.name);
@@ -364,8 +428,15 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         }
         break;
       case 'F2':
-        if (current?.kind === 'document') {
+        if (current?.kind === 'document' && current.group !== 'trash') {
           setRenaming(current.document.id);
+        }
+        break;
+      case 'Delete':
+        if (current?.kind === 'document' && current.group === 'trash') {
+          void purgeDocument(current.document.id);
+        } else if (current?.kind === 'document') {
+          void deleteDocument(current.document.id);
         }
         break;
       default:
@@ -374,8 +445,6 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     event.preventDefault();
     event.stopPropagation();
   };
-
-  const groupLabel = (group: ExplorerGroup) => t(`explorer.group.${group}`);
 
   return (
     <section aria-labelledby="explorer-title" className="flex h-full min-h-0 flex-col" data-testid="explorer">
@@ -445,6 +514,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                       toggle(row.group);
                     }
                   }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    openGroupMenu(row, { x: event.clientX, y: event.clientY });
+                  }}
                 >
                   <Chevron
                     aria-hidden="true"
@@ -504,12 +577,20 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                 aria-selected={isSelected}
                 data-document={document.id}
                 data-group-member={row.group}
-                title={document.originalName ?? undefined}
-                className={`${base} pr-3 pl-7 ${document.id === active ? 'font-semibold' : ''}`}
+                title={
+                  row.group === 'trash' && document.deletedAt
+                    ? t('explorer.deletedAt', { date: dateTime.format(new Date(document.deletedAt)) })
+                    : (document.originalName ?? undefined)
+                }
+                className={`${base} pr-3 pl-7 ${document.id === active ? 'font-semibold' : ''} ${
+                  row.group === 'trash' ? 'text-muted' : ''
+                }`}
                 style={style}
                 onClick={() => {
                   setSelected(row.key);
-                  void openDocument(document.id);
+                  if (row.group !== 'trash') {
+                    void openDocument(document.id);
+                  }
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();

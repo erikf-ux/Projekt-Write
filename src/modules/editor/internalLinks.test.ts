@@ -18,6 +18,8 @@ function summary(id: string, title: string): DocumentSummary {
     originalName: null,
     favoritedAt: null,
     lastOpenedAt: null,
+    archivedAt: null,
+    deletedAt: null,
   };
 }
 

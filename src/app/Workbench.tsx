@@ -79,6 +79,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
       await useWorkspace.getState().refresh();
+      void useWorkspace.getState().refreshTrash();
       // Files passed at start or by a second start open now.
       setOpenRequestsReady(true);
       await useWorkspace.getState().takeOpenRequests();

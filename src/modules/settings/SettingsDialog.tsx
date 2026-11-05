@@ -6,6 +6,7 @@ import { effectiveKeybindings } from '@/modules/commands/keymap';
 import { allCommands } from '@/modules/commands/registry';
 import { LibraryPanel } from '@/modules/library/LibraryPanel';
 import { GeneralSettings } from './GeneralSettings';
+import { LibraryPreferences } from './LibraryPreferences';
 import { ShortcutSettings } from './ShortcutSettings';
 import { useUi, type SettingsSection } from './uiStore';
 
@@ -100,7 +101,12 @@ export function SettingsDialog() {
             onRecording={onRecording}
           />
         ) : null}
-        {section === 'library' ? <LibraryPanel /> : null}
+        {section === 'library' ? (
+          <>
+            <LibraryPanel />
+            <LibraryPreferences />
+          </>
+        ) : null}
       </div>
     </Dialog>
   );

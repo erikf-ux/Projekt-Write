@@ -47,6 +47,9 @@ const activeLibraryDocument = () => {
   return document && !document.external ? document : null;
 };
 
+/** The list entry of a library document. */
+const activeSummary = (id: string) => workspace().documents.find((entry) => entry.id === id);
+
 /** The active tab, if it shows an external file. */
 const activeExternal = () => {
   const document = activeDocument(workspace());
@@ -171,6 +174,58 @@ export function createAppCommands(): CommandDefinition[] {
           await workspace().takeIntoLibrary(document.id);
         }
       },
+    },
+    {
+      id: 'document.delete',
+      category: 'document',
+      titleKey: 'command.document.delete',
+      isAvailable: () => activeLibraryDocument() !== null,
+      run: async () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          await workspace().deleteDocument(document.id);
+        }
+      },
+    },
+    {
+      id: 'document.archive',
+      category: 'document',
+      titleKey: 'command.document.archive',
+      isAvailable: () => {
+        const document = activeLibraryDocument();
+        return document !== null && activeSummary(document.id)?.archivedAt === null;
+      },
+      run: async () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          await workspace().archiveDocument(document.id, true);
+        }
+      },
+    },
+    {
+      id: 'document.unarchive',
+      category: 'document',
+      titleKey: 'command.document.unarchive',
+      isAvailable: () => {
+        const document = activeLibraryDocument();
+        return document !== null && typeof activeSummary(document.id)?.archivedAt === 'string';
+      },
+      run: async () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          await workspace().archiveDocument(document.id, false);
+        }
+      },
+    },
+    {
+      id: 'trash.empty',
+      category: 'document',
+      titleKey: 'command.trash.empty',
+      isAvailable: () => libraryOpen() && workspace().trash.length > 0,
+      run: () =>
+        workspace()
+          .emptyTrash()
+          .then(() => undefined),
     },
     convertCommand('document.convertToText', 'command.document.convertToText', 'txt'),
     convertCommand('document.convertToMarkdown', 'command.document.convertToMarkdown', 'md'),

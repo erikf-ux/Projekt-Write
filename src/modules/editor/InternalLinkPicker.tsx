@@ -42,7 +42,7 @@ export function matchingDocuments(
   const words = query.toLocaleLowerCase(locale).split(/\s+/).filter(Boolean);
   const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
   return documents
-    .filter((document) => document.id !== exclude)
+    .filter((document) => document.id !== exclude && document.archivedAt === null)
     .filter((document) => {
       const title = document.title.toLocaleLowerCase(locale);
       return words.every((word) => title.includes(word));

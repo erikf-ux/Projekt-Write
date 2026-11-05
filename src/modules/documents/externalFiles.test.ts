@@ -56,6 +56,8 @@ function summary(id: string, title: string) {
     originalName: 'notiz.txt',
     favoritedAt: null,
     lastOpenedAt: '2026-11-04T10:00:00.000Z',
+    archivedAt: null,
+    deletedAt: null,
   };
 }
 
