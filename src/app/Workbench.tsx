@@ -35,6 +35,7 @@ import {
 } from '@/modules/documents/workspaceStore';
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
 import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
+import { HistoryDialog, VersionNameDialog } from '@/modules/history/HistoryDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
@@ -314,6 +315,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       )}
       <LinkDialog />
       <InternalLinkPicker />
+      <HistoryDialog />
+      <VersionNameDialog />
       {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (
         <StatisticsDialog

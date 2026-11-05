@@ -14,6 +14,7 @@ import {
   useWorkspace,
 } from '@/modules/documents/workspaceStore';
 import { useFind } from '@/modules/editor/find/findStore';
+import { useHistory } from '@/modules/history/HistoryDialog';
 import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
@@ -214,6 +215,33 @@ export function createAppCommands(): CommandDefinition[] {
         const document = activeLibraryDocument();
         if (document) {
           await workspace().archiveDocument(document.id, false);
+        }
+      },
+    },
+    {
+      id: 'document.history',
+      category: 'document',
+      titleKey: 'command.document.history',
+      isAvailable: () => activeLibraryDocument()?.loaded === true,
+      run: () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          useHistory.getState().open(document.id);
+        }
+      },
+    },
+    {
+      id: 'document.saveVersion',
+      category: 'document',
+      titleKey: 'command.document.saveVersion',
+      isAvailable: () => {
+        const document = activeLibraryDocument();
+        return document?.loaded === true && !document.readOnly;
+      },
+      run: () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          useHistory.getState().askName(document.id);
         }
       },
     },

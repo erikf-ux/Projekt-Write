@@ -18,6 +18,8 @@ export type CommandId =
   | 'document.archive'
   | 'document.unarchive'
   | 'trash.empty'
+  | 'document.history'
+  | 'document.saveVersion'
   | 'document.convertToMarkdown'
   | 'document.convertToRichText'
   | 'document.rename'

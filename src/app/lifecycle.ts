@@ -14,6 +14,8 @@ export async function requestQuit(): Promise<void> {
     await call('ui_close_response', { close: false });
     return;
   }
+  // Closing the app closes its tabs: versions "beim Schließen" (stage 4).
+  await useWorkspace.getState().recordCloseVersions();
   if (saved) {
     await call('ui_close_response', { close: true });
     return;

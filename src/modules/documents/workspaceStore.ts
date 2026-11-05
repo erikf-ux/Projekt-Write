@@ -189,6 +189,14 @@ interface WorkspaceStore {
   purgeDocument: (id: string) => Promise<boolean>;
   /** "Papierkorb leeren", after a question. */
   emptyTrash: () => Promise<boolean>;
+  /** Restores a version (stage 4) after saving the tab; the tab reloads. */
+  restoreVersion: (id: string, versionId: string) => Promise<boolean>;
+  /** Reads a library document again and starts its editor anew. */
+  reloadLibraryDocument: (id: string) => Promise<boolean>;
+  /** "Version speichern" (saved first); the error, or null. */
+  saveVersion: (id: string, name: string) => Promise<CommandError | null>;
+  /** Versions "beim Schließen" of every open library tab (before quitting). */
+  recordCloseVersions: () => Promise<void>;
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -718,6 +726,10 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return true;
       }
       removeTab(id);
+      // Stage 4: a version "beim Schließen" (Rust skips unchanged content).
+      if (document?.loaded && !document.readOnly) {
+        void call('document_version_close', { id });
+      }
       return true;
     },
 
@@ -1290,6 +1302,75 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       }
       set({ trash: [] });
       return true;
+    },
+
+    restoreVersion: async (id, versionId) => {
+      if (get().open[id] && !(await get().flush(id))) {
+        return false;
+      }
+      const result = await call('document_version_restore', { id: versionId });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      set((state) => ({ documents: upsert(state.documents, result.value) }));
+      if (get().open[id]) {
+        await get().reloadLibraryDocument(id);
+      }
+      useUi.getState().showNotice({ tone: 'info', key: 'history.restored' });
+      return true;
+    },
+
+    reloadLibraryDocument: async (id) => {
+      const result = await call('document_read', { id });
+      if (!result.ok) {
+        set({ lastError: result.error });
+        return false;
+      }
+      const { document, text, readOnly } = result.value;
+      clearTimer(id);
+      sources.delete(id);
+      closeSession(id);
+      const current = get().open[id];
+      if (!current) {
+        return true;
+      }
+      patch(id, {
+        title: document.title,
+        format: document.format,
+        loadedText: text,
+        savedText: text,
+        state: 'saved',
+        error: null,
+        losses: [],
+        viewIssues: [],
+        view: document.format === 'txt' ? 'plain' : 'rich',
+        readOnly,
+        revision: current.revision + 1,
+        generation: current.generation + 1,
+      });
+      set((state) => ({ documents: upsert(state.documents, document) }));
+      return true;
+    },
+
+    saveVersion: async (id, name) => {
+      if (get().open[id] && !(await get().flush(id))) {
+        return get().open[id]?.error ?? null;
+      }
+      const result = await call('document_version_save', { id, name });
+      if (!result.ok) {
+        return result.error;
+      }
+      useUi.getState().showNotice({ tone: 'info', key: 'history.saved', params: { name: name.trim() } });
+      return null;
+    },
+
+    recordCloseVersions: async () => {
+      const library = get().tabs.filter((id) => {
+        const document = get().open[id];
+        return document?.loaded === true && !document.external && !document.readOnly;
+      });
+      await Promise.all(library.map((id) => call('document_version_close', { id })));
     },
 
     takeOpenRequests: async () => {
