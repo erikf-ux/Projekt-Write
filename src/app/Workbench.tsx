@@ -25,6 +25,7 @@ import { findConflicts } from '@/modules/commands/keymap';
 import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
 import { Connections } from '@/modules/documents/Connections';
+import { restoreSession, startSessionTracking, stopSessionTracking } from '@/modules/documents/sessionTabs';
 import { Explorer } from '@/modules/documents/Explorer';
 import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
 import {
@@ -78,12 +79,16 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       return;
     }
     void (async () => {
+      stopSessionTracking();
       setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
       await useWorkspace.getState().refresh();
       void useWorkspace.getState().refreshTrash();
       // Stage 2: unsaved changes from a crash are offered first.
       await offerRecovery();
+      // Stage 1: the tabs of the last session open again.
+      await restoreSession();
+      startSessionTracking();
       // Files passed at start or by a second start open now.
       setOpenRequestsReady(true);
       await useWorkspace.getState().takeOpenRequests();

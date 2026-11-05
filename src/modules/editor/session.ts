@@ -182,6 +182,24 @@ export class EditorSession {
     return editor;
   }
 
+  /** The selection of the current view (stage 1 keeps it across a restart). */
+  selection(): { anchor: number; head: number } {
+    const { anchor, head } = this.editor.state.selection;
+    return { anchor, head };
+  }
+
+  /** Puts the selection back where it was; positions beyond the end go to the end. */
+  restoreSelection(anchor: number, head: number): void {
+    const editor = this.editor;
+    const end = editor.state.doc.content.size;
+    const clamp = (position: number) => Math.max(1, Math.min(position, Math.max(1, end - 1)));
+    editor
+      .chain()
+      .setTextSelection({ from: clamp(anchor), to: clamp(head) })
+      .scrollIntoView()
+      .run();
+  }
+
   /** The text of the current view, as it would be saved (`.pwrite`: the content as JSON). */
   text(): string {
     if (this.format === 'pwrite') {

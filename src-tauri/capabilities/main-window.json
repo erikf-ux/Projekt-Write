@@ -48,6 +48,8 @@
     "allow-recovery-list",
     "allow-recovery-restore",
     "allow-recovery-drop",
+    "allow-session-save",
+    "allow-session-restore",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",

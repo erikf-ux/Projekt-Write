@@ -14,6 +14,7 @@ pub mod links;
 pub mod recovery;
 pub mod system;
 pub mod ui;
+pub mod workspace;
 
 use tauri::Runtime;
 use tauri::ipc::Invoke;
@@ -64,6 +65,8 @@ pub const COMMAND_NAMES: &[&str] = &[
     "recovery_list",
     "recovery_restore",
     "recovery_drop",
+    "session_save",
+    "session_restore",
     "external_open",
     "external_read",
     "external_check",
@@ -128,6 +131,8 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         recovery::recovery_list,
         recovery::recovery_restore,
         recovery::recovery_drop,
+        workspace::session_save,
+        workspace::session_restore,
         external::external_open,
         external::external_read,
         external::external_check,

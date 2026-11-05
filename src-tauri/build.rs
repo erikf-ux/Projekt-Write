@@ -47,6 +47,8 @@ fn main() {
         "recovery_list",
         "recovery_restore",
         "recovery_drop",
+        "session_save",
+        "session_restore",
         "external_open",
         "external_read",
         "external_check",

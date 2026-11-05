@@ -4,6 +4,7 @@
  * lost otherwise). External files with changes ask "Speichern, Verwerfen,
  * Abbrechen" one by one (ADR 0015).
  */
+import { saveSessionNow } from '@/modules/documents/sessionTabs';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { call } from '@/services/ipc';
@@ -14,6 +15,8 @@ export async function requestQuit(): Promise<void> {
     await call('ui_close_response', { close: false });
     return;
   }
+  // Stage 1: the tabs as they are now, for the next start.
+  await saveSessionNow();
   // Closing the app closes its tabs: versions "beim Schließen" (stage 4).
   await useWorkspace.getState().recordCloseVersions();
   if (saved) {

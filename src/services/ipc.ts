@@ -54,6 +54,8 @@ import type { DiscardDraftRequest } from '@/types/generated/DiscardDraftRequest'
 import type { DraftEntry } from '@/types/generated/DraftEntry';
 import type { DraftRequest } from '@/types/generated/DraftRequest';
 import type { RestoredDraft } from '@/types/generated/RestoredDraft';
+import type { RestoredSession } from '@/types/generated/RestoredSession';
+import type { SaveSessionRequest } from '@/types/generated/SaveSessionRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
 import type { WriteDraftRequest } from '@/types/generated/WriteDraftRequest';
 import type { VersionRequest } from '@/types/generated/VersionRequest';
@@ -107,6 +109,8 @@ export interface Commands {
   recovery_list: { request: EmptyRequest; response: DraftEntry[] };
   recovery_restore: { request: DraftRequest; response: RestoredDraft };
   recovery_drop: { request: DraftRequest; response: null };
+  session_save: { request: SaveSessionRequest; response: null };
+  session_restore: { request: EmptyRequest; response: RestoredSession };
   library_preferences: { request: EmptyRequest; response: LibraryPreferences };
   library_update_preferences: { request: LibraryPreferences; response: LibraryPreferences };
   link_open: { request: OpenLinkRequest; response: null };

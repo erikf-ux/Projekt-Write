@@ -30,7 +30,7 @@ use crate::services::history::RetentionPolicy;
 use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
-use crate::services::settings::app::{AppSettingsStore, LoadOutcome};
+use crate::services::settings::app::{AppSettingsStore, LoadOutcome, SavedSession};
 use crate::services::settings::library::{
     AcceptedLocation, HistoryDailyDays, HistoryKeepAllHours, HistoryWeeklyDays, TrashRetentionDays,
 };
@@ -362,6 +362,27 @@ impl LibrarySession {
         let result = operation(repository).await;
         drop(slot);
         result
+    }
+
+    /// The id of the open library.
+    pub async fn library_id(&self) -> Option<String> {
+        match &*self.slot.lock().await {
+            Slot::Open { library, .. } => Some(library.manifest().id.hyphenated().to_string()),
+            Slot::Closed { .. } | Slot::Moving => None,
+        }
+    }
+
+    /// Stores the tabs of this session (stage 1).
+    pub fn save_tabs(&self, session: Option<SavedSession>) {
+        let result = lock(&self.settings).update(|settings| settings.session = session);
+        if let Err(error) = result {
+            log::warn!("session not saved: {error}");
+        }
+    }
+
+    /// The tabs of the last session.
+    pub fn saved_tabs(&self) -> Option<SavedSession> {
+        lock(&self.settings).get().session.clone()
     }
 
     /// The current time (ISO 8601), from the clock of the session.

@@ -2325,3 +2325,99 @@ fn recovery_drafts_are_offered_and_restored_after_saving_the_current_state() {
     }
     app.shut_down();
 }
+
+#[test]
+fn the_tabs_of_a_session_open_again_after_a_restart() {
+    let dir = common::temp_dir("pw-ipc-");
+    let first = app_at(dir.path(), None);
+    let choice = default_location(&first);
+    call(
+        &first,
+        "library_create",
+        json!({ "location": choice["token"], "acceptWarning": false }),
+    )
+    .unwrap();
+    let create = |title: &str| -> String {
+        call(
+            &first,
+            "document_create",
+            json!({ "title": title, "format": "md" }),
+        )
+        .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let a = create("Eins");
+    let b = create("Zwei");
+    let path = user_file(&first, "Extern.md", b"# Extern\n");
+    let file = open_external(&first, &path);
+    call(
+        &first,
+        "session_save",
+        json!({
+            "tabs": [
+                { "target": { "kind": "library", "id": a }, "anchor": 3, "head": 5, "view": "rich" },
+                { "target": { "kind": "external", "id": file["id"] }, "anchor": 1, "head": 1, "view": "source" },
+                { "target": { "kind": "external", "id": "0123456789abcdef0123456789abcdef" }, "anchor": 1, "head": 1, "view": "rich" },
+                { "target": { "kind": "library", "id": b }, "anchor": 1, "head": 1, "view": "rich" }
+            ],
+            "active": 3
+        }),
+    )
+    .unwrap();
+    let settings: Value =
+        serde_json::from_slice(&std::fs::read(dir.path().join("config/settings.json")).unwrap())
+            .unwrap();
+    // The path of the external file stays in Rust (settings.json), the
+    // unknown file id is left out.
+    assert_eq!(settings["session"]["tabs"].as_array().unwrap().len(), 3);
+    assert!(
+        settings["session"]["tabs"][1]["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("Extern.md")
+    );
+    assert_eq!(settings["session"]["active"], 2);
+    first.shut_down();
+
+    let second = app_at(dir.path(), None);
+    let restored = call(&second, "session_restore", json!({})).unwrap();
+    let tabs = restored["tabs"].as_array().unwrap();
+    assert_eq!(tabs.len(), 3);
+    assert_eq!(tabs[0]["target"], json!({ "kind": "library", "id": a }));
+    assert_eq!(tabs[0]["anchor"], 3);
+    assert_eq!(tabs[0]["head"], 5);
+    assert_eq!(tabs[1]["target"]["kind"], "external");
+    assert_eq!(tabs[1]["target"]["file"]["name"], "Extern.md");
+    assert_eq!(tabs[1]["view"], "source");
+    assert_eq!(restored["active"], 2);
+
+    // A deleted document and a vanished file are left out.
+    call(&second, "document_delete", json!({ "id": b })).unwrap();
+    std::fs::remove_file(&path).unwrap();
+    let restored = call(&second, "session_restore", json!({})).unwrap();
+    assert_eq!(restored["tabs"].as_array().unwrap().len(), 1);
+    assert_eq!(restored["active"], Value::Null);
+
+    for (request, field) in [
+        (json!({ "tabs": [], "active": 0 }), "active"),
+        (
+            json!({ "tabs": [{ "target": { "kind": "library", "id": "x" }, "anchor": 1, "head": 1, "view": "rich" }], "active": null }),
+            "id",
+        ),
+        (
+            json!({ "tabs": [{ "target": { "kind": "library", "id": a }, "anchor": -1, "head": 1, "view": "rich" }], "active": null }),
+            "request",
+        ),
+        (
+            json!({ "tabs": [{ "target": { "kind": "library", "id": a }, "anchor": 1, "head": 1, "view": "html" }], "active": null }),
+            "request",
+        ),
+        (json!({ "tabs": [], "open": true }), "request"),
+    ] {
+        let error = call(&second, "session_save", request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    second.shut_down();
+}

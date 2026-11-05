@@ -44,6 +44,8 @@ pub struct AppSettings {
     /// External files opened last, newest first (at most
     /// [`MAX_RECENT_FILES`]).
     pub recent_files: Vec<RecentFile>,
+    /// The tabs of the last session (stage 1, ADR 0016).
+    pub session: Option<SavedSession>,
     /// Fields of newer versions, kept unchanged.
     pub other: Map<String, Value>,
 }
@@ -56,9 +58,44 @@ impl Default for AppSettings {
             ui: UiSettings::default(),
             window: None,
             recent_files: Vec::new(),
+            session: None,
             other: Map::new(),
         }
     }
+}
+
+/// Most tabs a saved session holds.
+pub const MAX_SESSION_TABS: usize = 100;
+
+/// What a tab of the last session showed.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SavedTabTarget {
+    Library { id: String },
+    External { path: String },
+}
+
+/// One tab of the last session.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedTab {
+    #[serde(flatten)]
+    pub target: SavedTabTarget,
+    /// Selection in the editor (ProseMirror positions).
+    pub anchor: u32,
+    pub head: u32,
+    /// `rich`, `source` or `plain`.
+    pub view: String,
+}
+
+/// The tabs of the last session in one library (stage 1).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSession {
+    pub library_id: String,
+    pub tabs: Vec<SavedTab>,
+    /// Index of the active tab.
+    pub active: Option<u32>,
 }
 
 /// Most entries kept in `recentFiles`.
@@ -90,6 +127,7 @@ impl RecentFile {
 const KEY_FORMAT_VERSION: &str = "formatVersion";
 const KEY_LIBRARY_PATH: &str = "libraryPath";
 const KEY_RECENT_FILES: &str = "recentFiles";
+const KEY_SESSION: &str = "session";
 
 impl AppSettings {
     /// Reads the settings from the top-level object of the file.
@@ -113,12 +151,22 @@ impl AppSettings {
                 .collect(),
             _ => Vec::new(),
         };
+        // A session that does not parse is dropped, like an invalid
+        // interface value.
+        let session = object
+            .remove(KEY_SESSION)
+            .and_then(|value| serde_json::from_value::<SavedSession>(value).ok())
+            .map(|mut session| {
+                session.tabs.truncate(MAX_SESSION_TABS);
+                session
+            });
         Ok(Self {
             format_version,
             library_path,
             ui,
             window,
             recent_files,
+            session,
             other: object,
         })
     }
@@ -140,6 +188,16 @@ impl AppSettings {
         }
         self.ui.put_into(&mut object);
         WindowState::put_into(self.window.as_ref(), &mut object);
+        match &self.session {
+            Some(session) => {
+                if let Ok(value) = serde_json::to_value(session) {
+                    object.insert(KEY_SESSION.to_owned(), value);
+                }
+            }
+            None => {
+                object.remove(KEY_SESSION);
+            }
+        }
         if self.recent_files.is_empty() {
             object.remove(KEY_RECENT_FILES);
         } else {

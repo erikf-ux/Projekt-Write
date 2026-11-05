@@ -25,6 +25,7 @@ import { FindBar } from './find/FindBar';
 import { useFind } from './find/findStore';
 import { useInternalLinkPicker } from './InternalLinkPicker';
 import { internalLinkTarget } from './schema/extensions';
+import { takePendingSelection } from '@/modules/documents/sessionTabs';
 import { getSession, openSession } from './session';
 import './editor.css';
 
@@ -170,6 +171,18 @@ function DocumentPanel({
     });
     setDocumentSource(id, session);
     element.append(session.root);
+    // Stage 1: view and selection of the last session.
+    const restored = takePendingSelection(id);
+    if (restored) {
+      if (restored.view === 'source' && session.isMarkdown && session.view === 'rich') {
+        session.toggleView();
+      }
+      try {
+        session.restoreSelection(restored.anchor, restored.head);
+      } catch {
+        // A selection that no longer fits stays at the start.
+      }
+    }
     useWorkspace
       .getState()
       .attachView(
