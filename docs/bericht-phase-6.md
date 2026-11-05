@@ -54,7 +54,7 @@ Was die Tests zeigen, im Einzelnen:
 
 | Kriterium                                                                                               | Stand                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ein harter Abbruch beim Tippen kostet höchstens 2 s Text; der nächste Start bietet Wiederherstellung an | **erfüllt** unter Linux (E2E, drei Läufe: höchstens 908 ms verloren; Angebot beim nächsten Start). Windows: derselbe Test läuft in CI (`taskkill /F`).                                                                            |
+| Ein harter Abbruch beim Tippen kostet höchstens 2 s Text; der nächste Start bietet Wiederherstellung an | **erfüllt** unter Linux und Windows (E2E; Angebot beim nächsten Start). Verloren: lokal unter Linux 887, 674 und 908 ms; in CI-Lauf 99 unter Linux 869 ms, unter Windows (`taskkill /F /T`) 508 ms.                               |
 | Ein gelöschtes Element kehrt mit Zuordnungen und Verbindungen zurück                                    | **erfüllt** für Dokumente mit Links, Rückverweisen, Favorit und Versionen (Rust, IPC, E2E). Subnetze und Tags gibt es erst ab Phase 7; sie werden wie die Links nie entfernt, solange ein Element im Papierkorb liegt (ADR 0016). |
 | Die Aufbewahrung arbeitet richtig, getestet mit simulierter Zeit                                        | **erfüllt** für Papierkorb und Historie (`ManualClock`, Unit- und Integrationstests).                                                                                                                                             |
 | Jede Wiederherstellung sichert zuerst den aktuellen Stand                                               | **erfüllt** für Stufe 2 und 4 (Rust, IPC, E2E); Stufe 1 und 3 ändern keinen Inhalt.                                                                                                                                               |
@@ -62,7 +62,7 @@ Was die Tests zeigen, im Einzelnen:
 ## Was konnte nicht getestet werden und warum?
 
 - **Stromausfall und Systemabsturz:** Geprüft ist der harte Prozessabbruch. Ob ein Entwurf einen Stromausfall übersteht, hängt zusätzlich am Dateisystem; geschrieben wird atomar mit `fsync` von Datei und Ordner (Phase 2). Einen echten Stromausfall kann der Container nicht auslösen.
-- **Windows:** Die neuen E2E-Tests (auch der harte Abbruch mit `taskkill /F /T`) laufen erst in CI; lokal nicht ausführbar. Clippy für Windows lief lokal.
+- **Windows:** nur in CI geprüft (Lauf 99 grün, auch der harte Abbruch mit `taskkill /F /T`); lokal lief nur Clippy für das Windows-Ziel.
 - **macOS:** zurückgestellt.
 - **Natives Menü:** Die neuen Befehle stehen in Befehlspalette und Kontextmenüs; Menüklicks bleiben in CI unbedienbar (wie bisher).
 - **Enter im Namensdialog:** Das synthetische Enter des eingebetteten WebDrivers sendet kein Formular ab (F-24); der E2E-Test klickt „Speichern“. Der Dialog ist ein HTML-Formular, das Enter im Eingabefeld nach dem Standard absendet; mit einer echten Tastatur ist das nicht geprüft.
@@ -90,7 +90,16 @@ F-23 bis F-26 in `docs/status.md`: F-23 (Umwandeln-Test prüfte zu früh) und F-
 
 ## CI
 
-Zwischenstände trugen `[skip ci]`, um Actions-Minuten zu sparen. **Lauf 98** (Zwischenstand `1468541`, ohne `[skip ci]`) scheiterte an der Typprüfung (F-26). Den Abschluss prüft **Lauf 99** (von Hand gestartet, Commit des Berichts) unter Windows und Linux; Ergebnis siehe Nachtrag unten.
+**CI-Lauf 99 ist grün** (von Hand gestartet am 5. November 2026, Commit `90bf17d`, Stand des Berichts):
+
+| Job                             | Ergebnis                                                                                                                                                                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows (`windows-latest`)      | grün: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy, Rust-Tests (mit den 100 harten Abbrüchen), Referenzbibliothek zweimal gleich, Typen und Lizenzliste aktuell, E2E alle 12 Dateien (harter Abbruch: 44 von 50 Zeichen zurück, 508 ms verloren) |
+| Linux (`ubuntu-24.04`)          | grün: dieselben Schritte, E2E alle 12 Dateien (39 von 48 Zeichen zurück, 869 ms verloren)                                                                                                                                                                 |
+| Abhängigkeitsprüfung            | grün: `cargo audit`, `cargo deny` (auch für `flate2`), `npm audit`                                                                                                                                                                                        |
+| Release-Build ohne Test-Plugins | grün                                                                                                                                                                                                                                                      |
+
+Zwischenstände trugen `[skip ci]`, um Actions-Minuten zu sparen. **Lauf 98** (Zwischenstand `1468541`, ohne `[skip ci]`) scheiterte an der Typprüfung (F-26); der Code danach ist in Lauf 99 geprüft.
 
 ## Nächster Schritt
 

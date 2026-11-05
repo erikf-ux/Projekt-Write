@@ -10,18 +10,18 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur 
 
 Entscheidungen: ADR 0016. Stufe 5 (Backup) folgt in Phase 10; Zuordnungen zu Subnetzen und Tags (Phase 7) folgen demselben Muster wie die Links.
 
-CI: läuft wieder seit Lauf 97 (grün). Zwischenstände und reine Doku-Commits tragen `[skip ci]`, damit sie keine Minuten kosten; CI läuft an Meilensteinen.
+CI: Lauf 99 grün (Abschluss Phase 6, Commit `90bf17d`); Lauf 98 rot an einem Zwischenstand (F-26). Zwischenstände und reine Doku-Commits tragen `[skip ci]`, damit sie keine Minuten kosten; CI läuft an Meilensteinen.
 
 ## Stand Phase 6
 
-| Schritt | Inhalt                                                                                                                                          | Stand    |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1       | ADR 0016, Plan, `flate2` begründet                                                                                                              | erledigt |
-| 2       | Papierkorb (Stufe 3) und Archiv: Löschen, Wiederherstellen, endgültig Löschen, Aufbewahrung mit simulierter Zeit, Explorer-Gruppen              | erledigt |
-| 3       | Dokumenthistorie (Stufe 4): Migration 0006, komprimierte Versionen, Aufbewahrung, Vergleich nebeneinander, Wiederherstellen mit Sicherung vorab | erledigt |
-| 4       | Recovery-Entwürfe (Stufe 2): höchstens 1 s nach einer ungespeicherten Eingabe, auch für externe Dateien; Angebot beim Start                     | erledigt |
-| 5       | Sitzung (Stufe 1): Tabs, aktiver Tab, Auswahl und Ansicht nach einem normalen Neustart                                                          | erledigt |
-| 6       | E2E (harter Abbruch beim Tippen, Papierkorb mit Verbindungen, Historie, Sitzung), Doku, Bericht                                                 | erledigt |
+| Schritt | Inhalt                                                                                                                                          | Stand                                                       |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1       | ADR 0016, Plan, `flate2` begründet                                                                                                              | erledigt                                                    |
+| 2       | Papierkorb (Stufe 3) und Archiv: Löschen, Wiederherstellen, endgültig Löschen, Aufbewahrung mit simulierter Zeit, Explorer-Gruppen              | erledigt                                                    |
+| 3       | Dokumenthistorie (Stufe 4): Migration 0006, komprimierte Versionen, Aufbewahrung, Vergleich nebeneinander, Wiederherstellen mit Sicherung vorab | erledigt                                                    |
+| 4       | Recovery-Entwürfe (Stufe 2): höchstens 1 s nach einer ungespeicherten Eingabe, auch für externe Dateien; Angebot beim Start                     | erledigt                                                    |
+| 5       | Sitzung (Stufe 1): Tabs, aktiver Tab, Auswahl und Ansicht nach einem normalen Neustart                                                          | erledigt                                                    |
+| 6       | E2E (harter Abbruch beim Tippen, Papierkorb mit Verbindungen, Historie, Sitzung), Doku, Bericht                                                 | erledigt; CI-Lauf 99 grün (Windows, Linux, Audits, Release) |
 
 ## Stand Phase 5
 
