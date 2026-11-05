@@ -4,22 +4,24 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 6 – Wiederherstellung** (Abschnitte 4, 9, 13): freigegeben am 5. November 2026 („Du kannst nun starten“), in Arbeit.
+**Phase 6 – Wiederherstellung** (Abschnitte 4, 9, 13): umgesetzt und lokal geprüft; Bericht in `docs/bericht-phase-6.md`. Wartet auf die Freigabe von Phase 7.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Entscheidungen: ADR 0016. Stufe 5 (Backup) folgt in Phase 10; Zuordnungen zu Subnetzen und Tags (Phase 7) folgen demselben Muster wie die Links.
 
-Plan Phase 6 (Reihenfolge):
+CI: läuft wieder seit Lauf 97 (grün). Zwischenstände und reine Doku-Commits tragen `[skip ci]`, damit sie keine Minuten kosten; CI läuft an Meilensteinen.
 
-1. ADR 0016, Plan, `flate2` begründen.
-2. Papierkorb (Stufe 3) und Archiv: Löschen, Wiederherstellen, endgültig Löschen, Aufbewahrung mit simulierter Zeit, Explorer-Einträge.
-3. Dokumenthistorie (Stufe 4): Migration 0006, komprimierte Versionen, Aufbewahrung, Vergleich nebeneinander, Wiederherstellen mit Sicherung vorab.
-4. Recovery-Entwürfe (Stufe 2): höchstens 1 s nach der ersten ungespeicherten Eingabe, auch für externe Dateien; Angebot beim Start.
-5. Sitzung (Stufe 1): Tabs, aktiver Tab, Auswahl und Ansicht nach einem normalen Neustart.
-6. E2E (harter Abbruch beim Tippen, Papierkorb mit Verbindungen, Historie, Sitzung), Doku, Bericht.
+## Stand Phase 6
 
-CI: läuft wieder seit Lauf 97 (grün). Reine Doku-Commits tragen `[skip ci]`.
+| Schritt | Inhalt                                                                                                                                          | Stand    |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1       | ADR 0016, Plan, `flate2` begründet                                                                                                              | erledigt |
+| 2       | Papierkorb (Stufe 3) und Archiv: Löschen, Wiederherstellen, endgültig Löschen, Aufbewahrung mit simulierter Zeit, Explorer-Gruppen              | erledigt |
+| 3       | Dokumenthistorie (Stufe 4): Migration 0006, komprimierte Versionen, Aufbewahrung, Vergleich nebeneinander, Wiederherstellen mit Sicherung vorab | erledigt |
+| 4       | Recovery-Entwürfe (Stufe 2): höchstens 1 s nach einer ungespeicherten Eingabe, auch für externe Dateien; Angebot beim Start                     | erledigt |
+| 5       | Sitzung (Stufe 1): Tabs, aktiver Tab, Auswahl und Ansicht nach einem normalen Neustart                                                          | erledigt |
+| 6       | E2E (harter Abbruch beim Tippen, Papierkorb mit Verbindungen, Historie, Sitzung), Doku, Bericht                                                 | erledigt |
 
 ## Stand Phase 5
 
@@ -119,6 +121,9 @@ CI: läuft wieder seit Lauf 97 (grün). Reine Doku-Commits tragen `[skip ci]`.
 | F-20 | E2E: Text landete am Anfang statt am Ende des Dokuments                                                                                                                                                                            | `Strg + Ende` des eingebetteten WebDrivers bewegt die Schreibmarke unter WebKitGTK nicht; der Test setzt sie über die DOM-Auswahl, der ProseMirror folgt                                                                                                                                                                                                                                                                     |
 | F-21 | E2E: Der zweite Dialog „Datei wurde außerhalb geändert“ galt als unsichtbar                                                                                                                                                        | Der Test hielt die Elementreferenz des ersten Dialogs; jedes Warten sucht das Element jetzt neu                                                                                                                                                                                                                                                                                                                              |
 | F-22 | E2E: Der Kürzel-Test der Phase 3 scheiterte einmal in fünf Läufen                                                                                                                                                                  | Die Tasten kamen, bevor der Aufnahmebereich den Fokus hatte (er bekommt ihn in einem Effekt); `Strg + N` legte dann ein Dokument an. Der Test wartet auf den Fokus                                                                                                                                                                                                                                                           |
+| F-23 | E2E: Der Umwandeln-Test fand nach dem Umwandeln noch die alte `.md`-Datei                                                                                                                                                          | Wettlauf im Test: Rust schreibt die neue Datei, ändert die Zeile und löscht die alte Datei zuletzt; der Test prüfte direkt nach dem Erscheinen der neuen Datei. Er wartet jetzt auf beides                                                                                                                                                                                                                                   |
+| F-24 | E2E: Der Namensdialog „Version speichern“ schloss nach Enter nicht                                                                                                                                                                 | Das synthetische Enter des eingebetteten WebDrivers sendet kein Formular ab (ADR 0003); mit einer echten Tastatur geht es. Der Test klickt „Speichern“. Die vier folgenden Dateien scheiterten als Folge am offenen Dialog                                                                                                                                                                                                   |
+| F-25 | Ein Dokument im Papierkorb ließ sich mit `document_read` öffnen                                                                                                                                                                    | Beim Schreiben der IPC-Tests gefunden. `document_read` meldet für gelöschte Dokumente `DOCUMENT_NOT_FOUND`; Wiederherstellen ist der einzige Weg zurück                                                                                                                                                                                                                                                                      |
 
 ## Offene Aufgaben
 
@@ -126,15 +131,16 @@ CI: läuft wieder seit Lauf 97 (grün). Reine Doku-Commits tragen `[skip ci]`.
 
 - Dateizuordnung auf echten Systemen von Hand prüfen: Doppelklick und „Öffnen mit“ unter Windows (Installer, Phase 14) und Linux (installiertes `.deb`); in CI sind nur Startargumente und zweiter Start testbar. Der erste Start mit Dateiargument ist per Rust-Test (Argumente, Warteschlange, Abholen) geprüft, nicht im E2E-Test.
 - Externe Dateien unter Windows: Rechte (ACL) der ersetzten Datei; die neue Datei erbt die des Ordners. Harte Links werden beim atomaren Ersetzen getrennt (wie bei den meisten Editoren).
-- Recovery-Entwürfe auch für externe Dateien (Phase 6).
 
 - Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
-- Bilder einfügen und importieren, PDF-Verweise (Phase 8); Drucken (Phase 10); Wiederherstellen aus den Tabs (Phase 6).
+- Bilder einfügen und importieren, PDF-Verweise (Phase 8); Drucken (Phase 10).
 - Eingabe mit Komposition (IME, Tottasten) und `Strg + Umschalt + V` mit echten Programmen von Hand prüfen; der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003).
 
 - Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
-- Phase 6: Löschen und Papierkorb mit Wiederherstellen, Archiv (Abschnitt 25; ADR 0015 korrigiert ADR 0011).
+- Phase 7: Zuordnungen zu Subnetzen und Tags bleiben im Papierkorb wie die Links (ADR 0016); Archiv „im Mesh grau“ (Phase 11); Archiv in der Standardsuche ausblenden (Phase 9).
+- Phase 10: Wiederherstellung Stufe 5 (Backup); während des Backups schreibt Autosave nur nach `recovery/` (Abschnitt 21).
+- Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
 - Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
 - Referenzbibliothek ergänzen: Medien, Subnetze, Tags und Verbindungen mit ihren Tabellen (Phasen 7, 8, 11), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).
@@ -160,4 +166,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 6 (Historie, Papierkorb, Archiv, Recovery; Abschnitt 25).
+Nach Freigabe: Phase 7 (Subnetze und Tags; Abschnitt 25).

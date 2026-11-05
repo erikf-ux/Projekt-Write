@@ -113,6 +113,20 @@ describe('recovery drafts (stage 2)', () => {
     expect(discarded).toEqual([JSON.stringify({ kind: 'library', id: ID })]);
   });
 
+  it('keeps the draft when saving fails, and drafts what follows (section 9)', async () => {
+    failSave = true;
+    const session = (await import('@/modules/editor/session')).getSession(ID);
+    session?.editor.commands.insertContentAt(1, 'Neu ');
+    await vi.advanceTimersByTimeAsync(DRAFT_DELAY_MS);
+    expect(drafts).toHaveLength(1);
+    expect(await useWorkspace.getState().save(ID)).toBe(false);
+    expect(discarded).toEqual([]);
+    session?.editor.commands.insertContentAt(1, 'mehr ');
+    await vi.advanceTimersByTimeAsync(DRAFT_DELAY_MS);
+    expect(drafts.at(-1)?.text).toBe('mehr Neu Anfang');
+    expect(discarded).toEqual([]);
+  });
+
   it('writes nothing for a tab without unsaved changes', async () => {
     useWorkspace.getState().edit(ID);
     await vi.advanceTimersByTimeAsync(DRAFT_DELAY_MS * 2);

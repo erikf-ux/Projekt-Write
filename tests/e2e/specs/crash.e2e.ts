@@ -1,9 +1,9 @@
 /**
- * Stage 2, "Absturz" (ADR 0016, decision 9), first half: the app is killed
- * hard while the user types about ten characters a second. Autosave waits
- * for a pause of 1 s and never comes; only the draft in `recovery/`, written
- * at most a second after an input, keeps the text. crash-recovered.e2e.ts
- * checks the next start.
+ * Stage 2, "Absturz" (ADR 0016, decisions 8 and 9), first half: the app is
+ * killed hard while the user types about ten characters a second. Autosave
+ * waits for a pause of 1 s and never comes; only the draft in `recovery/`,
+ * written at most a second after an input, keeps the text.
+ * crash-recovered.e2e.ts checks the next start.
  *
  * Runs after session-restored.e2e.ts; kills the app (the test service
  * starts it again for the next file).

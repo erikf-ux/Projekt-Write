@@ -77,6 +77,12 @@ describe('internal links', () => {
     expect(matchingDocuments(documents, 'fehlt', 'x', 'de')).toEqual([]);
   });
 
+  it('leaves archived documents out (ADR 0016, decision 3)', () => {
+    const archived = { ...summary('a', 'Kapitel alt'), archivedAt: '2026-11-05T09:00:00.000Z' };
+    const documents = [archived, summary('b', 'Kapitel neu')];
+    expect(matchingDocuments(documents, 'kapitel', 'x', 'de').map((d) => d.id)).toEqual(['b']);
+  });
+
   it('asks for a document after [[ and writes the link as Markdown', () => {
     vi.useFakeTimers();
     const asked = vi.fn();
