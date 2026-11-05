@@ -37,6 +37,10 @@ pub struct DocumentSummary {
     pub favorited_at: Option<String>,
     /// Last opened in a tab ("Zuletzt verwendet").
     pub last_opened_at: Option<String>,
+    /// Archived since ("Archiv").
+    pub archived_at: Option<String>,
+    /// In the trash since ("Papierkorb").
+    pub deleted_at: Option<String>,
 }
 
 impl From<&DocumentMeta> for DocumentSummary {
@@ -51,6 +55,8 @@ impl From<&DocumentMeta> for DocumentSummary {
             original_name: meta.original_name.clone(),
             favorited_at: meta.favorited_at.clone(),
             last_opened_at: meta.last_opened_at.clone(),
+            archived_at: meta.archived_at.clone(),
+            deleted_at: meta.deleted_at.clone(),
         }
     }
 }
@@ -148,6 +154,21 @@ impl Validate for SaveDocumentRequest {
             return Err(CommandError::new(ErrorCode::DocumentTooLarge));
         }
         Ok(())
+    }
+}
+
+/// Request of `document_archive`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ArchiveDocumentRequest {
+    pub id: String,
+    pub archived: bool,
+}
+
+impl Validate for ArchiveDocumentRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id).map(|_| ())
     }
 }
 
@@ -319,7 +340,11 @@ pub async fn document_read(
     state
         .session
         .with_documents(|documents| async move {
-            let (_, content) = documents.read(id).await.map_err(document_error)?;
+            let (meta, content) = documents.read(id).await.map_err(document_error)?;
+            // Documents in the trash do not open (they come back first).
+            if meta.deleted_at.is_some() {
+                return Err(CommandError::new(ErrorCode::DocumentNotFound));
+            }
             // Opening in a tab is what "Zuletzt verwendet" lists.
             let meta = documents.mark_opened(id).await.map_err(document_error)?;
             if meta.format == DocumentFormat::Pwrite {
@@ -390,6 +415,120 @@ pub async fn document_convert(
                 .await
                 .map_err(document_error)?;
             Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// Moves a document to the trash (stage 3, ADR 0016). Row, file, links and
+/// versions stay.
+#[tauri::command]
+pub async fn document_delete(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents.move_to_trash(id).await.map_err(document_error)?;
+            log::info!("document {} moved to the trash", meta.id);
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// Takes a document out of the trash, with everything it had.
+#[tauri::command]
+pub async fn document_restore(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .restore_from_trash(id)
+                .await
+                .map_err(document_error)?;
+            log::info!("document {} restored from the trash", meta.id);
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// Archives a document or takes it out of the archive.
+#[tauri::command]
+pub async fn document_archive(
+    state: State<'_, AppState>,
+    request: Input<ArchiveDocumentRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let request = request.into_inner();
+    let id = parse_id(&request.id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .set_archived(id, request.archived)
+                .await
+                .map_err(document_error)?;
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
+/// The documents in the trash, most recently deleted first. Documents past
+/// the retention period are removed first.
+#[tauri::command]
+pub async fn documents_trash(
+    state: State<'_, AppState>,
+    request: Input<EmptyRequest>,
+) -> Result<Vec<DocumentSummary>, CommandError> {
+    let _ = request.into_inner();
+    let days = state.session.trash_retention_days().await;
+    state
+        .session
+        .with_documents(|documents| async move {
+            if let Some(days) = days {
+                documents
+                    .purge_expired(days)
+                    .await
+                    .map_err(document_error)?;
+            }
+            let list = documents.list_trash().await.map_err(document_error)?;
+            Ok(list.iter().map(DocumentSummary::from).collect())
+        })
+        .await
+}
+
+/// Removes a document in the trash for good ("Endgültig löschen").
+#[tauri::command]
+pub async fn document_purge(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<(), CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(
+            |documents| async move { documents.purge(id).await.map_err(document_error) },
+        )
+        .await
+}
+
+/// Empties the trash; returns how many documents were removed.
+#[tauri::command]
+pub async fn trash_empty(
+    state: State<'_, AppState>,
+    request: Input<EmptyRequest>,
+) -> Result<u32, CommandError> {
+    let _ = request.into_inner();
+    state
+        .session
+        .with_documents(|documents| async move {
+            let removed = documents.empty_trash().await.map_err(document_error)?;
+            log::info!("trash emptied ({removed} documents)");
+            Ok(u32::try_from(removed).unwrap_or(u32::MAX))
         })
         .await
 }
@@ -550,6 +689,7 @@ pub(crate) fn document_error(error: DocumentError) -> CommandError {
         DocumentError::InvalidPwrite => CommandError::new(ErrorCode::PwriteInvalid),
         DocumentError::ReadOnly => CommandError::new(ErrorCode::DocumentReadOnly),
         DocumentError::SameFormat => CommandError::invalid_input("format", "same format"),
+        DocumentError::NotInTrash => CommandError::invalid_input("id", "not in the trash"),
         DocumentError::NotText => CommandError::new(ErrorCode::DocumentNotText),
     }
 }

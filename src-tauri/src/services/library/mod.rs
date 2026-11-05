@@ -30,7 +30,7 @@ use crate::database::{Database, DatabaseError, JournalMode, diagnostics};
 use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, PathError, SafeRoot};
 use crate::services::documents::DocumentRepository;
-use crate::services::settings::library::LibrarySettings;
+use crate::services::settings::library::{LibrarySettings, TrashRetentionDays};
 
 use layout::{
     DATABASE_FILE, GUARDED_PATHS, INITIAL_DIRS, KNOWN_TOP_LEVEL, LOCK_FILE, MANIFEST_FILE,
@@ -386,6 +386,25 @@ impl Library {
     /// The library-wide settings.
     pub fn settings(&self) -> LibrarySettings {
         LibrarySettings::new(self.database.clone(), self.generators.clone())
+    }
+
+    /// Work after opening (ADR 0016): documents past the retention period of
+    /// the trash go for good. Failures are logged; the library stays open.
+    pub async fn housekeeping(&self) {
+        let days = match self.settings().get::<TrashRetentionDays>().await {
+            Ok(days) => days,
+            Err(error) => {
+                log::warn!("trash retention not read: {error}");
+                return;
+            }
+        };
+        match self.documents().purge_expired(days).await {
+            Ok(0) => {}
+            Ok(removed) => {
+                log::info!("{removed} documents removed from the trash after {days} days")
+            }
+            Err(error) => log::warn!("trash not cleaned up: {error}"),
+        }
     }
 
     /// Closes the database, then releases the lock.

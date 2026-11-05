@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-restore"
+description = "Enables the document_restore command without any pre-configured scope."
+commands.allow = ["document_restore"]
+
+[[permission]]
+identifier = "deny-document-restore"
+description = "Denies the document_restore command without any pre-configured scope."
+commands.deny = ["document_restore"]

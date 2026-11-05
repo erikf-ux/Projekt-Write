@@ -153,6 +153,39 @@ impl Clock for SystemClock {
     }
 }
 
+/// A clock that stands still until it is moved: for tests with simulated
+/// time (retention of the trash and of the history, ADR 0016).
+#[derive(Debug)]
+pub struct ManualClock {
+    millis: std::sync::atomic::AtomicI64,
+}
+
+impl ManualClock {
+    pub fn new(start: Timestamp) -> Self {
+        Self {
+            millis: std::sync::atomic::AtomicI64::new(start.unix_millis()),
+        }
+    }
+
+    /// Moves the clock forward (or back, with a negative value).
+    pub fn advance(&self, millis: i64) {
+        self.millis
+            .fetch_add(millis, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn set(&self, time: Timestamp) {
+        self.millis
+            .store(time.unix_millis(), std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl Clock for ManualClock {
+    fn now(&self) -> Timestamp {
+        Timestamp::from_unix_millis(self.millis.load(std::sync::atomic::Ordering::SeqCst))
+            .unwrap_or_else(Timestamp::now)
+    }
+}
+
 /// Random version 4 UUIDs.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RandomIds;

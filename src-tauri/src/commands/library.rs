@@ -13,7 +13,9 @@ use ts_rs::TS;
 use crate::commands::input::{EmptyRequest, Input, Validate};
 use crate::error::CommandError;
 use crate::services::library::relocate::{MovePhase, MoveProgress};
-use crate::services::session::{LibraryStatus, LocationChoice, LocationPurpose};
+use crate::services::session::{
+    LibraryPreferences, LibraryStatus, LocationChoice, LocationPurpose,
+};
 use crate::state::AppState;
 
 /// Longest dialog title accepted from the frontend.
@@ -262,4 +264,35 @@ mod tests {
         assert!(request(&"x".repeat(121)).validate().is_err());
         assert!(request("a\u{0}b").validate().is_err());
     }
+}
+
+impl Validate for LibraryPreferences {
+    fn validate(&self) -> Result<(), CommandError> {
+        if !(1..=3650).contains(&self.trash_retention_days) {
+            return Err(CommandError::invalid_input(
+                "trashRetentionDays",
+                "between 1 and 3650 days",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// The library settings shown in Einstellungen › Bibliothek.
+#[tauri::command]
+pub async fn library_preferences(
+    state: State<'_, AppState>,
+    request: Input<EmptyRequest>,
+) -> Result<LibraryPreferences, CommandError> {
+    let _ = request.into_inner();
+    state.session.preferences().await
+}
+
+/// Changes the library settings shown in Einstellungen › Bibliothek.
+#[tauri::command]
+pub async fn library_update_preferences(
+    state: State<'_, AppState>,
+    request: Input<LibraryPreferences>,
+) -> Result<LibraryPreferences, CommandError> {
+    state.session.set_preferences(&request.into_inner()).await
 }

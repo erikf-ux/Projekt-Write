@@ -47,6 +47,27 @@ impl LibrarySetting for AcceptedLocation {
     }
 }
 
+/// Days a document stays in the trash before it is removed for good
+/// (section 4, "Papierkorb": 30 days, adjustable).
+pub struct TrashRetentionDays;
+
+impl LibrarySetting for TrashRetentionDays {
+    const KEY: &'static str = "trash.retentionDays";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        30
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=3650).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 3650 days")
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SettingsError {
     #[error("invalid value for {key}: {reason}")]

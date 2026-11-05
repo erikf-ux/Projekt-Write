@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::clock::Generators;
+use crate::clock::{Generators, Timestamp};
 use crate::database::Database;
 use crate::database::documents::{self as rows, DocumentRow};
 use crate::filesystem::atomic;
@@ -168,6 +168,8 @@ pub enum DocumentError {
     ReadOnly,
     #[error("the document has this format already")]
     SameFormat,
+    #[error("the document is not in the trash")]
+    NotInTrash,
     #[error("content is not UTF-8 text")]
     NotText,
 }
@@ -698,6 +700,108 @@ impl DocumentRepository {
             return Err(DocumentError::NotFound);
         }
         self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// Takes a document out of the trash (stage 3, "Papierkorb"). Its links,
+    /// versions and its favourite come back with it: they never left.
+    pub async fn restore_from_trash(&self, id: Uuid) -> Result<DocumentMeta, DocumentError> {
+        let _guard = self.write_lock.lock().await;
+        let changed =
+            rows::clear_deleted(self.database.writer(), &id.hyphenated().to_string()).await?;
+        if changed == 0 {
+            return Err(DocumentError::NotFound);
+        }
+        self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// Archives a document or takes it out of the archive (section 4,
+    /// "Archiv"). Changes neither content nor `updated_at`.
+    pub async fn set_archived(
+        &self,
+        id: Uuid,
+        archived: bool,
+    ) -> Result<DocumentMeta, DocumentError> {
+        let _guard = self.write_lock.lock().await;
+        let now = self.generators.now().to_iso();
+        let changed = rows::set_archived(
+            self.database.writer(),
+            &id.hyphenated().to_string(),
+            archived.then_some(now.as_str()),
+        )
+        .await?;
+        if changed == 0 {
+            return Err(DocumentError::NotFound);
+        }
+        self.get(id).await?.ok_or(DocumentError::NotFound)
+    }
+
+    /// Documents in the trash, most recently deleted first.
+    pub async fn list_trash(&self) -> Result<Vec<DocumentMeta>, DocumentError> {
+        rows::list_trash(self.database.reader())
+            .await?
+            .into_iter()
+            .map(meta_from_row)
+            .collect()
+    }
+
+    /// Removes a document in the trash for good: first the row (with its
+    /// links and versions), then its file. A document outside the trash is
+    /// never removed.
+    pub async fn purge(&self, id: Uuid) -> Result<(), DocumentError> {
+        let _guard = self.write_lock.lock().await;
+        let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
+        if meta.deleted_at.is_none() {
+            return Err(DocumentError::NotInTrash);
+        }
+        let changed =
+            rows::delete_trashed(self.database.writer(), &meta.id.hyphenated().to_string()).await?;
+        if changed == 0 {
+            return Err(DocumentError::NotFound);
+        }
+        // Without a row nothing refers to the file any more (section 9).
+        let path = self.root.resolve(&meta.format.relative_path(meta.id))?;
+        if let Err(error) = std::fs::remove_file(&path)
+            && error.kind() != io::ErrorKind::NotFound
+        {
+            log::warn!("file of removed document {} not deleted: {error}", meta.id);
+        }
+        log::info!("document {} removed from the trash for good", meta.id);
+        Ok(())
+    }
+
+    /// Removes every document that has been in the trash for longer than
+    /// `retention_days`. Returns how many went.
+    pub async fn purge_expired(&self, retention_days: u32) -> Result<usize, DocumentError> {
+        let now = self.generators.now();
+        let cutoff = Timestamp::from_unix_millis(
+            now.unix_millis() - i64::from(retention_days) * 24 * 60 * 60 * 1000,
+        )
+        .unwrap_or(now)
+        .to_iso();
+        let expired = rows::trashed_before(self.database.reader(), &cutoff).await?;
+        let mut removed = 0;
+        for id in expired.iter().filter_map(|id| Uuid::try_parse(id).ok()) {
+            match self.purge(id).await {
+                Ok(()) => removed += 1,
+                Err(DocumentError::NotFound | DocumentError::NotInTrash) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(removed)
+    }
+
+    /// "Papierkorb leeren": removes every document in the trash.
+    pub async fn empty_trash(&self) -> Result<usize, DocumentError> {
+        let trashed = self.list_trash().await?;
+        let mut removed = 0;
+        for meta in trashed {
+            match self.purge(meta.id).await {
+                Ok(()) => removed += 1,
+                Err(DocumentError::NotFound | DocumentError::NotInTrash) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(removed)
     }
 
     /// Moves a document to the trash. Row and file stay (section 13).

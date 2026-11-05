@@ -285,6 +285,67 @@ pub async fn set_deleted(
     )
 }
 
+/// Takes a document out of the trash.
+pub async fn clear_deleted(pool: &SqlitePool, id: &str) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE documents SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL",
+    )
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected())
+}
+
+/// Archives a document (`Some`) or takes it out of the archive (`None`).
+pub async fn set_archived(
+    pool: &SqlitePool,
+    id: &str,
+    archived_at: Option<&str>,
+) -> Result<u64, sqlx::Error> {
+    Ok(
+        sqlx::query("UPDATE documents SET archived_at = ?2 WHERE id = ?1 AND deleted_at IS NULL")
+            .bind(id)
+            .bind(archived_at)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
+}
+
+/// Documents in the trash, most recently deleted first.
+pub async fn list_trash(pool: &SqlitePool) -> Result<Vec<DocumentRow>, sqlx::Error> {
+    sqlx::query(select_documents!(
+        "WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, id"
+    ))
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(from_row)
+    .collect()
+}
+
+/// Ids of documents deleted before `cutoff` (ISO 8601, same width).
+pub async fn trashed_before(pool: &SqlitePool, cutoff: &str) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT id FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?1 ORDER BY deleted_at, id",
+    )
+    .bind(cutoff)
+    .fetch_all(pool)
+    .await
+}
+
+/// Removes the row of a document in the trash for good; `ON DELETE CASCADE`
+/// removes its links and versions.
+pub async fn delete_trashed(pool: &SqlitePool, id: &str) -> Result<u64, sqlx::Error> {
+    Ok(
+        sqlx::query("DELETE FROM documents WHERE id = ?1 AND deleted_at IS NOT NULL")
+            .bind(id)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
+}
+
 /// Marks a document as a favourite (`Some`) or not (`None`). Returns the number
 /// of changed rows.
 pub async fn set_favorited(

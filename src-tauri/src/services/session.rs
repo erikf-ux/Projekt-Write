@@ -30,7 +30,7 @@ use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome};
-use crate::services::settings::library::AcceptedLocation;
+use crate::services::settings::library::{AcceptedLocation, TrashRetentionDays};
 
 /// Name of the library folder inside the documents folder (section 9:
 /// "Standard ist `Dokumente/ProjectWrite`").
@@ -275,10 +275,13 @@ impl LibrarySession {
         )
         .await;
         *slot = match result {
-            Ok((library, report)) => Slot::Open {
-                notes: OpenNotes::from_report(&report),
-                library: Box::new(library),
-            },
+            Ok((library, report)) => {
+                library.housekeeping().await;
+                Slot::Open {
+                    notes: OpenNotes::from_report(&report),
+                    library: Box::new(library),
+                }
+            }
             Err(error) => {
                 log::warn!("configured library not opened: {error}");
                 Slot::Closed {
@@ -356,6 +359,15 @@ impl LibrarySession {
         let result = operation(repository).await;
         drop(slot);
         result
+    }
+
+    /// Days documents stay in the trash, if a library is open.
+    pub async fn trash_retention_days(&self) -> Option<u32> {
+        let slot = self.slot.lock().await;
+        match &*slot {
+            Slot::Open { library, .. } => library.settings().get::<TrashRetentionDays>().await.ok(),
+            Slot::Closed { .. } | Slot::Moving => None,
+        }
     }
 
     /// The database of the open library (for the system check).
@@ -514,6 +526,7 @@ impl LibrarySession {
 
     /// Replaces the open library by `library` and remembers its path.
     async fn switch_to(&self, slot: &mut Slot, library: Library, report: &OpenReport) {
+        library.housekeeping().await;
         let previous = std::mem::replace(
             slot,
             Slot::Open {
@@ -638,6 +651,32 @@ impl LibrarySession {
         Ok(self.describe(&slot).await)
     }
 
+    /// The library settings the interface shows (ADR 0016).
+    pub async fn preferences(&self) -> Result<LibraryPreferences, CommandError> {
+        let slot = self.slot.lock().await;
+        let Slot::Open { library, .. } = &*slot else {
+            return Err(CommandError::new(ErrorCode::LibraryNotOpen));
+        };
+        read_preferences(library).await
+    }
+
+    /// Changes the library settings the interface shows.
+    pub async fn set_preferences(
+        &self,
+        preferences: &LibraryPreferences,
+    ) -> Result<LibraryPreferences, CommandError> {
+        let slot = self.slot.lock().await;
+        let Slot::Open { library, .. } = &*slot else {
+            return Err(CommandError::new(ErrorCode::LibraryNotOpen));
+        };
+        let settings = library.settings();
+        settings
+            .set::<TrashRetentionDays>(&preferences.trash_retention_days)
+            .await
+            .map_err(preferences_error)?;
+        read_preferences(library).await
+    }
+
     /// Closes the open library (at exit).
     pub async fn close(&self) {
         let mut slot = self.slot.lock().await;
@@ -650,6 +689,38 @@ impl LibrarySession {
 }
 
 /// Locks `mutex`; a panic in another thread does not make the data unusable.
+/// Library settings shown in Einstellungen › Bibliothek (ADR 0016).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct LibraryPreferences {
+    /// Days a document stays in the trash (1–3650).
+    pub trash_retention_days: u32,
+}
+
+async fn read_preferences(library: &Library) -> Result<LibraryPreferences, CommandError> {
+    let trash_retention_days = library
+        .settings()
+        .get::<TrashRetentionDays>()
+        .await
+        .map_err(preferences_error)?;
+    Ok(LibraryPreferences {
+        trash_retention_days,
+    })
+}
+
+fn preferences_error(error: crate::services::settings::library::SettingsError) -> CommandError {
+    match error {
+        crate::services::settings::library::SettingsError::Invalid { key, reason } => {
+            CommandError::invalid_input(key, reason)
+        }
+        crate::services::settings::library::SettingsError::Database(error) => {
+            log::error!("library settings: {error}");
+            CommandError::new(ErrorCode::Database)
+        }
+    }
+}
+
 pub(crate) fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex
         .lock()

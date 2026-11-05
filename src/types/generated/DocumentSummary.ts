@@ -16,4 +16,12 @@ favoritedAt: string | null,
 /**
  * Last opened in a tab ("Zuletzt verwendet").
  */
-lastOpenedAt: string | null, };
+lastOpenedAt: string | null, 
+/**
+ * Archived since ("Archiv").
+ */
+archivedAt: string | null, 
+/**
+ * In the trash since ("Papierkorb").
+ */
+deletedAt: string | null, };

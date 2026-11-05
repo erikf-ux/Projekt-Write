@@ -1954,3 +1954,124 @@ fn internal_links_are_derived_on_save_and_listed_as_backlinks() {
     assert_uniform_error(&error, "id");
     app.shut_down();
 }
+
+#[test]
+fn documents_go_to_the_trash_come_back_and_are_archived() {
+    let app = app_with_library();
+    let create = |title: &str| -> String {
+        call(
+            &app,
+            "document_create",
+            json!({ "title": title, "format": "md" }),
+        )
+        .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let target = create("Ziel");
+    let source = create("Quelle");
+    call(
+        &app,
+        "document_save",
+        json!({ "id": source, "text": format!("[Ziel](pwrite://{target})\n") }),
+    )
+    .unwrap();
+    let titles = |command: &str, request: Value| -> Vec<String> {
+        call(&app, command, request)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["title"].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    let deleted = call(&app, "document_delete", json!({ "id": source })).unwrap();
+    assert!(deleted["deletedAt"].is_string());
+    assert_eq!(titles("documents_list", json!({})), ["Ziel"]);
+    assert_eq!(titles("documents_trash", json!({})), ["Quelle"]);
+    assert!(titles("document_backlinks", json!({ "id": target })).is_empty());
+    let error = call(&app, "document_read", json!({ "id": source })).unwrap_err();
+    assert_error_code(&error, "DOCUMENT_NOT_FOUND");
+
+    let restored = call(&app, "document_restore", json!({ "id": source })).unwrap();
+    assert_eq!(restored["deletedAt"], Value::Null);
+    assert_eq!(
+        titles("document_backlinks", json!({ "id": target })),
+        ["Quelle"]
+    );
+    assert!(titles("documents_trash", json!({})).is_empty());
+
+    let archived = call(
+        &app,
+        "document_archive",
+        json!({ "id": target, "archived": true }),
+    )
+    .unwrap();
+    assert!(archived["archivedAt"].is_string());
+    // Archived documents stay in the list (the interface shows them under "Archiv").
+    let list = call(&app, "documents_list", json!({})).unwrap();
+    assert!(
+        list.as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["id"] == target.as_str() && d["archivedAt"].is_string())
+    );
+    call(
+        &app,
+        "document_archive",
+        json!({ "id": target, "archived": false }),
+    )
+    .unwrap();
+
+    // For good: only from the trash.
+    let error = call(&app, "document_purge", json!({ "id": target })).unwrap_err();
+    assert_uniform_error(&error, "id");
+    call(&app, "document_delete", json!({ "id": source })).unwrap();
+    call(&app, "document_purge", json!({ "id": source })).unwrap();
+    assert!(titles("documents_trash", json!({})).is_empty());
+    assert!(
+        !app.path(&format!(
+            "Dokumente/ProjectWrite/documents/markdown/{source}.md"
+        ))
+        .exists()
+    );
+    call(&app, "document_delete", json!({ "id": target })).unwrap();
+    assert_eq!(call(&app, "trash_empty", json!({})).unwrap(), 1);
+
+    // Settings of the library.
+    assert_eq!(
+        call(&app, "library_preferences", json!({})).unwrap(),
+        json!({ "trashRetentionDays": 30 })
+    );
+    assert_eq!(
+        call(
+            &app,
+            "library_update_preferences",
+            json!({ "trashRetentionDays": 7 })
+        )
+        .unwrap(),
+        json!({ "trashRetentionDays": 7 })
+    );
+    for bad in [
+        json!({ "trashRetentionDays": 0 }),
+        json!({ "trashRetentionDays": 4000 }),
+    ] {
+        let error = call(&app, "library_update_preferences", bad).unwrap_err();
+        assert_uniform_error(&error, "trashRetentionDays");
+    }
+    let error = call(&app, "library_update_preferences", json!({ "days": 3 })).unwrap_err();
+    assert_uniform_error(&error, "request");
+    for (command, request, field) in [
+        ("document_delete", json!({ "id": "x" }), "id"),
+        ("document_restore", json!({}), "request"),
+        ("document_archive", json!({ "id": target }), "request"),
+        ("documents_trash", json!({ "all": true }), "request"),
+        ("trash_empty", json!({ "force": true }), "request"),
+    ] {
+        let error = call(&app, command, request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    app.shut_down();
+}
