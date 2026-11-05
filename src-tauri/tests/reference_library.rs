@@ -36,6 +36,15 @@ async fn the_same_seed_builds_the_same_library() {
     assert_ne!(a, generate::fingerprint(&other_seed).await.unwrap());
     assert_eq!(summary.documents, DOCUMENTS);
     assert_eq!(summary.markdown + summary.text, DOCUMENTS);
+    // Phase 7: subnets and tags in proportion, most documents assigned.
+    let (subnets, tags) = generate::structure_size(DOCUMENTS);
+    assert_eq!((summary.subnets, summary.tags), (subnets, tags));
+    assert!(summary.unassigned > 0 && summary.unassigned < DOCUMENTS / 3);
+    assert!(summary.memberships >= DOCUMENTS - summary.unassigned);
+    assert_eq!(
+        generate::structure_size(generate::FULL_DOCUMENTS),
+        (500, 1_000)
+    );
 
     // It is an ordinary, intact library.
     let (library, report) = Library::open(&first, OpenOptions::default(), Generators::system())
@@ -50,6 +59,19 @@ async fn the_same_seed_builds_the_same_library() {
     );
     let documents = library.documents();
     assert_eq!(documents.count().await.unwrap(), DOCUMENTS as u64);
+    let structure = library.structure();
+    let rows = structure.subnets().await.unwrap();
+    assert_eq!(rows.len(), subnets);
+    // At most four levels, no cycles.
+    for row in &rows {
+        let mut depth = 1;
+        let mut parent = row.parent_id.clone();
+        while let Some(id) = parent {
+            depth += 1;
+            parent = rows.iter().find(|r| r.id == id).unwrap().parent_id.clone();
+        }
+        assert!(depth <= 4, "{} is on level {depth}", row.name);
+    }
 
     // One document has the 50,000 words of the performance targets.
     let longest = documents

@@ -156,6 +156,14 @@ fn main() -> ExitCode {
                 summary.documents, summary.markdown, summary.text
             );
             println!("content:     {} bytes", summary.bytes);
+            println!(
+                "structure:   {} subnets, {} tags, {} memberships, {} document tags, {} documents not assigned",
+                summary.subnets,
+                summary.tags,
+                summary.memberships,
+                summary.document_tags,
+                summary.unassigned
+            );
             println!("time:        {:.1} s", started.elapsed().as_secs_f64());
             println!("fingerprint: {fingerprint}");
             ExitCode::SUCCESS

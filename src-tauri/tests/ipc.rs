@@ -2421,3 +2421,207 @@ fn the_tabs_of_a_session_open_again_after_a_restart() {
     }
     second.shut_down();
 }
+
+#[test]
+fn subnets_memberships_and_tags_through_the_commands() {
+    let app = app_with_library();
+    let id = |value: &Value| value["subjectId"].as_str().unwrap().to_owned();
+    let doc = call(
+        &app,
+        "document_create",
+        json!({ "title": "Kapitel", "format": "md" }),
+    )
+    .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let projects = call(&app, "subnet_create", json!({ "name": "Projekte" })).unwrap();
+    assert_eq!(projects["step"]["action"], "subnetCreate");
+    assert_eq!(projects["history"]["undo"]["subject"], "Projekte");
+    let projects = id(&projects);
+    let novel = id(&call(
+        &app,
+        "subnet_create",
+        json!({ "name": "Roman", "parentId": projects, "description": "Erster Band" }),
+    )
+    .unwrap());
+    let error = call(
+        &app,
+        "subnet_move",
+        json!({ "id": projects, "parentId": novel }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "SUBNET_CYCLE");
+    let error = call(&app, "subnet_create", json!({ "name": "projekte" })).unwrap_err();
+    assert_error_code(&error, "SUBNET_NAME_TAKEN");
+    assert_eq!(error["details"]["existing"], projects.as_str());
+
+    // One document in two subnets: one row, two memberships.
+    call(
+        &app,
+        "document_assign",
+        json!({ "id": doc, "subnetId": novel }),
+    )
+    .unwrap();
+    let both = call(
+        &app,
+        "document_assign",
+        json!({ "id": doc, "subnetId": projects }),
+    )
+    .unwrap();
+    assert_eq!(both["documents"][0]["subnetIds"], json!([novel, projects]));
+    assert_eq!(
+        call(&app, "documents_list", json!({}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let moved = call(
+        &app,
+        "document_move",
+        json!({ "id": doc, "subnetId": projects }),
+    )
+    .unwrap();
+    assert_eq!(moved["documents"][0]["subnetIds"], json!([projects]));
+
+    // Tags by name, unique without case.
+    let tagged = call(
+        &app,
+        "document_tag",
+        json!({ "id": doc, "name": "Entwurf" }),
+    )
+    .unwrap();
+    let draft = id(&tagged);
+    assert_eq!(tagged["tags"][0]["name"], "Entwurf");
+    let error = call(&app, "tag_create", json!({ "name": "ENTWURF" })).unwrap_err();
+    assert_error_code(&error, "TAG_NAME_TAKEN");
+    assert_eq!(error["details"]["existing"], draft.as_str());
+
+    // The state at start, and deleting a subnet keeps the document.
+    let state = call(&app, "structure_state", json!({})).unwrap();
+    assert_eq!(state["subnets"].as_array().unwrap().len(), 2);
+    assert_eq!(state["documents"][0]["tagIds"], json!([draft]));
+    let deleted = call(
+        &app,
+        "subnet_delete",
+        json!({ "id": projects, "withChildren": false }),
+    )
+    .unwrap();
+    assert_eq!(deleted["subnets"].as_array().unwrap().len(), 1);
+    assert_eq!(deleted["subnets"][0]["parentId"], Value::Null);
+    assert_eq!(deleted["documents"][0]["subnetIds"], json!([]));
+    assert_eq!(
+        call(&app, "documents_list", json!({}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Undo brings the subnet and the membership back; redo removes them.
+    let undone = call(&app, "structure_undo", json!({})).unwrap();
+    assert_eq!(undone["step"]["action"], "subnetDelete");
+    assert_eq!(undone["documents"][0]["subnetIds"], json!([projects]));
+    assert_eq!(undone["history"]["redo"]["action"], "subnetDelete");
+    let redone = call(&app, "structure_redo", json!({})).unwrap();
+    assert_eq!(redone["documents"][0]["subnetIds"], json!([]));
+    assert_eq!(
+        call(&app, "structure_redo", json!({})).unwrap(),
+        Value::Null
+    );
+
+    // Deleting a document is a step too.
+    call(&app, "document_delete", json!({ "id": doc })).unwrap();
+    let undone = call(&app, "structure_undo", json!({})).unwrap();
+    assert_eq!(undone["step"]["action"], "documentDelete");
+    assert_eq!(call(&app, "documents_trash", json!({})).unwrap(), json!([]));
+
+    let bad = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3";
+    for (command, request, field) in [
+        ("subnet_create", json!({ "name": "" }), "name"),
+        (
+            "subnet_create",
+            json!({ "name": "A", "color": "red" }),
+            "color",
+        ),
+        (
+            "subnet_create",
+            json!({ "name": "A", "color": "#ffffff" }),
+            "color",
+        ),
+        (
+            "subnet_create",
+            json!({ "name": "A", "parentId": bad }),
+            "parentId",
+        ),
+        (
+            "subnet_create",
+            json!({ "name": "A", "extra": 1 }),
+            "request",
+        ),
+        (
+            "subnet_update",
+            json!({ "id": novel, "description": "a\u{0}b" }),
+            "description",
+        ),
+        (
+            "subnet_move",
+            json!({ "id": "C:/Users", "parentId": null }),
+            "id",
+        ),
+        ("subnet_delete", json!({ "id": novel }), "request"),
+        (
+            "document_assign",
+            json!({ "id": doc, "subnetId": "../x" }),
+            "subnetId",
+        ),
+        (
+            "document_move",
+            json!({ "id": bad, "subnetId": null }),
+            "id",
+        ),
+        ("tag_create", json!({ "name": "a, b" }), "name"),
+        ("tag_rename", json!({ "id": draft, "name": "  " }), "name"),
+        (
+            "tag_merge",
+            json!({ "sourceId": draft, "targetId": draft }),
+            "targetId",
+        ),
+        (
+            "document_tag",
+            json!({ "id": doc, "name": "x".repeat(101) }),
+            "name",
+        ),
+        (
+            "document_untag",
+            json!({ "id": doc, "tagId": bad }),
+            "tagId",
+        ),
+        ("structure_undo", json!({ "all": true }), "request"),
+    ] {
+        let error = call(&app, command, request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    let missing = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
+    let error = call(
+        &app,
+        "document_assign",
+        json!({ "id": doc, "subnetId": missing }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "SUBNET_NOT_FOUND");
+    let error = call(&app, "tag_delete", json!({ "id": missing })).unwrap_err();
+    assert_error_code(&error, "TAG_NOT_FOUND");
+    let error = call(
+        &app,
+        "document_unassign",
+        json!({ "id": doc, "subnetId": novel }),
+    )
+    .unwrap_err();
+    assert_uniform_error(&error, "subnetId");
+    app.shut_down();
+}

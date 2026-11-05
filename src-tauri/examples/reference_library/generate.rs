@@ -5,8 +5,11 @@
 //! library is built through the real code paths (`Library::create`, the
 //! document repository); nothing is written around them.
 //!
-//! Phase 2 contains documents only. Media, subnets, tags and confirmed
-//! connections join when their tables exist (Phases 7, 8 and 11).
+//! Phase 2 built the documents; Phase 7 adds 500 subnets in up to four
+//! levels, 1,000 tags, memberships (about 85 % of the documents in one to
+//! three subnets) and zero to four tags per document, through the structure
+//! service (ADR 0017). Media and confirmed connections join with Phases 8
+//! and 11.
 //!
 //! Shared by `examples/reference_library/main.rs` and
 //! `tests/reference_library.rs`.
@@ -25,6 +28,64 @@ use uuid::Uuid;
 pub const FULL_DOCUMENTS: usize = 10_000;
 /// Words of the one very long document (section 6: 50,000 words).
 pub const LONG_DOCUMENT_WORDS: usize = 50_000;
+/// Subnets and tags of the full reference library (section 6).
+pub const FULL_SUBNETS: usize = 500;
+pub const FULL_TAGS: usize = 1_000;
+/// Deepest level of the generated subnet tree.
+const MAX_DEPTH: usize = 4;
+
+const SUBNET_WORDS: &[&str] = &[
+    "Projekt",
+    "Kapitel",
+    "Recherche",
+    "Figuren",
+    "Orte",
+    "Notizen",
+    "Entwürfe",
+    "Quellen",
+    "Szenen",
+    "Briefe",
+    "Archivkisten",
+    "Ideen",
+    "Wissen",
+    "Übersetzungen",
+    "Gutachten",
+    "Vorträge",
+    "Reisen",
+    "Interviews",
+    "Zeitleisten",
+    "Glossar",
+];
+
+const TAG_WORDS: &[&str] = &[
+    "Entwurf",
+    "fertig",
+    "prüfen",
+    "Zitat",
+    "Quelle",
+    "Idee",
+    "später",
+    "wichtig",
+    "Österreich",
+    "Straße",
+    "Geschichte",
+    "Technik",
+    "Natur",
+    "Musik",
+    "Kunst",
+    "Recht",
+    "Medizin",
+    "Reise",
+    "Familie",
+    "Arbeit",
+];
+
+/// Subnets and tags for a library of `documents` (the full size has 500 and
+/// 1,000; smaller ones keep the proportion).
+pub fn structure_size(documents: usize) -> (usize, usize) {
+    let scaled = |full: usize| (documents * full / FULL_DOCUMENTS).max(5);
+    (scaled(FULL_SUBNETS), scaled(FULL_TAGS))
+}
 
 /// Small deterministic pseudo-random generator (SplitMix64).
 #[derive(Debug, Clone)]
@@ -464,6 +525,11 @@ pub struct Summary {
     pub markdown: usize,
     pub text: usize,
     pub bytes: u64,
+    pub subnets: usize,
+    pub tags: usize,
+    pub memberships: usize,
+    pub document_tags: usize,
+    pub unassigned: usize,
 }
 
 /// Creates the reference library in `path` (missing or empty folder).
@@ -493,7 +559,13 @@ pub async fn generate(
         markdown: 0,
         text: 0,
         bytes: 0,
+        subnets: 0,
+        tags: 0,
+        memberships: 0,
+        document_tags: 0,
+        unassigned: 0,
     };
+    let mut created = Vec::with_capacity(documents);
     for index in 0..documents {
         let title = title(&mut rng, index);
         let words = target_words(&mut rng, index);
@@ -505,15 +577,103 @@ pub async fn generate(
             (DocumentFormat::Txt, plain_text(&mut rng, words))
         };
         summary.bytes += content.len() as u64;
-        repository
+        let meta = repository
             .create(&title, format, content.as_bytes())
             .await
             .map_err(|e| format!("document {index}: {e}"))?;
+        created.push(meta.id);
         summary.documents += 1;
         progress(index + 1);
     }
+    build_structure(&library, seed, &created, &mut summary).await?;
     library.close().await;
     Ok(summary)
+}
+
+/// Subnets, tags, memberships and document tags (Phase 7).
+async fn build_structure(
+    library: &Library,
+    seed: u64,
+    documents: &[Uuid],
+    summary: &mut Summary,
+) -> Result<(), String> {
+    let structure = library.structure();
+    let mut rng = Rng::new(seed ^ 0x5B7E);
+    let (subnet_count, tag_count) = structure_size(documents.len());
+    // One in 25 on the top level, the rest below a random earlier subnet that
+    // is not yet at the deepest level.
+    let roots = (subnet_count / 25).max(1);
+    let mut subnets: Vec<(Uuid, usize)> = Vec::with_capacity(subnet_count);
+    for index in 0..subnet_count {
+        let (parent, depth) = if index < roots {
+            (None, 1)
+        } else {
+            let candidates: Vec<&(Uuid, usize)> = subnets
+                .iter()
+                .filter(|(_, depth)| *depth < MAX_DEPTH)
+                .collect();
+            let (id, depth) = candidates[rng.range(0, candidates.len())];
+            (Some(*id), depth + 1)
+        };
+        let name = format!("{} {}", rng.pick(SUBNET_WORDS), index + 1);
+        // Every seventh subnet chooses its colour; the others inherit it.
+        let color =
+            (index % 7 == 0).then(|| ["blue", "green", "violet", "orange", "grey"][index % 5]);
+        let description = if rng.chance(30) {
+            sentence(&mut rng)
+        } else {
+            String::new()
+        };
+        let outcome = structure
+            .create_subnet(&name, parent, color, &description)
+            .await
+            .map_err(|e| format!("subnet {index}: {e}"))?;
+        let id = outcome
+            .subject_id
+            .as_deref()
+            .and_then(|id| Uuid::parse_str(id).ok())
+            .ok_or_else(|| format!("subnet {index}: no id"))?;
+        subnets.push((id, depth));
+        summary.subnets += 1;
+    }
+    let tags: Vec<String> = (0..tag_count)
+        .map(|index| format!("{} {}", rng.pick(TAG_WORDS), index + 1))
+        .collect();
+    for name in &tags {
+        structure
+            .create_tag(name)
+            .await
+            .map_err(|e| format!("tag {name}: {e}"))?;
+        summary.tags += 1;
+    }
+    for (index, document) in documents.iter().enumerate() {
+        // About 15 % stay "Nicht zugeordnet".
+        if rng.chance(15) {
+            summary.unassigned += 1;
+        } else {
+            for _ in 0..rng.range(1, 4) {
+                let (subnet, _) = subnets[rng.range(0, subnets.len())];
+                let outcome = structure
+                    .assign(*document, subnet)
+                    .await
+                    .map_err(|e| format!("membership of document {index}: {e}"))?;
+                if outcome.step.is_some() {
+                    summary.memberships += 1;
+                }
+            }
+        }
+        for _ in 0..rng.range(0, 5) {
+            let name = &tags[rng.range(0, tags.len())];
+            let outcome = structure
+                .tag_document(*document, name)
+                .await
+                .map_err(|e| format!("tag of document {index}: {e}"))?;
+            if outcome.step.is_some() {
+                summary.document_tags += 1;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// SHA-256 over everything that defines the library's content: every file
@@ -554,6 +714,43 @@ pub async fn fingerprint(path: &Path) -> Result<String, String> {
             .map_err(|e| e.to_string())?;
     for row in &settings {
         hasher.update(format!("setting {row:?}\n"));
+    }
+    // Phase 7: subnets, memberships, tags.
+    let subnets: Vec<(String, String, String, String, Option<String>, String, String)> =
+        sqlx::query_as(
+            "SELECT id, name, description, color, parent_id, created_at, updated_at FROM subnets ORDER BY id",
+        )
+        .fetch_all(database.reader())
+        .await
+        .map_err(|e| e.to_string())?;
+    for row in &subnets {
+        hasher.update(format!("subnet {row:?}\n"));
+    }
+    let memberships: Vec<(String, String, i64, String)> = sqlx::query_as(
+        "SELECT subnet_id, document_id, is_primary, created_at FROM subnet_memberships ORDER BY document_id, subnet_id",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &memberships {
+        hasher.update(format!("membership {row:?}\n"));
+    }
+    let tags: Vec<(String, String, String, String)> =
+        sqlx::query_as("SELECT id, name, created_at, updated_at FROM tags ORDER BY id")
+            .fetch_all(database.reader())
+            .await
+            .map_err(|e| e.to_string())?;
+    for row in &tags {
+        hasher.update(format!("tag {row:?}\n"));
+    }
+    let document_tags: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT document_id, tag_id, created_at FROM document_tags ORDER BY document_id, tag_id",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &document_tags {
+        hasher.update(format!("document tag {row:?}\n"));
     }
     database.close().await;
     Ok(sha256_hex(&hasher.finalize()))
