@@ -36,6 +36,7 @@ import {
 import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor';
 import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
 import { HistoryDialog, VersionNameDialog } from '@/modules/history/HistoryDialog';
+import { offerRecovery, RecoveryDialog } from '@/modules/recovery/RecoveryDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
@@ -81,6 +82,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       await useWorkspace.getState().reset();
       await useWorkspace.getState().refresh();
       void useWorkspace.getState().refreshTrash();
+      // Stage 2: unsaved changes from a crash are offered first.
+      await offerRecovery();
       // Files passed at start or by a second start open now.
       setOpenRequestsReady(true);
       await useWorkspace.getState().takeOpenRequests();
@@ -316,6 +319,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       <LinkDialog />
       <InternalLinkPicker />
       <HistoryDialog />
+      <RecoveryDialog />
       <VersionNameDialog />
       {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (

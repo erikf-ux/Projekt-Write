@@ -19,6 +19,11 @@
  * and line endings stay as they were unless the user changes them. A
  * change from outside is reported by `checkExternalFiles` and decided in a
  * dialog: reload, keep my version, or save as a copy.
+ *
+ * Recovery drafts (stage 2, ADR 0016): at most `DRAFT_DELAY_MS` after the
+ * first unsaved input of a tab its text goes to Rust (`recovery_write`),
+ * also while the user keeps typing; a saved or discarded tab drops its
+ * draft.
  */
 import { create } from 'zustand';
 import { ask } from '@/components/prompt/promptStore';
@@ -41,6 +46,8 @@ import type { TextEncoding } from '@/types/generated/TextEncoding';
 import type { TextFormat } from '@/types/generated/TextFormat';
 
 export const AUTOSAVE_DELAY_MS = 1000;
+/** A draft is written at most this long after the first unsaved input. */
+export const DRAFT_DELAY_MS = 1000;
 
 export type SaveState = 'saved' | 'pending' | 'saving' | 'error' | 'blocked';
 
@@ -149,8 +156,11 @@ interface WorkspaceStore {
   recentFiles: RecentFileEntry[];
   /** Shows the open dialog and opens the chosen file. */
   openFile: (dialogTitle: string) => Promise<boolean>;
-  /** Opens a file Rust registered (dialog, recent list, start argument). */
-  openExternal: (info: ExternalFileInfo) => Promise<boolean>;
+  /**
+   * Opens a file Rust registered (dialog, recent list, start argument). With
+   * `draftText` the tab shows that text as an unsaved change (stage 2).
+   */
+  openExternal: (info: ExternalFileInfo, draftText?: string) => Promise<boolean>;
   openRecentFile: (recentId: string, name: string) => Promise<boolean>;
   forgetRecentFile: (recentId: string) => Promise<void>;
   refreshRecentFiles: () => Promise<void>;
@@ -204,6 +214,15 @@ const saving = new Map<string, Promise<boolean>>();
 const sources = new Map<string, DocumentSource>();
 /** Counts saves of external tabs, so a check that crossed a save is ignored. */
 const saveEpochs = new Map<string, number>();
+const draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Tabs that may have a draft in Rust (written, or restored from one). */
+const drafted = new Set<string>();
+
+function draftTarget(document: OpenDocument) {
+  return document.external
+    ? ({ kind: 'external', id: document.external.fileId } as const)
+    : ({ kind: 'library', id: document.id } as const);
+}
 
 /** The workbench has loaded the library: files from outside can open. */
 let openRequestsReady = false;
@@ -431,7 +450,9 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     if (now) {
       const unchangedSince = now.revision === revision;
       patch(id, { savedText: text, state: unchangedSince ? 'saved' : 'pending', error: null });
-      if (!unchangedSince) {
+      if (unchangedSince) {
+        discardDraft(id);
+      } else {
         schedule(id);
       }
     }
@@ -496,7 +517,9 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         differsFromFile: false,
         mixedLineEndings: false,
       });
-      if (!unchangedSince && autosaveExternal()) {
+      if (unchangedSince) {
+        discardDraft(id);
+      } else if (autosaveExternal()) {
         schedule(id);
       }
     }
@@ -521,12 +544,59 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     }
   };
 
+  /** Writes the draft of a tab now, if it still has unsaved changes. */
+  const writeDraft = (id: string) => {
+    draftTimers.delete(id);
+    const document = get().open[id];
+    if (!document?.loaded || document.readOnly) {
+      return;
+    }
+    const text = getSession(id)?.text();
+    if (text === undefined || !hasUnsavedChanges(document)) {
+      return;
+    }
+    drafted.add(id);
+    const external = document.external;
+    void call('recovery_write', {
+      target: draftTarget(document),
+      text,
+      ...(external ? { encoding: external.encoding, lineEnding: external.lineEnding } : {}),
+    });
+  };
+
+  /** Throttled, not debounced: continuous typing still writes every second. */
+  const scheduleDraft = (id: string) => {
+    if (!draftTimers.has(id)) {
+      draftTimers.set(
+        id,
+        setTimeout(() => {
+          writeDraft(id);
+        }, DRAFT_DELAY_MS),
+      );
+    }
+  };
+
+  /** The tab is saved or its changes are gone: so is its draft. */
+  const discardDraft = (id: string, document: OpenDocument | undefined = get().open[id]) => {
+    const timer = draftTimers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      draftTimers.delete(id);
+    }
+    if (!document || !drafted.delete(id)) {
+      return;
+    }
+    void call('recovery_discard', { target: draftTarget(document) });
+  };
+
   const closeExternalFile = (fileId: string) => {
     void call('external_close', { id: fileId });
   };
 
   const removeTab = (id: string) => {
     clearTimer(id);
+    // Closing follows saving or discarding: the draft is not needed.
+    discardDraft(id);
     sources.delete(id);
     saveEpochs.delete(id);
     closeSession(id);
@@ -627,6 +697,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return;
       }
       patch(id, { state: 'pending', error: null, revision: document.revision + 1 });
+      scheduleDraft(id);
       if (!document.external || autosaveExternal()) {
         schedule(id);
       }
@@ -805,6 +876,12 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       for (const id of tabs) {
         if (!kept.includes(id)) {
           clearTimer(id);
+          const timer = draftTimers.get(id);
+          if (timer !== undefined) {
+            clearTimeout(timer);
+            draftTimers.delete(id);
+          }
+          drafted.delete(id);
           sources.delete(id);
           closeSession(id);
         }
@@ -837,10 +914,23 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       return result.value ? get().openExternal(result.value) : false;
     },
 
-    openExternal: async (info) => {
+    openExternal: async (info, draftText) => {
       const tab = externalTabId(info.id);
-      if (get().open[tab]) {
+      const existing = get().open[tab];
+      if (existing) {
         get().activate(tab);
+        if (draftText !== undefined && existing.loaded) {
+          // The draft replaces what the tab shows; the file stays as it is.
+          sources.delete(tab);
+          closeSession(tab);
+          patch(tab, {
+            loadedText: draftText,
+            state: 'pending',
+            revision: existing.revision + 1,
+            generation: existing.generation + 1,
+          });
+          drafted.add(tab);
+        }
         return true;
       }
       if (info.large) {
@@ -874,13 +964,18 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       const text = result.value;
+      const restored = draftText !== undefined && !text.newerFormat;
       patch(tab, {
-        loadedText: text.text,
+        loadedText: restored ? draftText : text.text,
         savedText: text.text,
         loaded: true,
         readOnly: text.newerFormat,
+        ...(restored ? { state: 'pending' as const } : {}),
       });
       patchExternal(tab, loadedExternal(text));
+      if (restored) {
+        drafted.add(tab);
+      }
       void get().refreshRecentFiles();
       return true;
     },
@@ -996,6 +1091,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       }
       const text = result.value;
       clearTimer(id);
+      discardDraft(id);
       sources.delete(id);
       closeSession(id);
       const current = get().open[id] ?? document;

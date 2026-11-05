@@ -50,7 +50,12 @@ import type { SaveExternalAsRequest } from '@/types/generated/SaveExternalAsRequ
 import type { SaveExternalRequest } from '@/types/generated/SaveExternalRequest';
 import type { SaveOutcome } from '@/types/generated/SaveOutcome';
 import type { SaveVersionRequest } from '@/types/generated/SaveVersionRequest';
+import type { DiscardDraftRequest } from '@/types/generated/DiscardDraftRequest';
+import type { DraftEntry } from '@/types/generated/DraftEntry';
+import type { DraftRequest } from '@/types/generated/DraftRequest';
+import type { RestoredDraft } from '@/types/generated/RestoredDraft';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
+import type { WriteDraftRequest } from '@/types/generated/WriteDraftRequest';
 import type { VersionRequest } from '@/types/generated/VersionRequest';
 import type { VersionSummary } from '@/types/generated/VersionSummary';
 import type { VersionText } from '@/types/generated/VersionText';
@@ -97,6 +102,11 @@ export interface Commands {
   document_version_save: { request: SaveVersionRequest; response: VersionSummary };
   document_version_close: { request: DocumentRequest; response: VersionSummary };
   document_version_restore: { request: VersionRequest; response: DocumentSummary };
+  recovery_write: { request: WriteDraftRequest; response: null };
+  recovery_discard: { request: DiscardDraftRequest; response: null };
+  recovery_list: { request: EmptyRequest; response: DraftEntry[] };
+  recovery_restore: { request: DraftRequest; response: RestoredDraft };
+  recovery_drop: { request: DraftRequest; response: null };
   library_preferences: { request: EmptyRequest; response: LibraryPreferences };
   library_update_preferences: { request: LibraryPreferences; response: LibraryPreferences };
   link_open: { request: OpenLinkRequest; response: null };
