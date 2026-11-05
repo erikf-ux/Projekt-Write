@@ -405,6 +405,11 @@ impl Library {
             }
             Err(error) => log::warn!("trash not cleaned up: {error}"),
         }
+        match self.documents().history().apply_retention_all().await {
+            Ok(0) => {}
+            Ok(removed) => log::info!("{removed} old versions removed by the retention rules"),
+            Err(error) => log::warn!("history retention not applied: {error}"),
+        }
     }
 
     /// Closes the database, then releases the lock.

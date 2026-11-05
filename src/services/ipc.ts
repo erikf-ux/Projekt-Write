@@ -49,7 +49,11 @@ import type { RecentFileEntry } from '@/types/generated/RecentFileEntry';
 import type { SaveExternalAsRequest } from '@/types/generated/SaveExternalAsRequest';
 import type { SaveExternalRequest } from '@/types/generated/SaveExternalRequest';
 import type { SaveOutcome } from '@/types/generated/SaveOutcome';
+import type { SaveVersionRequest } from '@/types/generated/SaveVersionRequest';
 import type { SystemCheckRequest } from '@/types/generated/SystemCheckRequest';
+import type { VersionRequest } from '@/types/generated/VersionRequest';
+import type { VersionSummary } from '@/types/generated/VersionSummary';
+import type { VersionText } from '@/types/generated/VersionText';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
 import type { UiEvent } from '@/types/generated/UiEvent';
 import type { UiState } from '@/types/generated/UiState';
@@ -88,6 +92,11 @@ export interface Commands {
   documents_trash: { request: EmptyRequest; response: DocumentSummary[] };
   document_purge: { request: DocumentRequest; response: null };
   trash_empty: { request: EmptyRequest; response: number };
+  document_versions: { request: DocumentRequest; response: VersionSummary[] };
+  document_version_text: { request: VersionRequest; response: VersionText };
+  document_version_save: { request: SaveVersionRequest; response: VersionSummary };
+  document_version_close: { request: DocumentRequest; response: VersionSummary };
+  document_version_restore: { request: VersionRequest; response: DocumentSummary };
   library_preferences: { request: EmptyRequest; response: LibraryPreferences };
   library_update_preferences: { request: LibraryPreferences; response: LibraryPreferences };
   link_open: { request: OpenLinkRequest; response: null };
@@ -165,6 +174,8 @@ const errorCodes: Record<ErrorCode, true> = {
   FILE_CHANGED: true,
   FILE_READ_ONLY: true,
   FILE_UNENCODABLE: true,
+  VERSION_NOT_FOUND: true,
+  VERSION_DAMAGED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

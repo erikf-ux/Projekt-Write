@@ -182,6 +182,8 @@
   "error.themeInvalid": "Die Design-Datei ist ungültig ({field}).",
   "error.themeLimit": "Es sind bereits 50 Designs importiert. Bitte entfernen Sie zuerst eines.",
   "error.themeNotFound": "Das Design wurde nicht gefunden.",
+  "error.versionDamaged": "Diese Version ist beschädigt und lässt sich nicht lesen.",
+  "error.versionNotFound": "Diese Version gibt es nicht mehr.",
   "explorer.archive": "Archivieren",
   "explorer.copy": "Kopie anlegen",
   "explorer.copySuffix": " (Kopie)",

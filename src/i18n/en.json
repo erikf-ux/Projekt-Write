@@ -182,6 +182,8 @@
   "error.themeInvalid": "The theme file is not valid ({field}).",
   "error.themeLimit": "50 themes are imported already. Please remove one first.",
   "error.themeNotFound": "The theme was not found.",
+  "error.versionDamaged": "This version is damaged and cannot be read.",
+  "error.versionNotFound": "This version no longer exists.",
   "explorer.archive": "Archive",
   "explorer.copy": "Make a copy",
   "explorer.copySuffix": " (copy)",

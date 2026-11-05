@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-version-close"
+description = "Enables the document_version_close command without any pre-configured scope."
+commands.allow = ["document_version_close"]
+
+[[permission]]
+identifier = "deny-document-version-close"
+description = "Denies the document_version_close command without any pre-configured scope."
+commands.deny = ["document_version_close"]

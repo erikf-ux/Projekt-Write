@@ -15,6 +15,7 @@ use crate::error::{CommandError, ErrorCode};
 use crate::services::documents::{
     DocumentError, DocumentFormat, DocumentMeta, MAX_DOCUMENT_BYTES, validate_title,
 };
+use crate::services::history::{self, HistoryError, VersionKind, VersionSummary};
 use crate::services::import::{self, ImportError, MAX_IMPORT_BYTES};
 use crate::services::pwrite;
 use crate::state::AppState;
@@ -155,6 +156,49 @@ impl Validate for SaveDocumentRequest {
         }
         Ok(())
     }
+}
+
+/// Request of the commands that name one version.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct VersionRequest {
+    /// Id of the version.
+    pub id: String,
+}
+
+impl Validate for VersionRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id).map(|_| ())
+    }
+}
+
+/// Request of `document_version_save`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SaveVersionRequest {
+    /// Id of the document.
+    pub id: String,
+    pub name: String,
+}
+
+impl Validate for SaveVersionRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_id(&self.id)?;
+        history::validate_name(&self.name).map_err(history_error)?;
+        Ok(())
+    }
+}
+
+/// A version with its text: TXT and Markdown as stored, `.pwrite` as the
+/// editor content (JSON).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct VersionText {
+    pub version: VersionSummary,
+    pub text: String,
 }
 
 /// Request of `document_archive`.
@@ -533,6 +577,108 @@ pub async fn trash_empty(
         .await
 }
 
+/// The versions of a document, newest first (stage 4).
+#[tauri::command]
+pub async fn document_versions(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<Vec<VersionSummary>, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            documents.history().list(id).await.map_err(history_error)
+        })
+        .await
+}
+
+/// The text of a version, for showing and comparing.
+#[tauri::command]
+pub async fn document_version_text(
+    state: State<'_, AppState>,
+    request: Input<VersionRequest>,
+) -> Result<VersionText, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            let (version, content) = documents
+                .history()
+                .content(id)
+                .await
+                .map_err(history_error)?;
+            let text = if version.format == DocumentFormat::Pwrite {
+                match pwrite::parse(&content) {
+                    Ok(parsed) => serde_json::to_string(parsed.content()).unwrap_or_default(),
+                    Err(_) => return Err(CommandError::new(ErrorCode::PwriteInvalid)),
+                }
+            } else {
+                String::from_utf8(content)
+                    .map_err(|_| CommandError::new(ErrorCode::DocumentNotText))?
+            };
+            Ok(VersionText { version, text })
+        })
+        .await
+}
+
+/// "Version speichern": the current content as a named version.
+#[tauri::command]
+pub async fn document_version_save(
+    state: State<'_, AppState>,
+    request: Input<SaveVersionRequest>,
+) -> Result<VersionSummary, CommandError> {
+    let request = request.into_inner();
+    let id = parse_id(&request.id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            documents
+                .record_version(id, VersionKind::Named, Some(&request.name))
+                .await
+                .map_err(document_error)
+        })
+        .await
+}
+
+/// The tab of a document was closed: its content as a version `close`.
+#[tauri::command]
+pub async fn document_version_close(
+    state: State<'_, AppState>,
+    request: Input<DocumentRequest>,
+) -> Result<VersionSummary, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    state
+        .session
+        .with_documents(|documents| async move {
+            documents
+                .record_version(id, VersionKind::Close, None)
+                .await
+                .map_err(document_error)
+        })
+        .await
+}
+
+/// Restores a version (stage 4); the current content becomes a version
+/// first.
+#[tauri::command]
+pub async fn document_version_restore(
+    state: State<'_, AppState>,
+    request: Input<VersionRequest>,
+) -> Result<DocumentSummary, CommandError> {
+    let id = parse_id(&request.into_inner().id)?;
+    let language = pwrite::language_tag(state.ui.locale());
+    state
+        .session
+        .with_documents(|documents| async move {
+            let meta = documents
+                .restore_version(id, language)
+                .await
+                .map_err(document_error)?;
+            Ok(DocumentSummary::from(&meta))
+        })
+        .await
+}
+
 /// The documents that link to a document ("Verbindungen", ADR 0015,
 /// decision 14), by title.
 #[tauri::command]
@@ -663,6 +809,21 @@ pub(crate) fn import_error(error: ImportError) -> CommandError {
     }
 }
 
+pub(crate) fn history_error(error: HistoryError) -> CommandError {
+    match error {
+        HistoryError::NotFound => CommandError::new(ErrorCode::VersionNotFound),
+        HistoryError::Damaged(reason) => {
+            log::error!("damaged version: {reason}");
+            CommandError::new(ErrorCode::VersionDamaged)
+        }
+        HistoryError::InvalidName(reason) => CommandError::invalid_input("name", reason),
+        HistoryError::Database(error) => {
+            log::error!("history database error: {error}");
+            CommandError::new(ErrorCode::Database)
+        }
+    }
+}
+
 pub(crate) fn document_error(error: DocumentError) -> CommandError {
     match error {
         DocumentError::NotFound | DocumentError::InTrash => {
@@ -690,6 +851,7 @@ pub(crate) fn document_error(error: DocumentError) -> CommandError {
         DocumentError::ReadOnly => CommandError::new(ErrorCode::DocumentReadOnly),
         DocumentError::SameFormat => CommandError::invalid_input("format", "same format"),
         DocumentError::NotInTrash => CommandError::invalid_input("id", "not in the trash"),
+        DocumentError::History(error) => history_error(error),
         DocumentError::NotText => CommandError::new(ErrorCode::DocumentNotText),
     }
 }

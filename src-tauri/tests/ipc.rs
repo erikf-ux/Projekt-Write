@@ -2041,25 +2041,44 @@ fn documents_go_to_the_trash_come_back_and_are_archived() {
     assert_eq!(call(&app, "trash_empty", json!({})).unwrap(), 1);
 
     // Settings of the library.
+    let defaults = json!({
+        "trashRetentionDays": 30,
+        "history": { "keepAllHours": 24, "dailyDays": 30, "weeklyDays": 365 }
+    });
     assert_eq!(
         call(&app, "library_preferences", json!({})).unwrap(),
-        json!({ "trashRetentionDays": 30 })
+        defaults
+    );
+    let changed = json!({
+        "trashRetentionDays": 7,
+        "history": { "keepAllHours": 48, "dailyDays": 60, "weeklyDays": 730 }
+    });
+    assert_eq!(
+        call(&app, "library_update_preferences", changed.clone()).unwrap(),
+        changed
     );
     assert_eq!(
-        call(
-            &app,
-            "library_update_preferences",
-            json!({ "trashRetentionDays": 7 })
-        )
-        .unwrap(),
-        json!({ "trashRetentionDays": 7 })
+        call(&app, "library_preferences", json!({})).unwrap(),
+        changed
     );
-    for bad in [
-        json!({ "trashRetentionDays": 0 }),
-        json!({ "trashRetentionDays": 4000 }),
+    let history = json!({ "keepAllHours": 24, "dailyDays": 30, "weeklyDays": 365 });
+    for (bad, field) in [
+        (
+            json!({ "trashRetentionDays": 0, "history": history }),
+            "trashRetentionDays",
+        ),
+        (
+            json!({ "trashRetentionDays": 4000, "history": history }),
+            "trashRetentionDays",
+        ),
+        (
+            json!({ "trashRetentionDays": 30, "history": { "keepAllHours": 0, "dailyDays": 30, "weeklyDays": 365 } }),
+            "keepAllHours",
+        ),
+        (json!({ "trashRetentionDays": 30 }), "request"),
     ] {
         let error = call(&app, "library_update_preferences", bad).unwrap_err();
-        assert_uniform_error(&error, "trashRetentionDays");
+        assert_uniform_error(&error, field);
     }
     let error = call(&app, "library_update_preferences", json!({ "days": 3 })).unwrap_err();
     assert_uniform_error(&error, "request");
@@ -2073,5 +2092,94 @@ fn documents_go_to_the_trash_come_back_and_are_archived() {
         let error = call(&app, command, request.clone()).unwrap_err();
         assert_uniform_error(&error, field);
     }
+    app.shut_down();
+}
+
+#[test]
+fn versions_are_listed_compared_named_and_restored() {
+    let app = app_with_library();
+    let id = call(
+        &app,
+        "document_create",
+        json!({ "title": "Fassungen", "format": "md" }),
+    )
+    .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Erste\n" }),
+    )
+    .unwrap();
+    let versions = call(&app, "document_versions", json!({ "id": id })).unwrap();
+    assert_eq!(versions.as_array().unwrap().len(), 1);
+    assert_eq!(versions[0]["kind"], "auto");
+    let first = versions[0]["id"].as_str().unwrap().to_owned();
+
+    let named = call(
+        &app,
+        "document_version_save",
+        json!({ "id": id, "name": "Erste Fassung" }),
+    )
+    .unwrap();
+    assert_eq!(named["id"], first.as_str());
+    assert_eq!(named["kind"], "named");
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Zweite\n" }),
+    )
+    .unwrap();
+    let closed = call(&app, "document_version_close", json!({ "id": id })).unwrap();
+    assert_eq!(closed["kind"], "close");
+
+    let text = call(&app, "document_version_text", json!({ "id": first })).unwrap();
+    assert_eq!(text["text"], "Erste\n");
+    assert_eq!(text["version"]["name"], "Erste Fassung");
+
+    let restored = call(&app, "document_version_restore", json!({ "id": first })).unwrap();
+    assert_eq!(restored["id"], id.as_str());
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["text"], "Erste\n");
+    let versions = call(&app, "document_versions", json!({ "id": id })).unwrap();
+    let kinds: Vec<_> = versions
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v["kind"].as_str().unwrap().to_owned())
+        .collect();
+    // "Zweite" was the newest version already (close); nothing was lost.
+    assert_eq!(kinds, ["close", "named"]);
+
+    for (command, request, field) in [
+        ("document_versions", json!({ "id": "x" }), "id"),
+        ("document_version_text", json!({}), "request"),
+        (
+            "document_version_save",
+            json!({ "id": id, "name": "  " }),
+            "name",
+        ),
+        (
+            "document_version_save",
+            json!({ "id": id, "name": "x".repeat(201) }),
+            "name",
+        ),
+        ("document_version_restore", json!({ "id": 7 }), "request"),
+        (
+            "document_version_close",
+            json!({ "id": id, "x": 1 }),
+            "request",
+        ),
+    ] {
+        let error = call(&app, command, request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    let missing = "1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c";
+    let error = call(&app, "document_version_text", json!({ "id": missing })).unwrap_err();
+    assert_error_code(&error, "VERSION_NOT_FOUND");
+    let error = call(&app, "document_version_restore", json!({ "id": missing })).unwrap_err();
+    assert_error_code(&error, "VERSION_NOT_FOUND");
     app.shut_down();
 }

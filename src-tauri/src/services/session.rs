@@ -26,11 +26,14 @@ use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, display_path};
 use crate::services::dialog::{FolderPicker, PickRequest};
 use crate::services::documents::DocumentRepository;
+use crate::services::history::RetentionPolicy;
 use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome};
-use crate::services::settings::library::{AcceptedLocation, TrashRetentionDays};
+use crate::services::settings::library::{
+    AcceptedLocation, HistoryDailyDays, HistoryKeepAllHours, HistoryWeeklyDays, TrashRetentionDays,
+};
 
 /// Name of the library folder inside the documents folder (section 9:
 /// "Standard ist `Dokumente/ProjectWrite`").
@@ -674,6 +677,18 @@ impl LibrarySession {
             .set::<TrashRetentionDays>(&preferences.trash_retention_days)
             .await
             .map_err(preferences_error)?;
+        settings
+            .set::<HistoryKeepAllHours>(&preferences.history.keep_all_hours)
+            .await
+            .map_err(preferences_error)?;
+        settings
+            .set::<HistoryDailyDays>(&preferences.history.daily_days)
+            .await
+            .map_err(preferences_error)?;
+        settings
+            .set::<HistoryWeeklyDays>(&preferences.history.weekly_days)
+            .await
+            .map_err(preferences_error)?;
         read_preferences(library).await
     }
 
@@ -696,6 +711,8 @@ impl LibrarySession {
 pub struct LibraryPreferences {
     /// Days a document stays in the trash (1–3650).
     pub trash_retention_days: u32,
+    /// Retention rules of the history.
+    pub history: RetentionPolicy,
 }
 
 async fn read_preferences(library: &Library) -> Result<LibraryPreferences, CommandError> {
@@ -704,8 +721,10 @@ async fn read_preferences(library: &Library) -> Result<LibraryPreferences, Comma
         .get::<TrashRetentionDays>()
         .await
         .map_err(preferences_error)?;
+    let history = library.documents().history().policy().await;
     Ok(LibraryPreferences {
         trash_retention_days,
+        history,
     })
 }
 

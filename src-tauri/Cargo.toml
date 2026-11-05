@@ -36,6 +36,7 @@ tauri-plugin-single-instance = "2.5.5"
 rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
 sha2 = "0.10.9"
+flate2 = "1.1.10"
 time = "0.3.55"
 tokio = { version = "1", features = ["sync", "rt"] }
 

@@ -68,6 +68,66 @@ impl LibrarySetting for TrashRetentionDays {
     }
 }
 
+/// History: every version of the last hours stays (section 13: 24 hours).
+pub struct HistoryKeepAllHours;
+
+impl LibrarySetting for HistoryKeepAllHours {
+    const KEY: &'static str = "history.keepAllHours";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        24
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=8760).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 8760 hours")
+        }
+    }
+}
+
+/// History: up to this age one version per day stays (section 13: 30 days).
+pub struct HistoryDailyDays;
+
+impl LibrarySetting for HistoryDailyDays {
+    const KEY: &'static str = "history.dailyDays";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        30
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=3650).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 3650 days")
+        }
+    }
+}
+
+/// History: up to this age one version per week stays (section 13: a year).
+pub struct HistoryWeeklyDays;
+
+impl LibrarySetting for HistoryWeeklyDays {
+    const KEY: &'static str = "history.weeklyDays";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        365
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=36500).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 36500 days")
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SettingsError {
     #[error("invalid value for {key}: {reason}")]

@@ -30,6 +30,7 @@ use crate::database::Database;
 use crate::database::documents::{self as rows, DocumentRow};
 use crate::filesystem::atomic;
 use crate::security::paths::{PathError, SafeRoot};
+use crate::services::history::{History, HistoryError, VersionKind, VersionSummary};
 use crate::services::pwrite;
 
 /// Largest document content accepted (64 MiB). A 50,000-word text is about
@@ -170,6 +171,8 @@ pub enum DocumentError {
     SameFormat,
     #[error("the document is not in the trash")]
     NotInTrash,
+    #[error("history: {0}")]
+    History(#[from] HistoryError),
     #[error("content is not UTF-8 text")]
     NotText,
 }
@@ -452,6 +455,15 @@ impl DocumentRepository {
             &links_in(meta.format, content),
         )
         .await?;
+        // Stage 4: one version per 10 minutes of editing. A failure here
+        // must not fail the save; the content is safe in its file.
+        if let Err(error) = self
+            .history()
+            .record_auto_if_due(meta.id, meta.format, content)
+            .await
+        {
+            log::warn!("automatic version of {} not stored: {error}", meta.id);
+        }
         let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
         Ok(SaveOutcome::Saved(meta))
     }
@@ -558,6 +570,17 @@ impl DocumentRepository {
         {
             return Err(DocumentError::ReadOnly);
         }
+        // The old content in the old format first (section 13); without it
+        // nothing is converted.
+        self.history()
+            .record(
+                meta.id,
+                VersionKind::BeforeConversion,
+                None,
+                meta.format,
+                &stored,
+            )
+            .await?;
         let now = self.generators.now().to_iso();
         let data = if format == DocumentFormat::Pwrite {
             let value: serde_json::Value =
@@ -642,6 +665,93 @@ impl DocumentRepository {
                 .filter_map(|target| Uuid::try_parse(target).ok())
                 .collect(),
         )
+    }
+
+    /// The history of this library's documents.
+    pub fn history(&self) -> History {
+        History::new(self.database.clone(), self.generators.clone())
+    }
+
+    /// Stores the current content as a version (tab closed, "Version
+    /// speichern"). Unchanged content names or reuses the newest version.
+    pub async fn record_version(
+        &self,
+        id: Uuid,
+        kind: VersionKind,
+        name: Option<&str>,
+    ) -> Result<VersionSummary, DocumentError> {
+        let (meta, content) = self.read(id).await?;
+        if meta.deleted_at.is_some() {
+            return Err(DocumentError::InTrash);
+        }
+        Ok(self
+            .history()
+            .record(meta.id, kind, name, meta.format, &content)
+            .await?)
+    }
+
+    /// Restores a version (stage 4): the current content becomes a version
+    /// `beforeRestore` first, then the version is written – in its own
+    /// format, if it was taken before a conversion.
+    pub async fn restore_version(
+        &self,
+        version_id: Uuid,
+        language: &str,
+    ) -> Result<DocumentMeta, DocumentError> {
+        let (version, content) = self.history().content(version_id).await?;
+        let id = Uuid::try_parse(&version.document_id).map_err(|_| DocumentError::NotFound)?;
+        let (meta, current) = self.read(id).await?;
+        if meta.deleted_at.is_some() {
+            return Err(DocumentError::InTrash);
+        }
+        self.history()
+            .record(
+                meta.id,
+                VersionKind::BeforeRestore,
+                None,
+                meta.format,
+                &current,
+            )
+            .await?;
+        let restored = self
+            .write_restored(&meta, version.format, &content, language)
+            .await?;
+        log::info!("version {} of document {} restored", version.id, meta.id);
+        Ok(restored)
+    }
+
+    /// Writes restored content (a version or a draft) in `format`.
+    pub(crate) async fn write_restored(
+        &self,
+        meta: &DocumentMeta,
+        format: DocumentFormat,
+        content: &[u8],
+        language: &str,
+    ) -> Result<DocumentMeta, DocumentError> {
+        // `.pwrite` versions hold the whole file; the document keeps its own
+        // envelope and takes the content.
+        let pwrite_content = || -> Result<serde_json::Value, DocumentError> {
+            match pwrite::parse(content).map_err(|_| DocumentError::InvalidPwrite)? {
+                pwrite::Parsed::Current(file) => Ok(file.content),
+                pwrite::Parsed::Newer { .. } => Err(DocumentError::ReadOnly),
+            }
+        };
+        if format == meta.format {
+            if format == DocumentFormat::Pwrite {
+                return Ok(self
+                    .save_pwrite(meta.id, pwrite_content()?)
+                    .await?
+                    .meta()
+                    .clone());
+            }
+            return Ok(self.save(meta.id, content).await?.meta().clone());
+        }
+        let converted = if format == DocumentFormat::Pwrite {
+            serde_json::to_vec(&pwrite_content()?).map_err(|_| DocumentError::InvalidPwrite)?
+        } else {
+            content.to_vec()
+        };
+        self.convert(meta.id, format, &converted, language).await
     }
 
     /// The library document stored in `path`, if the file lies in this

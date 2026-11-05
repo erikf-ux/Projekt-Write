@@ -115,11 +115,15 @@ pub enum ErrorCode {
     FileReadOnly,
     /// The chosen encoding cannot represent a character of the text.
     FileUnencodable,
+    /// No version with this id (removed by the retention rules?).
+    VersionNotFound,
+    /// A stored version does not match its checksum.
+    VersionDamaged,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 47] = [
+    pub const ALL: [ErrorCode; 49] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -167,6 +171,8 @@ impl ErrorCode {
         ErrorCode::FileChanged,
         ErrorCode::FileReadOnly,
         ErrorCode::FileUnencodable,
+        ErrorCode::VersionNotFound,
+        ErrorCode::VersionDamaged,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -219,6 +225,8 @@ impl ErrorCode {
             ErrorCode::FileChanged => "error.fileChanged",
             ErrorCode::FileReadOnly => "error.fileReadOnly",
             ErrorCode::FileUnencodable => "error.fileUnencodable",
+            ErrorCode::VersionNotFound => "error.versionNotFound",
+            ErrorCode::VersionDamaged => "error.versionDamaged",
         }
     }
 }

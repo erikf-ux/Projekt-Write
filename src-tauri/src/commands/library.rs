@@ -274,6 +274,25 @@ impl Validate for LibraryPreferences {
                 "between 1 and 3650 days",
             ));
         }
+        let history = &self.history;
+        if !(1..=8760).contains(&history.keep_all_hours) {
+            return Err(CommandError::invalid_input(
+                "keepAllHours",
+                "between 1 and 8760 hours",
+            ));
+        }
+        if !(1..=3650).contains(&history.daily_days) {
+            return Err(CommandError::invalid_input(
+                "dailyDays",
+                "between 1 and 3650 days",
+            ));
+        }
+        if !(1..=36500).contains(&history.weekly_days) {
+            return Err(CommandError::invalid_input(
+                "weeklyDays",
+                "between 1 and 36500 days",
+            ));
+        }
         Ok(())
     }
 }

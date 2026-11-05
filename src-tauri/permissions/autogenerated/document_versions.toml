@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-document-versions"
+description = "Enables the document_versions command without any pre-configured scope."
+commands.allow = ["document_versions"]
+
+[[permission]]
+identifier = "deny-document-versions"
+description = "Denies the document_versions command without any pre-configured scope."
+commands.deny = ["document_versions"]

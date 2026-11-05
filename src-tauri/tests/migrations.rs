@@ -61,6 +61,15 @@ const FIXTURES: &[(i64, &str, &str)] = &[
          WHERE source_id = '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f' \
            AND target_id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11'",
     ),
+    (
+        6,
+        "INSERT INTO document_history (id, document_id, kind, name, format, content, compression, size_bytes, content_sha256, created_at) \
+         VALUES ('9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d', '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', 'named', 'Erste Fassung', \
+                 'txt', X'0300', 'deflate', 0, \
+                 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', '2026-11-05T10:00:00.000Z')",
+        "SELECT count(*) FROM document_history \
+         WHERE id = '9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d' AND name = 'Erste Fassung' AND content = X'0300'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -90,6 +99,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         5,
         "document links",
         "e584d60dfe05ea529c3fb0602cf57ea10b1c32c91cdd321819a2cea6d3735f593e3ed685f669ddd3b7c96871c4ee07e7",
+    ),
+    (
+        6,
+        "document history",
+        "546edd56b24d253ac981b4ad7d7e8ff14d730cd452e17171321e1bdbe51f2166f770c0ca6415a7c59e5f5ef86aed6974",
     ),
 ];
 
