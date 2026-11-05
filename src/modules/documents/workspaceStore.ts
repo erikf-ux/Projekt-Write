@@ -34,6 +34,7 @@ import type { Loss } from '@/modules/editor/markdown/losses';
 import type { ProbeIssue } from '@/modules/editor/markdown/probe';
 import { closeAllSessions, closeSession, getSession, type SaveRequest } from '@/modules/editor/session';
 import { useUi } from '@/modules/settings/uiStore';
+import { setDocumentReloader, useStructure } from '@/modules/structure/structureStore';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
@@ -854,6 +855,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return null;
       }
       set((state) => ({ documents: upsert(state.documents, result.value) }));
+      // The copy has the subnets and tags of the original (section 13).
+      void useStructure.getState().refreshDocument(result.value.id);
       await get().openDocument(result.value.id);
       return result.value.id;
     },
@@ -1199,6 +1202,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         }
         if (result.value.kind === 'imported') {
           target = result.value.document;
+          // A .pwrite brings the tags of its envelope.
+          void useStructure.getState().refreshDocument(target.id);
           break;
         }
         const existing = result.value.existing;
@@ -1320,6 +1325,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         documents: state.documents.filter((entry) => entry.id !== id),
         trash: [deleted, ...state.trash.filter((entry) => entry.id !== id)],
       }));
+      // A step of the structural undo (ADR 0017, decision 10).
+      void useStructure.getState().noteStep();
       return true;
     },
 
@@ -1334,6 +1341,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         documents: upsert(state.documents, restored),
         trash: state.trash.filter((entry) => entry.id !== id),
       }));
+      void useStructure.getState().noteStep();
       return true;
     },
 
@@ -1344,6 +1352,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       set((state) => ({ documents: upsert(state.documents, result.value) }));
+      void useStructure.getState().noteStep();
       return true;
     },
 
@@ -1369,6 +1378,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       set((state) => ({ trash: state.trash.filter((document) => document.id !== id) }));
+      // Its subnets and tags went with it.
+      useStructure.getState().forget(id);
       return true;
     },
 
@@ -1397,6 +1408,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       set({ trash: [] });
+      void useStructure.getState().load();
       return true;
     },
 
@@ -1523,3 +1535,9 @@ export function freeTitle(base: string, documents: readonly DocumentSummary[]): 
   }
   return `${base} ${String(number)}`;
 }
+
+// Undoing a trash or archive step reloads the document lists.
+setDocumentReloader(async () => {
+  await useWorkspace.getState().refresh();
+  await useWorkspace.getState().refreshTrash();
+});

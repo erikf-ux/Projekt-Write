@@ -6,6 +6,7 @@ import type { LibraryInfo } from '@/types/generated/LibraryInfo';
 import type { MoveProgress } from '@/types/generated/MoveProgress';
 import type { StorageLocation } from '@/types/generated/StorageLocation';
 import { formatBytes } from './format';
+import { useSampleSubnets } from '@/modules/structure/sampleSubnets';
 import { useLibrary, type Prompt } from './libraryStore';
 
 type Translate = ReturnType<typeof useT>;
@@ -54,6 +55,7 @@ export function LibraryPanel() {
   const status = useLibrary((state) => state.status);
   const defaultLocation = useLibrary((state) => state.defaultLocation);
   const busy = useLibrary((state) => state.busy);
+  const sampleSubnets = useSampleSubnets((state) => state.wanted);
   const error = useLibrary((state) => state.error);
   const prompt = useLibrary((state) => state.prompt);
   const progress = useLibrary((state) => state.progress);
@@ -181,6 +183,17 @@ export function LibraryPanel() {
             {t('library.createAt', { path: defaultLocation.displayPath })}
           </p>
         )}
+        <label className="text-ui mt-3 flex items-center gap-2 text-fg">
+          <input
+            type="checkbox"
+            data-testid="library-sample-subnets"
+            checked={sampleSubnets}
+            onChange={(event) => {
+              useSampleSubnets.setState({ wanted: event.target.checked });
+            }}
+          />
+          {t('library.sampleSubnets')}
+        </label>
       </>
     );
   }

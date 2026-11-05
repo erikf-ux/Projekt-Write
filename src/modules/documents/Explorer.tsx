@@ -1,85 +1,71 @@
 /**
- * Explorer (sections 11 and 13): a tree of the library's documents with the
- * entries "Favoriten", "Zuletzt verwendet" and "Alle Dokumente". Subnets
- * join the tree with Phase 7; an element in several entries stays one
- * element. "Zuletzt verwendet" also lists external files opened last
- * (ADR 0015, decision 10); one that is gone is marked and can be removed.
- * "Archiv" holds archived documents (hidden everywhere else), "Papierkorb"
- * the deleted ones until they come back (stage 3) or go for good (ADR 0016).
- * `Entf` moves a document to the trash, or removes it from the trash.
+ * Explorer (sections 11, 13 and 16; ADR 0017): Favoriten, Zuletzt
+ * verwendet, the subnets as a tree, Nicht zugeordnet, Archiv, Papierkorb.
+ * A document in several subnets appears in each and stays one element; a
+ * further membership carries a mark. "Zuletzt verwendet" also lists
+ * external files (ADR 0015); "Archiv" and "Papierkorb" hold what is
+ * archived or deleted (ADR 0016).
  *
  * The tree is virtualised ("Lange Listen werden virtualisiert"): only the
  * visible rows exist in the DOM, as a flat list with `aria-level`. It is one
  * tab stop (ARIA tree with `aria-activedescendant`): arrow keys move, Right
- * and Left open and close an entry, Enter opens, F2 renames, the context
- * menu key or Shift+F10 opens the context menu.
+ * and Left open and close, Enter opens, F2 renames (a subnet: edit), `Entf`
+ * deletes, the context menu key or Shift+F10 opens the menu, `Strg + Z` and
+ * `Strg + Y` undo and redo structural steps. Drag & drop is the short way:
+ * a document onto a subnet moves it (with `Strg` it is assigned as well),
+ * onto "Nicht zugeordnet" it leaves every subnet; a subnet onto a subnet
+ * becomes its child.
  */
-import { ChevronDown, ChevronRight, FilePlus, FileText, HardDrive, Hash, PenLine, Star } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  FilePlus,
+  FileText,
+  Filter,
+  HardDrive,
+  Hash,
+  Link2,
+  Network,
+  PenLine,
+  Star,
+  X,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
   ContextMenu,
   isContextMenuKey,
   positionBelow,
+  type ContextMenuItem,
   type ContextMenuState,
 } from '@/components/ContextMenu';
 import { useLocale, useT } from '@/i18n';
+import { useStructureDialogs } from '@/modules/structure/dialogStore';
+import { useStructure } from '@/modules/structure/structureStore';
+import { colorValue, pathTo, type SubnetIndex } from '@/modules/structure/tree';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
-import type { DocumentSummary } from '@/types/generated/DocumentSummary';
-import type { RecentFileEntry } from '@/types/generated/RecentFileEntry';
+import {
+  explorerModel,
+  explorerRows,
+  GROUPS_AFTER,
+  GROUPS_BEFORE,
+  homeRowKey,
+  RECENT_LIMIT,
+  type ExplorerGroup,
+  type Row,
+} from './explorerRows';
+import { useExplorer } from './explorerStore';
 import { useWorkspace } from './workspaceStore';
 
+export { RECENT_LIMIT };
 export const EXPLORER_LIST_ID = 'pw-explorer-list';
 const ROW_HEIGHT = 26;
 const OVERSCAN = 8;
-/** Entries of "Zuletzt verwendet". */
-export const RECENT_LIMIT = 10;
 const MAX_TITLE = 300;
+/** Drag data of Explorer rows (not files from outside). */
+export const EXPLORER_DRAG_TYPE = 'application/x-project-write-item';
 
-export type ExplorerGroup = 'favorites' | 'recent' | 'all' | 'archive' | 'trash';
-const GROUPS: readonly ExplorerGroup[] = ['favorites', 'recent', 'all', 'archive', 'trash'];
-/** Entries closed until the user opens them. */
-const CLOSED_AT_START: readonly ExplorerGroup[] = ['archive', 'trash'];
-
-type Row =
-  | { kind: 'group'; key: string; group: ExplorerGroup; count: number; expanded: boolean }
-  | {
-      kind: 'document';
-      key: string;
-      group: ExplorerGroup;
-      document: DocumentSummary;
-      position: number;
-      size: number;
-    }
-  | {
-      kind: 'file';
-      key: string;
-      group: 'recent';
-      file: RecentFileEntry;
-      position: number;
-      size: number;
-    };
-
-/** An entry of "Zuletzt verwendet": a library document or an external file. */
-export type RecentEntry =
-  { kind: 'document'; document: DocumentSummary } | { kind: 'file'; file: RecentFileEntry };
-
-/** Library documents and external files of "Zuletzt verwendet", newest first. */
-export function recentEntries(
-  documents: readonly DocumentSummary[],
-  files: readonly RecentFileEntry[],
-): RecentEntry[] {
-  const entries: { at: string; entry: RecentEntry }[] = [
-    ...documents.map((document) => ({
-      at: document.lastOpenedAt ?? '',
-      entry: { kind: 'document', document } as const,
-    })),
-    ...files.map((file) => ({ at: file.openedAt, entry: { kind: 'file', file } as const })),
-  ];
-  return entries
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, RECENT_LIMIT)
-    .map(({ entry }) => entry);
-}
+type DocumentRow = Extract<Row, { kind: 'document' }>;
+type SubnetRow = Extract<Row, { kind: 'subnet' }>;
 
 function FormatIcon({ format }: { format: DocumentFormat }) {
   if (format === 'md') {
@@ -91,32 +77,16 @@ function FormatIcon({ format }: { format: DocumentFormat }) {
   return <FileText aria-hidden="true" className="size-3.5 shrink-0 text-muted" />;
 }
 
-/**
- * The documents of each entry: favourites, all and archive by title, recent
- * by last opening, the trash as Rust lists it (most recently deleted first).
- * Archived documents appear only under "Archiv".
- */
-export function explorerGroups(
-  documents: readonly DocumentSummary[],
-  locale: string,
-  trash: readonly DocumentSummary[] = [],
-): Record<ExplorerGroup, DocumentSummary[]> {
-  const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
-  const sorted = [...documents].sort(
-    (a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id),
+/** A subnet's colour: a dot with a rim, beside its name (never alone). */
+export function ColorDot({ color }: { color: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-color={color}
+      className="inline-block size-2.5 shrink-0 rounded-full border border-fg/50"
+      style={{ backgroundColor: colorValue(color) }}
+    />
   );
-  const byTitle = sorted.filter((document) => document.archivedAt === null);
-  const recent = byTitle
-    .filter((document) => document.lastOpenedAt !== null)
-    .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? '') || a.id.localeCompare(b.id))
-    .slice(0, RECENT_LIMIT);
-  return {
-    favorites: byTitle.filter((document) => document.favoritedAt !== null),
-    recent,
-    all: byTitle,
-    archive: sorted.filter((document) => document.archivedAt !== null),
-    trash: [...trash],
-  };
 }
 
 /** Title of a copy: "Titel (Kopie)", shortened to fit. */
@@ -137,6 +107,9 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const documents = useWorkspace((state) => state.documents);
   const listLoaded = useWorkspace((state) => state.listLoaded);
   const active = useWorkspace((state) => state.active);
+  const activeIsLibrary = useWorkspace((state) =>
+    state.active ? !state.open[state.active]?.external : false,
+  );
   const renaming = useWorkspace((state) => state.renaming);
   const openDocument = useWorkspace((state) => state.openDocument);
   const setRenaming = useWorkspace((state) => state.setRenaming);
@@ -152,65 +125,69 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const archiveDocument = useWorkspace((state) => state.archiveDocument);
   const purgeDocument = useWorkspace((state) => state.purgeDocument);
   const emptyTrash = useWorkspace((state) => state.emptyTrash);
+  const createDocument = useWorkspace((state) => state.createDocument);
 
-  const [collapsed, setCollapsed] = useState<ReadonlySet<ExplorerGroup>>(() => new Set(CLOSED_AT_START));
-  const groups = useMemo(() => explorerGroups(documents, locale, trash), [documents, locale, trash]);
-  const recent = useMemo(() => recentEntries(groups.recent, recentFiles), [groups.recent, recentFiles]);
-  const rows = useMemo(() => {
-    const result: Row[] = [];
-    for (const group of GROUPS) {
-      const members: RecentEntry[] =
-        group === 'recent' ? recent : groups[group].map((document) => ({ kind: 'document', document }));
-      const expanded = !collapsed.has(group) && members.length > 0;
-      result.push({ kind: 'group', key: group, group, count: members.length, expanded });
-      if (expanded) {
-        members.forEach((entry, index) => {
-          const position = index + 1;
-          const size = members.length;
-          result.push(
-            entry.kind === 'document'
-              ? {
-                  kind: 'document',
-                  key: `${group}:${entry.document.id}`,
-                  group,
-                  document: entry.document,
-                  position,
-                  size,
-                }
-              : {
-                  kind: 'file',
-                  key: `recent:file-${entry.file.id}`,
-                  group: 'recent',
-                  file: entry.file,
-                  position,
-                  size,
-                },
-          );
-        });
-      }
-    }
-    return result;
-  }, [groups, recent, collapsed]);
+  const subnets = useStructure((state) => state.subnets);
+  const placements = useStructure((state) => state.byDocument);
+  const tags = useStructure((state) => state.tags);
+  const structure = useStructure.getState;
+  const dialogs = useStructureDialogs.getState;
 
-  const [selected, setSelected] = useState<string | null>(active ? `all:${active}` : null);
-  const [followed, setFollowed] = useState(active);
+  const collapsed = useExplorer((state) => state.collapsed);
+  const expanded = useExplorer((state) => state.expanded);
+  const filter = useExplorer((state) => state.filter);
+  const filterVisible = useExplorer((state) => state.filterVisible);
+  const reveal = useExplorer((state) => state.reveal);
+  const explorer = useExplorer.getState;
+
+  const model = useMemo(
+    () => explorerModel({ documents, trash, recentFiles, subnets, placements, filter, locale }),
+    [documents, trash, recentFiles, subnets, placements, filter, locale],
+  );
+  const rows = useMemo(
+    () => explorerRows(model, collapsed, expanded, placements),
+    [model, collapsed, expanded, placements],
+  );
+  const roots = useMemo(
+    () => (model.index.children.get(null) ?? []).filter((subnet) => model.shown.has(subnet.id)).length,
+    [model],
+  );
+  const topLevel = GROUPS_BEFORE.length + roots + GROUPS_AFTER.length;
+
+  const [selected, setSelected] = useState<string | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ top: 0, height: 400 });
 
-  // Follow the active tab, so the Explorer shows where one is.
-  if (active !== followed) {
+  // Follow the active tab: its primary place opens and is selected.
+  const [followed, setFollowed] = useState<string | null>(null);
+  if (active !== followed && activeIsLibrary && active) {
     setFollowed(active);
-    if (active) {
-      const row =
-        rows.find(
-          (entry) => entry.kind === 'document' && entry.document.id === active && entry.group === 'all',
-        ) ?? rows.find((entry) => entry.kind === 'document' && entry.document.id === active);
-      if (row) {
-        setSelected(row.key);
-      }
+    setSelected(homeRowKey(active, placements, model.index));
+  }
+  const index = model.index;
+  useEffect(() => {
+    if (active && activeIsLibrary) {
+      openPlaceOf(active, index);
+    }
+    // Only when another document becomes active, not on every change of the tree.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, activeIsLibrary]);
+
+  // Shown from elsewhere (breadcrumbs, palette): select and focus the row.
+  const [revealed, setRevealed] = useState(reveal);
+  if (reveal !== revealed) {
+    setRevealed(reveal);
+    if (reveal) {
+      setSelected(reveal.key);
     }
   }
+  useEffect(() => {
+    if (reveal) {
+      list.current?.focus();
+    }
+  }, [reveal]);
 
   // Renaming (F2, menu, palette) happens in the selected row of the document.
   const [renamed, setRenamed] = useState(renaming);
@@ -218,12 +195,15 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     setRenamed(renaming);
     const shown = rows.find((row) => row.key === selected);
     if (renaming && !(shown?.kind === 'document' && shown.document.id === renaming)) {
-      if (collapsed.has('all')) {
-        setCollapsed((previous) => new Set([...previous].filter((group) => group !== 'all')));
-      }
-      setSelected(`all:${renaming}`);
+      setSelected(homeRowKey(renaming, placements, model.index));
     }
   }
+  useEffect(() => {
+    if (renaming) {
+      openPlaceOf(renaming, index);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renaming]);
 
   const selectedIndex = rows.findIndex((row) => row.key === selected);
   const current = rows[selectedIndex];
@@ -269,20 +249,17 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     }
   };
 
-  const toggle = (group: ExplorerGroup, open?: boolean) => {
-    setCollapsed((previous) => {
-      const next = new Set(previous);
-      if (open ?? next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-      }
-      return next;
-    });
-  };
-
   const groupLabel = (group: ExplorerGroup) => t(`explorer.group.${group}`);
   const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  const subnetName = (id: string | null) => (id ? (model.index.byId.get(id)?.name ?? '') : '');
+
+  const newDocumentIn = async (subnetId: string) => {
+    const title = t('document.untitled');
+    const id = await createDocument(title);
+    if (id) {
+      await structure().assign(id, subnetId);
+    }
+  };
 
   const openGroupMenu = (row: Extract<Row, { kind: 'group' }>, position: { x: number; y: number }) => {
     if (row.group !== 'trash' || row.count === 0) {
@@ -293,6 +270,50 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
       ...position,
       label: groupLabel(row.group),
       items: [{ id: 'emptyTrash', label: t('explorer.emptyTrash'), onSelect: () => void emptyTrash() }],
+    });
+  };
+
+  const openSubnetMenu = (row: SubnetRow, position: { x: number; y: number }) => {
+    setSelected(row.key);
+    const { subnet } = row;
+    setMenu({
+      ...position,
+      label: subnet.name,
+      items: [
+        {
+          id: 'newDocument',
+          label: t('subnet.newDocument'),
+          onSelect: () => void newDocumentIn(subnet.id),
+        },
+        {
+          id: 'newChild',
+          label: t('subnet.newChild'),
+          onSelect: () => {
+            dialogs().openSubnet({ mode: 'create', parentId: subnet.id });
+          },
+        },
+        {
+          id: 'edit',
+          label: t('subnet.edit'),
+          shortcut: 'F2',
+          onSelect: () => {
+            dialogs().openSubnet({ mode: 'edit', id: subnet.id });
+          },
+        },
+        {
+          id: 'move',
+          label: t('subnet.moveTo'),
+          onSelect: () => {
+            dialogs().openPicker({ mode: 'moveSubnet', subnetId: subnet.id });
+          },
+        },
+        {
+          id: 'delete',
+          label: t('subnet.deleteItem'),
+          shortcut: t('keys.delete'),
+          onSelect: () => void structure().deleteSubnet(subnet.id),
+        },
+      ],
     });
   };
 
@@ -324,42 +345,98 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     }
     const { document } = row;
     const favorite = document.favoritedAt !== null;
-    setMenu({
-      ...position,
-      label: document.title,
-      items: [
-        { id: 'open', label: t('explorer.open'), onSelect: () => void openDocument(document.id) },
+    const items: ContextMenuItem[] = [
+      { id: 'open', label: t('explorer.open'), onSelect: () => void openDocument(document.id) },
+      {
+        id: 'rename',
+        label: t('explorer.rename'),
+        shortcut: renameShortcut,
+        onSelect: () => {
+          setRenaming(document.id);
+        },
+      },
+      {
+        id: 'copy',
+        label: t('explorer.copy'),
+        onSelect: () => void copyDocument(document.id, copyTitle(document.title, t('explorer.copySuffix'))),
+      },
+      {
+        id: 'favorite',
+        label: favorite ? t('explorer.unfavorite') : t('explorer.favorite'),
+        onSelect: () => void setFavorite(document.id, !favorite),
+      },
+    ];
+    if (document.archivedAt === null) {
+      items.push(
         {
-          id: 'rename',
-          label: t('explorer.rename'),
-          shortcut: renameShortcut,
+          id: 'moveTo',
+          label: t('structure.moveTo'),
           onSelect: () => {
-            setRenaming(document.id);
+            dialogs().openPicker({ mode: 'moveDocument', documentId: document.id });
           },
         },
         {
-          id: 'copy',
-          label: t('explorer.copy'),
-          onSelect: () => void copyDocument(document.id, copyTitle(document.title, t('explorer.copySuffix'))),
+          id: 'assignTo',
+          label: t('structure.assignTo'),
+          onSelect: () => {
+            dialogs().openPicker({ mode: 'assignDocument', documentId: document.id });
+          },
         },
-        {
-          id: 'favorite',
-          label: favorite ? t('explorer.unfavorite') : t('explorer.favorite'),
-          onSelect: () => void setFavorite(document.id, !favorite),
+      );
+    }
+    if (row.subnetId) {
+      const subnetId = row.subnetId;
+      if (row.secondary) {
+        items.push({
+          id: 'primary',
+          label: t('structure.makePrimary', { subnet: subnetName(subnetId) }),
+          onSelect: () => void structure().setPrimary(document.id, subnetId),
+        });
+      }
+      items.push({
+        id: 'unassign',
+        label: t('structure.removeFrom', { subnet: subnetName(subnetId) }),
+        onSelect: () => void structure().unassign(document.id, subnetId),
+      });
+    }
+    items.push(
+      {
+        id: 'tags',
+        label: t('tags.edit'),
+        onSelect: () => {
+          dialogs().openTags(document.id);
         },
-        {
-          id: 'archive',
-          label: document.archivedAt === null ? t('explorer.archive') : t('explorer.unarchive'),
-          onSelect: () => void archiveDocument(document.id, document.archivedAt === null),
-        },
-        {
-          id: 'delete',
-          label: t('explorer.delete'),
-          shortcut: t('keys.delete'),
-          onSelect: () => void deleteDocument(document.id),
-        },
-      ],
-    });
+      },
+      {
+        id: 'archive',
+        label: document.archivedAt === null ? t('explorer.archive') : t('explorer.unarchive'),
+        onSelect: () => void archiveDocument(document.id, document.archivedAt === null),
+      },
+      {
+        id: 'delete',
+        label: t('explorer.delete'),
+        shortcut: t('keys.delete'),
+        onSelect: () => void deleteDocument(document.id),
+      },
+    );
+    setMenu({ ...position, label: document.title, items });
+  };
+
+  const parentKey = (index: number): string | null => {
+    const row = rows[index];
+    if (!row) {
+      return null;
+    }
+    if (row.kind === 'document' || row.kind === 'file') {
+      if (row.kind === 'document' && row.subnetId) {
+        return `s:${row.subnetId}`;
+      }
+      return row.group;
+    }
+    if (row.kind === 'subnet' && row.subnet.parentId) {
+      return `s:${row.subnet.parentId}`;
+    }
+    return null;
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -368,15 +445,27 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     }
     const page = Math.max(1, Math.floor(scroll.height / ROW_HEIGHT) - 1);
     const index = selectedIndex < 0 ? -1 : selectedIndex;
+    const control = event.ctrlKey || event.metaKey;
+    if (control && !event.altKey && (event.key === 'z' || event.key === 'Z' || event.key === 'y')) {
+      // Structural undo, apart from the editor's (section 8).
+      const redo = event.key === 'y' || event.shiftKey;
+      void (redo ? structure().redo() : structure().undo());
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (isContextMenuKey(event)) {
       const element = current ? window.document.getElementById(rowId(current.key)) : null;
       const position = element ? positionBelow(element) : { x: 40, y: 80 };
       if (current?.kind === 'document' || current?.kind === 'file') {
         openMenu(current, position);
+      } else if (current?.kind === 'subnet') {
+        openSubnetMenu(current, position);
       } else if (current?.kind === 'group') {
         openGroupMenu(current, position);
       }
       event.preventDefault();
+      event.stopPropagation();
       return;
     }
     switch (event.key) {
@@ -391,15 +480,26 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           if (current.expanded) {
             select(index + 1);
           } else if (current.count > 0) {
-            toggle(current.group, true);
+            explorer().toggleGroup(current.group, true);
+          }
+        } else if (current?.kind === 'subnet' && current.hasContent) {
+          if (current.expanded) {
+            select(index + 1);
+          } else {
+            explorer().toggleSubnet(current.subnet.id, true);
           }
         }
         break;
       case 'ArrowLeft':
         if (current?.kind === 'group' && current.expanded) {
-          toggle(current.group, false);
-        } else if (current?.kind === 'document' || current?.kind === 'file') {
-          setSelected(current.group);
+          explorer().toggleGroup(current.group, false);
+        } else if (current?.kind === 'subnet' && current.expanded) {
+          explorer().toggleSubnet(current.subnet.id, false);
+        } else {
+          const parent = parentKey(index);
+          if (parent) {
+            setSelected(parent);
+          }
         }
         break;
       case 'Home':
@@ -424,12 +524,16 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         } else if (current?.kind === 'file') {
           void openRecentFile(current.file.id, current.file.name);
         } else if (current?.kind === 'group' && current.count > 0) {
-          toggle(current.group);
+          explorer().toggleGroup(current.group);
+        } else if (current?.kind === 'subnet' && current.hasContent) {
+          explorer().toggleSubnet(current.subnet.id);
         }
         break;
       case 'F2':
         if (current?.kind === 'document' && current.group !== 'trash') {
           setRenaming(current.document.id);
+        } else if (current?.kind === 'subnet') {
+          dialogs().openSubnet({ mode: 'edit', id: current.subnet.id });
         }
         break;
       case 'Delete':
@@ -437,6 +541,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           void purgeDocument(current.document.id);
         } else if (current?.kind === 'document') {
           void deleteDocument(current.document.id);
+        } else if (current?.kind === 'subnet') {
+          void structure().deleteSubnet(current.subnet.id);
         }
         break;
       default:
@@ -446,27 +552,216 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     event.stopPropagation();
   };
 
+  // --- Drag & drop inside the Explorer ---------------------------------------
+
+  const startDrag = (event: DragEvent<HTMLDivElement>, item: { kind: 'document' | 'subnet'; id: string }) => {
+    event.dataTransfer.setData(EXPLORER_DRAG_TYPE, JSON.stringify(item));
+    event.dataTransfer.effectAllowed = 'copyMove';
+  };
+  const carriesItem = (event: DragEvent<HTMLDivElement>) =>
+    event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE);
+  const dropHandlers = (key: string, target: { subnetId: string | null }) => ({
+    onDragOver: (event: DragEvent<HTMLDivElement>) => {
+      if (!carriesItem(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = event.ctrlKey || event.metaKey ? 'copy' : 'move';
+      setDropTarget(key);
+    },
+    onDragLeave: () => {
+      setDropTarget((previous) => (previous === key ? null : previous));
+    },
+    onDrop: (event: DragEvent<HTMLDivElement>) => {
+      if (!carriesItem(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setDropTarget(null);
+      let item: { kind?: unknown; id?: unknown };
+      try {
+        item = JSON.parse(event.dataTransfer.getData(EXPLORER_DRAG_TYPE)) as typeof item;
+      } catch {
+        return;
+      }
+      if (typeof item.id !== 'string') {
+        return;
+      }
+      const id = item.id;
+      if (item.kind === 'document') {
+        if (target.subnetId && (event.ctrlKey || event.metaKey)) {
+          void structure().assign(id, target.subnetId);
+        } else {
+          void structure().moveDocument(id, target.subnetId);
+        }
+      } else if (item.kind === 'subnet' && target.subnetId && target.subnetId !== id) {
+        void structure().moveSubnet(id, target.subnetId);
+      }
+    },
+  });
+
+  const tagName = (id: string) => tags.find((tag) => tag.id === id)?.name ?? '';
+  const [tagQuery, setTagQuery] = useState('');
+  const [tagListOpen, setTagListOpen] = useState(false);
+  const tagChoices = useMemo(() => {
+    const query = tagQuery.trim().toLocaleLowerCase(locale);
+    return tags
+      .filter((tag) => !filter.tagIds.includes(tag.id))
+      .filter((tag) => query === '' || tag.name.toLocaleLowerCase(locale).includes(query))
+      .slice(0, 50);
+  }, [tags, tagQuery, filter.tagIds, locale]);
+
   return (
     <section aria-labelledby="explorer-title" className="flex h-full min-h-0 flex-col" data-testid="explorer">
       <header className="flex h-9 shrink-0 items-center justify-between px-3">
         <h2 id="explorer-title" className="text-ui font-semibold tracking-wide text-muted uppercase">
           {t('explorer.title')}
         </h2>
-        <button
-          type="button"
-          className="inline-flex size-7 items-center justify-center rounded-pw text-fg hover:bg-surface"
-          aria-label={t('command.document.new')}
-          title={
-            newDocumentShortcut
-              ? `${t('command.document.new')} (${newDocumentShortcut})`
-              : t('command.document.new')
-          }
-          data-testid="explorer-new"
-          onClick={onNewDocument}
-        >
-          <FilePlus aria-hidden="true" className="size-4" />
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            className={`inline-flex size-7 items-center justify-center rounded-pw hover:bg-surface ${
+              filterVisible ? 'text-accent' : 'text-fg'
+            }`}
+            aria-label={t('explorer.filter')}
+            aria-pressed={filterVisible}
+            title={t('explorer.filter')}
+            data-testid="explorer-filter-toggle"
+            onClick={() => {
+              explorer().showFilter(!filterVisible);
+            }}
+          >
+            <Filter aria-hidden="true" className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded-pw text-fg hover:bg-surface"
+            aria-label={t('command.subnet.new')}
+            title={t('command.subnet.new')}
+            data-testid="explorer-new-subnet"
+            onClick={() => {
+              dialogs().openSubnet({ mode: 'create', parentId: null });
+            }}
+          >
+            <Network aria-hidden="true" className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded-pw text-fg hover:bg-surface"
+            aria-label={t('command.document.new')}
+            title={
+              newDocumentShortcut
+                ? `${t('command.document.new')} (${newDocumentShortcut})`
+                : t('command.document.new')
+            }
+            data-testid="explorer-new"
+            onClick={onNewDocument}
+          >
+            <FilePlus aria-hidden="true" className="size-4" />
+          </button>
+        </div>
       </header>
+      {filterVisible ? (
+        <div className="text-ui flex shrink-0 flex-col gap-1 px-3 pb-2" data-testid="explorer-filter">
+          <input
+            type="search"
+            className="text-ui h-7 rounded-pw border border-muted bg-surface px-2 text-fg"
+            placeholder={t('explorer.filterText')}
+            aria-label={t('explorer.filterText')}
+            data-testid="explorer-filter-text"
+            value={filter.text}
+            onChange={(event) => {
+              explorer().setFilterText(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && filter.text !== '') {
+                event.stopPropagation();
+                explorer().setFilterText('');
+              }
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-1">
+            {filter.tagIds.map((id) => (
+              <button
+                key={id}
+                type="button"
+                data-filter-tag={id}
+                className="inline-flex h-6 items-center gap-1 rounded-pw border border-accent px-1.5 text-fg"
+                aria-label={t('explorer.filterTagRemove', { tag: tagName(id) })}
+                onClick={() => {
+                  explorer().toggleFilterTag(id);
+                }}
+              >
+                # {tagName(id)}
+                <X aria-hidden="true" className="size-3" />
+              </button>
+            ))}
+            <button
+              type="button"
+              className="inline-flex h-6 items-center rounded-pw border border-muted px-1.5 text-fg disabled:opacity-50"
+              aria-expanded={tagListOpen}
+              data-testid="explorer-filter-tags"
+              disabled={tags.length === 0}
+              onClick={() => {
+                setTagListOpen(!tagListOpen);
+              }}
+            >
+              {t('explorer.filterTags')}
+            </button>
+            {filter.text !== '' || filter.tagIds.length > 0 ? (
+              <button
+                type="button"
+                className="inline-flex h-6 items-center rounded-pw px-1.5 text-muted hover:text-fg"
+                data-testid="explorer-filter-clear"
+                onClick={() => {
+                  explorer().clearFilter();
+                }}
+              >
+                {t('explorer.filterClear')}
+              </button>
+            ) : null}
+          </div>
+          {tagListOpen ? (
+            <div
+              className="flex flex-col gap-1 rounded-pw border border-muted p-1"
+              data-testid="explorer-filter-tag-list"
+            >
+              <input
+                type="search"
+                className="text-ui h-6 rounded-pw border border-muted bg-surface px-1.5 text-fg"
+                aria-label={t('explorer.filterTagSearch')}
+                placeholder={t('explorer.filterTagSearch')}
+                value={tagQuery}
+                onChange={(event) => {
+                  setTagQuery(event.target.value);
+                }}
+              />
+              <ul className="max-h-40 overflow-y-auto">
+                {tagChoices.map((tag) => (
+                  <li key={tag.id}>
+                    <button
+                      type="button"
+                      data-tag-choice={tag.id}
+                      className="w-full truncate rounded-pw px-1.5 py-0.5 text-left text-fg hover:bg-surface"
+                      onClick={() => {
+                        explorer().toggleFilterTag(tag.id);
+                      }}
+                    >
+                      # {tag.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {model.filtering ? (
+            <p role="status" className="text-muted">
+              {t('explorer.filterActive')}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div
         ref={list}
         id={EXPLORER_LIST_ID}
@@ -492,17 +787,21 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
             const style = { top: index * ROW_HEIGHT, height: ROW_HEIGHT };
             const base = `text-ui absolute inset-x-0 flex cursor-default items-center gap-1.5 ${
               isSelected ? 'bg-surface text-fg' : 'text-fg'
-            }`;
+            } ${dropTarget === row.key ? 'outline-2 outline-offset-[-2px] outline-accent outline-dashed' : ''}`;
             if (row.kind === 'group') {
               const Chevron = row.expanded ? ChevronDown : ChevronRight;
+              const position =
+                row.group === 'favorites' || row.group === 'recent'
+                  ? GROUPS_BEFORE.indexOf(row.group) + 1
+                  : GROUPS_BEFORE.length + roots + GROUPS_AFTER.indexOf(row.group) + 1;
               return (
                 <div
                   key={row.key}
                   id={rowId(row.key)}
                   role="treeitem"
                   aria-level={1}
-                  aria-setsize={GROUPS.length}
-                  aria-posinset={GROUPS.indexOf(row.group) + 1}
+                  aria-setsize={topLevel}
+                  aria-posinset={position}
                   aria-expanded={row.count > 0 ? row.expanded : undefined}
                   aria-selected={isSelected}
                   data-group={row.group}
@@ -511,13 +810,14 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                   onClick={() => {
                     setSelected(row.key);
                     if (row.count > 0) {
-                      toggle(row.group);
+                      explorer().toggleGroup(row.group);
                     }
                   }}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     openGroupMenu(row, { x: event.clientX, y: event.clientY });
                   }}
+                  {...(row.group === 'unassigned' ? dropHandlers(row.key, { subnetId: null }) : {})}
                 >
                   <Chevron
                     aria-hidden="true"
@@ -525,6 +825,54 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                   />
                   <span className="truncate">{groupLabel(row.group)}</span>
                   <span className="ml-auto pr-2 font-normal text-muted">{row.count}</span>
+                </div>
+              );
+            }
+            if (row.kind === 'subnet') {
+              const Chevron = row.expanded ? ChevronDown : ChevronRight;
+              const { subnet } = row;
+              return (
+                <div
+                  key={row.key}
+                  id={rowId(row.key)}
+                  role="treeitem"
+                  aria-level={row.level}
+                  aria-setsize={row.level === 1 ? topLevel : row.size}
+                  aria-posinset={row.level === 1 ? GROUPS_BEFORE.length + row.position : row.position}
+                  aria-expanded={row.hasContent ? row.expanded : undefined}
+                  aria-selected={isSelected}
+                  aria-label={
+                    subnet.description
+                      ? `${subnet.name}, ${t('subnet.label')}: ${subnet.description}`
+                      : `${subnet.name}, ${t('subnet.label')}`
+                  }
+                  data-subnet={subnet.id}
+                  title={subnet.description || undefined}
+                  draggable
+                  className={`${base} pr-3`}
+                  style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 }}
+                  onClick={() => {
+                    setSelected(row.key);
+                    if (row.hasContent) {
+                      explorer().toggleSubnet(subnet.id);
+                    }
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    openSubnetMenu(row, { x: event.clientX, y: event.clientY });
+                  }}
+                  onDragStart={(event) => {
+                    startDrag(event, { kind: 'subnet', id: subnet.id });
+                  }}
+                  {...dropHandlers(row.key, { subnetId: subnet.id })}
+                >
+                  <Chevron
+                    aria-hidden="true"
+                    className={`size-3.5 shrink-0 text-muted ${row.hasContent ? '' : 'invisible'}`}
+                  />
+                  <ColorDot color={subnet.color} />
+                  <span className="truncate">{subnet.name}</span>
+                  {row.count > 0 ? <span className="ml-auto text-muted">{row.count}</span> : null}
                 </div>
               );
             }
@@ -565,67 +913,42 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
                 </div>
               );
             }
-            const { document } = row;
             return (
-              <div
+              <DocumentRowView
                 key={row.key}
-                id={rowId(row.key)}
-                role="treeitem"
-                aria-level={2}
-                aria-setsize={row.size}
-                aria-posinset={row.position}
-                aria-selected={isSelected}
-                data-document={document.id}
-                data-group-member={row.group}
-                title={
-                  row.group === 'trash' && document.deletedAt
-                    ? t('explorer.deletedAt', { date: dateTime.format(new Date(document.deletedAt)) })
-                    : (document.originalName ?? undefined)
-                }
-                className={`${base} pr-3 pl-7 ${document.id === active ? 'font-semibold' : ''} ${
-                  row.group === 'trash' ? 'text-muted' : ''
-                }`}
+                row={row}
+                isSelected={isSelected}
+                base={base}
                 style={style}
-                onClick={() => {
+                active={row.document.id === active}
+                renaming={renaming === row.document.id && isSelected}
+                dateTime={dateTime}
+                subnetName={subnetName}
+                onSelect={() => {
                   setSelected(row.key);
                   if (row.group !== 'trash') {
-                    void openDocument(document.id);
+                    void openDocument(row.document.id);
                   }
                 }}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  openMenu(row, { x: event.clientX, y: event.clientY });
+                onMenu={(position) => {
+                  openMenu(row, position);
                 }}
-              >
-                <FormatIcon format={document.format} />
-                {renaming === document.id && isSelected ? (
-                  <RenameInput
-                    initial={document.title}
-                    label={t('explorer.renameLabel')}
-                    onDone={(title) => {
-                      if (title === null || title === document.title) {
-                        setRenaming(null);
-                      } else {
-                        void rename(document.id, title);
-                      }
-                      list.current?.focus();
-                    }}
-                  />
-                ) : (
-                  <span className="truncate">{document.title}</span>
-                )}
-                {document.favoritedAt !== null && row.group !== 'favorites' ? (
-                  <Star
-                    role="img"
-                    aria-label={t('explorer.isFavorite')}
-                    className="ml-auto size-3 shrink-0 text-muted"
-                  />
-                ) : null}
-              </div>
+                onRenamed={(title) => {
+                  if (title === null || title === row.document.title) {
+                    setRenaming(null);
+                  } else {
+                    void rename(row.document.id, title);
+                  }
+                  list.current?.focus();
+                }}
+                onDragStart={(event) => {
+                  startDrag(event, { kind: 'document', id: row.document.id });
+                }}
+              />
             );
           })}
         </div>
-        {listLoaded && documents.length === 0 ? (
+        {listLoaded && documents.length === 0 && subnets.length === 0 ? (
           <p className="text-ui px-3 py-2 text-muted" data-testid="explorer-empty">
             {t('explorer.empty')}
           </p>
@@ -643,8 +966,101 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   );
 }
 
+interface DocumentRowViewProps {
+  row: DocumentRow;
+  isSelected: boolean;
+  base: string;
+  style: { top: number; height: number };
+  active: boolean;
+  renaming: boolean;
+  dateTime: Intl.DateTimeFormat;
+  subnetName: (id: string | null) => string;
+  onSelect: () => void;
+  onMenu: (position: { x: number; y: number }) => void;
+  onRenamed: (title: string | null) => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+}
+
+function DocumentRowView({
+  row,
+  isSelected,
+  base,
+  style,
+  active,
+  renaming,
+  dateTime,
+  subnetName,
+  onSelect,
+  onMenu,
+  onRenamed,
+  onDragStart,
+}: DocumentRowViewProps) {
+  const t = useT();
+  const { document } = row;
+  const inTrash = row.group === 'trash';
+  return (
+    <div
+      id={rowId(row.key)}
+      role="treeitem"
+      aria-level={row.level}
+      aria-setsize={row.size}
+      aria-posinset={row.position}
+      aria-selected={isSelected}
+      data-document={document.id}
+      data-group-member={row.group}
+      data-subnet-member={row.subnetId ?? undefined}
+      data-secondary={row.secondary ? true : undefined}
+      draggable={!inTrash && !renaming}
+      title={
+        inTrash && document.deletedAt
+          ? t('explorer.deletedAt', { date: dateTime.format(new Date(document.deletedAt)) })
+          : (document.originalName ?? undefined)
+      }
+      className={`${base} pr-3 ${active ? 'font-semibold' : ''} ${inTrash ? 'text-muted' : ''}`}
+      style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 + 8 }}
+      onClick={onSelect}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onMenu({ x: event.clientX, y: event.clientY });
+      }}
+      onDragStart={onDragStart}
+    >
+      <FormatIcon format={document.format} />
+      {renaming ? (
+        <RenameInput initial={document.title} label={t('explorer.renameLabel')} onDone={onRenamed} />
+      ) : (
+        <span className="truncate">{document.title}</span>
+      )}
+      {row.secondary ? (
+        <Link2
+          role="img"
+          aria-label={t('explorer.secondary', { subnet: subnetName(row.subnetId) })}
+          className="size-3 shrink-0 text-muted"
+        />
+      ) : null}
+      {document.favoritedAt !== null && row.group !== 'favorites' ? (
+        <Star
+          role="img"
+          aria-label={t('explorer.isFavorite')}
+          className="ml-auto size-3 shrink-0 text-muted"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Opens the entries on the way to a document's primary place. */
+function openPlaceOf(id: string, index: SubnetIndex): void {
+  const primary = useStructure.getState().byDocument[id]?.subnetIds.find((subnet) => index.byId.has(subnet));
+  if (primary) {
+    useExplorer.getState().expandPath(pathTo(index, primary).map((subnet) => subnet.id));
+  } else {
+    useExplorer.getState().toggleGroup('unassigned', true);
+  }
+}
+
 function rowId(key: string): string {
-  return `pw-explorer-${key.replace(':', '-')}`;
+  return `pw-explorer-${key.replaceAll(':', '-')}`;
 }
 
 interface RenameInputProps {

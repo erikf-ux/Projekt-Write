@@ -42,6 +42,18 @@ export function NoticeBar({ notice, onClose }: NoticeBarProps) {
         <p>{t(notice.key, notice.params)}</p>
         {notice.error ? <p className="text-danger">{errorText(t, notice.error)}</p> : null}
       </div>
+      {notice.action ? (
+        <button
+          type="button"
+          data-testid="notice-action"
+          className="inline-flex h-6 shrink-0 items-center rounded-pw border border-muted px-2 text-fg hover:bg-surface"
+          onClick={() => {
+            notice.action?.run();
+          }}
+        >
+          {t(notice.action.labelKey)}
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label={t('dialog.close')}

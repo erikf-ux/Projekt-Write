@@ -24,6 +24,8 @@ export interface Notice {
   key: MessageKey;
   params?: Record<string, string | number>;
   error?: CommandError;
+  /** A button in the notice, such as "Rückgängig" after a structural step. */
+  action?: { labelKey: MessageKey; run: () => void };
 }
 
 interface UiStore {

@@ -7,6 +7,7 @@
 import { translate, useLocale } from '@/i18n';
 import type { CommandDefinition } from '@/modules/commands/types';
 import { copyTitle } from '@/modules/documents/Explorer';
+import { useExplorer } from '@/modules/documents/explorerStore';
 import {
   activeDocument,
   freeTitle,
@@ -19,6 +20,8 @@ import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
+import { useStructureDialogs } from '@/modules/structure/dialogStore';
+import { useStructure } from '@/modules/structure/structureStore';
 import type { TextFormat } from '@/types/generated/TextFormat';
 import type { UiSettings } from '@/types/generated/UiSettings';
 import { focusEditor, focusExplorer } from './focus';
@@ -244,6 +247,104 @@ export function createAppCommands(): CommandDefinition[] {
           useHistory.getState().askName(document.id);
         }
       },
+    },
+    {
+      id: 'subnet.new',
+      category: 'document',
+      titleKey: 'command.subnet.new',
+      isAvailable: libraryOpen,
+      run: () => {
+        useStructureDialogs.getState().openSubnet({ mode: 'create', parentId: null });
+      },
+    },
+    {
+      id: 'document.moveTo',
+      category: 'document',
+      titleKey: 'command.document.moveTo',
+      isAvailable: () =>
+        activeLibraryDocument() !== null &&
+        activeSummary(activeLibraryDocument()?.id ?? '')?.archivedAt === null,
+      run: () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          useStructureDialogs.getState().openPicker({ mode: 'moveDocument', documentId: document.id });
+        }
+      },
+    },
+    {
+      id: 'document.assignTo',
+      category: 'document',
+      titleKey: 'command.document.assignTo',
+      isAvailable: () =>
+        activeLibraryDocument() !== null &&
+        activeSummary(activeLibraryDocument()?.id ?? '')?.archivedAt === null &&
+        useStructure.getState().subnets.length > 0,
+      run: () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          useStructureDialogs.getState().openPicker({ mode: 'assignDocument', documentId: document.id });
+        }
+      },
+    },
+    {
+      id: 'document.tags',
+      category: 'document',
+      titleKey: 'command.document.tags',
+      isAvailable: () => activeLibraryDocument() !== null,
+      run: () => {
+        const document = activeLibraryDocument();
+        if (document) {
+          useStructureDialogs.getState().openTags(document.id);
+        }
+      },
+    },
+    {
+      id: 'tags.manage',
+      category: 'document',
+      titleKey: 'command.tags.manage',
+      isAvailable: libraryOpen,
+      run: () => {
+        useStructureDialogs.getState().openTagManager();
+      },
+    },
+    {
+      id: 'explorer.filter',
+      category: 'view',
+      titleKey: 'command.explorer.filter',
+      isAvailable: libraryOpen,
+      run: () => {
+        useExplorer.getState().showFilter(true);
+        const sidebar = settings()?.sidebar;
+        if (sidebar && !sidebar.visible) {
+          void ui().update({ sidebar: { ...sidebar, visible: true } });
+        }
+        // The field exists once the Explorer has drawn the filter.
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLInputElement>('[data-testid="explorer-filter-text"]')?.focus();
+        });
+      },
+    },
+    {
+      id: 'structure.undo',
+      category: 'edit',
+      titleKey: 'command.structure.undo',
+      isAvailable: () => libraryOpen() && useStructure.getState().history.undo !== null,
+      run: () =>
+        useStructure
+          .getState()
+          .undo()
+          .then(() => undefined),
+    },
+    {
+      id: 'structure.redo',
+      category: 'edit',
+      titleKey: 'command.structure.redo',
+      isAvailable: () => libraryOpen() && useStructure.getState().history.redo !== null,
+      run: () =>
+        useStructure
+          .getState()
+          .redo()
+          .then(() => undefined),
     },
     {
       id: 'trash.empty',

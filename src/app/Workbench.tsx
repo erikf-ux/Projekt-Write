@@ -44,6 +44,14 @@ import { readingMinutes } from '@/modules/editor/statistics';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useUi } from '@/modules/settings/uiStore';
+import { Breadcrumbs } from '@/modules/structure/Breadcrumbs';
+import { SubnetDialog } from '@/modules/structure/SubnetDialog';
+import { SubnetPicker } from '@/modules/structure/SubnetPicker';
+import { createSampleSubnets } from '@/modules/structure/sampleSubnets';
+import { useStructure } from '@/modules/structure/structureStore';
+import { TagManager } from '@/modules/structure/TagManager';
+import { TagsDialog } from '@/modules/structure/TagsDialog';
+import { useExplorer } from '@/modules/documents/explorerStore';
 import { useBindings, useShortcutLabel } from './bindings';
 
 /** How often external files are compared with their state on disk. */
@@ -82,7 +90,12 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       stopSessionTracking();
       setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
+      useStructure.getState().reset();
+      useExplorer.getState().reset();
       await useWorkspace.getState().refresh();
+      // Subnets and tags (Phase 7) before the tabs come back.
+      await useStructure.getState().load();
+      await createSampleSubnets();
       void useWorkspace.getState().refreshTrash();
       // Stage 2: unsaved changes from a crash are offered first.
       await offerRecovery();
@@ -250,6 +263,9 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               }}
             />
           ) : null}
+          {!focusMode && current && !current.external ? (
+            <Breadcrumbs documentId={current.id} title={current.title} />
+          ) : null}
           <DocumentEditor
             tabs={workspace.tabs}
             open={workspace.open}
@@ -326,6 +342,10 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       <HistoryDialog />
       <RecoveryDialog />
       <VersionNameDialog />
+      <SubnetDialog />
+      <SubnetPicker />
+      <TagsDialog />
+      <TagManager />
       {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (
         <StatisticsDialog

@@ -2,7 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocale } from '@/i18n';
 import type { DocumentSummary } from '@/types/generated/DocumentSummary';
-import { copyTitle, Explorer, explorerGroups, RECENT_LIMIT } from './Explorer';
+import { useStructure } from '@/modules/structure/structureStore';
+import { copyTitle, Explorer, RECENT_LIMIT } from './Explorer';
+import { explorerModel, NO_FILTER } from './explorerRows';
+import { useExplorer } from './explorerStore';
 import { useWorkspace } from './workspaceStore';
 
 function summary(id: string, title: string, extra: Partial<DocumentSummary> = {}): DocumentSummary {
@@ -50,9 +53,11 @@ describe('Explorer', () => {
 
   afterEach(() => {
     useWorkspace.setState(initial, true);
+    useStructure.getState().reset();
+    useExplorer.getState().reset();
   });
 
-  it('shows favourites, recently used and all documents as one tree', () => {
+  it('shows favourites, recently used and the documents in no subnet as one tree', () => {
     render(<Explorer onNewDocument={() => undefined} />);
     const groups = within(tree())
       .getAllByRole('treeitem')
@@ -60,14 +65,14 @@ describe('Explorer', () => {
     expect(groups.map((row) => row.textContent)).toEqual([
       'Favoriten1',
       'Zuletzt verwendet2',
-      'Alle Dokumente3',
+      'Nicht zugeordnet3',
       'Archiv0',
       'Papierkorb0',
     ]);
     expect(rowsOf('favorites')).toEqual(['Alpha']);
     expect(rowsOf('recent')).toEqual(['Gamma', 'Beta']);
-    expect(rowsOf('all')).toEqual(['Alpha', 'Beta', 'Gamma']);
-    const alpha = tree().querySelector<HTMLElement>('[data-group-member="all"][data-document="b"]');
+    expect(rowsOf('unassigned')).toEqual(['Alpha', 'Beta', 'Gamma']);
+    const alpha = tree().querySelector<HTMLElement>('[data-group-member="unassigned"][data-document="b"]');
     expect(alpha && within(alpha).getByRole('img', { name: 'Favorit' })).toBeTruthy();
     // One element in several entries.
     expect(tree().querySelectorAll('[data-document="b"]')).toHaveLength(2);
@@ -102,7 +107,7 @@ describe('Explorer', () => {
     const setFavorite = vi.fn(() => Promise.resolve(true));
     useWorkspace.setState({ copyDocument, setFavorite });
     render(<Explorer onNewDocument={() => undefined} />);
-    const beta = tree().querySelector('[data-group-member="all"][data-document="a"]');
+    const beta = tree().querySelector('[data-group-member="unassigned"][data-document="a"]');
     if (!beta) {
       throw new Error('no row');
     }
@@ -137,7 +142,7 @@ describe('Explorer', () => {
     render(<Explorer onNewDocument={() => undefined} />);
     expect(rowsOf('favorites')).toEqual([]);
     expect(rowsOf('recent')).toEqual(['Aktiv']);
-    expect(rowsOf('all')).toEqual(['Aktiv']);
+    expect(rowsOf('unassigned')).toEqual(['Aktiv']);
     // Archive and trash start closed.
     expect(rowsOf('archive')).toEqual([]);
     const list = tree();
@@ -157,7 +162,7 @@ describe('Explorer', () => {
     expect(restoreDocument).toHaveBeenCalledWith('t');
 
     // Del moves the selected document to the trash; the menu archives.
-    const active = list.querySelector<HTMLElement>('[data-group-member="all"][data-document="a"]');
+    const active = list.querySelector<HTMLElement>('[data-group-member="unassigned"][data-document="a"]');
     fireEvent.contextMenu(active as HTMLElement);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }));
     expect(archiveDocument).toHaveBeenCalledWith('a', true);
@@ -171,9 +176,17 @@ describe('Explorer', () => {
         lastOpenedAt: `2026-11-04T10:${String(index).padStart(2, '0')}:00.000Z`,
       }),
     );
-    const groups = explorerGroups(many, 'de');
-    expect(groups.recent).toHaveLength(RECENT_LIMIT);
-    expect(groups.recent[0]?.id).toBe(`d${String(RECENT_LIMIT + 2)}`);
+    const { recent } = explorerModel({
+      documents: many,
+      trash: [],
+      recentFiles: [],
+      subnets: [],
+      placements: {},
+      filter: NO_FILTER,
+      locale: 'de',
+    });
+    expect(recent).toHaveLength(RECENT_LIMIT);
+    expect(recent[0]?.kind === 'document' && recent[0].document.id).toBe(`d${String(RECENT_LIMIT + 2)}`);
     expect(copyTitle('x'.repeat(300), ' (Kopie)')).toHaveLength(300);
   });
 });

@@ -4,6 +4,7 @@
  * objects without a path; their content goes to Rust, which checks type
  * and content and stores a copy. The original file is only read.
  */
+import { useStructure } from '@/modules/structure/structureStore';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentSummary } from '@/types/generated/DocumentSummary';
@@ -73,6 +74,8 @@ export async function importFiles(
       summary.failed.push({ name: file.name, error: result.error });
     } else if (result.value.kind === 'imported') {
       summary.imported.push(result.value.document);
+      // A .pwrite brings the tags of its envelope (ADR 0017).
+      void useStructure.getState().refreshDocument(result.value.document.id);
     }
   }
   return summary;
