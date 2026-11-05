@@ -9,79 +9,78 @@
  *   is saved as `[Titel](pwrite://<id>)`, "Verbindungen" shows the
  *   backlink, Ctrl+click opens the linked document.
  *
+ * Phase 6 (ADR 0016):
+ *
+ * * Stage 3: a deleted document goes to the trash and comes back with its
+ *   connections.
+ * * Stage 4: a named version, the comparison, and the restore that first
+ *   keeps the current state as a version.
+ *
  * Runs after external.e2e.ts in the same library.
  */
 import fs from 'node:fs';
-import path from 'node:path';
-import { $, $$, browser, expect } from '@wdio/globals';
-import { pickedFolders } from '../sandbox';
+import { $, browser, expect } from '@wdio/globals';
+import {
+  activeDocumentId,
+  activeEditor,
+  appendText,
+  documentFile,
+  newDocument,
+  renameActive,
+  runFromPalette,
+  typeText,
+} from '../editing';
 import { closeSettings, pinMainWindow } from '../session';
 
-const FOLDERS = { md: 'markdown', pwrite: 'richtext', txt: 'text' } as const;
-
-function documentFile(id: string, format: keyof typeof FOLDERS): string {
-  return path.join(pickedFolders.moveTarget, 'documents', FOLDERS[format], `${id}.${format}`);
-}
-
-async function activeDocumentId(): Promise<string> {
-  return (await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').getAttribute('data-tab')) ?? '';
-}
-
-async function activeEditor() {
-  for (const surface of await $$('[role="tabpanel"]:not([hidden]) [data-testid="editor"]').getElements()) {
-    if (await surface.isDisplayed()) {
-      return surface;
-    }
-  }
-  throw new Error('no visible writing surface');
-}
-
-/** Types like the embedded WebDriver, without its legacy key codes (see editor.e2e.ts). */
-async function typeText(text: string) {
-  await browser.execute(async (keys: string) => {
-    for (const character of keys) {
-      const target = document.activeElement ?? document.body;
-      const options = { key: character, bubbles: true, cancelable: true, composed: true };
-      if (target.dispatchEvent(new KeyboardEvent('keydown', options))) {
-        // eslint-disable-next-line @typescript-eslint/no-deprecated -- the path the WebDriver types on
-        document.execCommand('insertText', false, character);
-      }
-      target.dispatchEvent(new KeyboardEvent('keyup', options));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-  }, text);
-}
-
-async function newDocument(): Promise<string> {
-  const before = await activeDocumentId();
-  await browser.keys(['Control', 'n']);
-  await browser.waitUntil(async () => {
-    const id = await activeDocumentId();
-    return id !== '' && id !== before && !id.startsWith('ext:');
+/** The row the Explorer has selected (its `aria-activedescendant`). */
+async function explorerRow(): Promise<{ document: string; group: string }> {
+  return browser.execute(() => {
+    const tree = document.getElementById('pw-explorer-list');
+    const row = document.getElementById(tree?.getAttribute('aria-activedescendant') ?? '');
+    return {
+      document: row?.getAttribute('data-document') ?? '',
+      group: row?.getAttribute('data-group-member') ?? `group:${row?.getAttribute('data-group') ?? ''}`,
+    };
   });
-  return activeDocumentId();
 }
 
-/** Renames the active document from the palette ("Umbenennen", F2 in the Explorer). */
-async function renameActive(title: string) {
-  await runFromPalette('document.rename');
-  const field = $('[data-testid="explorer-rename"]');
-  await field.waitForDisplayed();
-  await field.setValue(title);
-  await browser.keys('Enter');
-  await field.waitForExist({ reverse: true });
+/** Focuses the Explorer, goes to its last row and up from there to the row wanted. */
+async function selectInExplorer(document: string, group: string) {
+  await browser.execute(() => {
+    window.document.getElementById('pw-explorer-list')?.focus();
+  });
+  await browser.keys('End');
+  for (let step = 0; step < 60; step += 1) {
+    const row = await explorerRow();
+    if (row.document === document && row.group === group) {
+      return;
+    }
+    await browser.keys('ArrowUp');
+  }
+  throw new Error(`${document} is not in the Explorer group ${group}`);
 }
 
-/** Runs a command from the command palette. */
-async function runFromPalette(command: string) {
-  await browser.keys(['Control', 'Shift', 'p']);
-  const option = $(`[data-testid="command-palette"] [data-command="${command}"]`);
-  await option.waitForDisplayed({ timeoutMsg: `${command} is not offered` });
-  await option.click();
-  await $('[data-testid="command-palette"]').waitForExist({ reverse: true });
+function savedText(id: string): string | null {
+  const file = documentFile(id, 'md');
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 }
 
-describe('Converting documents (Phase 5)', () => {
+/** The label of the option a select of the history dialog shows. */
+async function chosenVersion(testId: string): Promise<string> {
+  return browser.execute((id: string) => {
+    const select = document.querySelector<HTMLSelectElement>(`[data-testid="${id}"]`);
+    return select?.selectedOptions[0]?.textContent ?? '';
+  }, testId);
+}
+
+async function waitForSaved(id: string, text: string, message: string) {
+  await browser.waitUntil(() => savedText(id) === text, { timeout: 10_000, timeoutMsg: message });
+}
+
+describe('Library documents (Phase 5 and 6)', () => {
+  let linkTarget = '';
+  let linkSource = '';
+
   before(async () => {
     await pinMainWindow();
     await closeSettings();
@@ -137,8 +136,10 @@ describe('Converting documents (Phase 5)', () => {
 
   it('links documents with [[, shows the backlink and opens the link with Ctrl+click', async () => {
     const target = await newDocument();
+    linkTarget = target;
     await renameActive('Linkziel');
     const source = await newDocument();
+    linkSource = source;
     await renameActive('Linkquelle');
     await (await activeEditor()).click();
     await typeText('Siehe [[');
@@ -185,5 +186,84 @@ describe('Converting documents (Phase 5)', () => {
     expect(await backlink.getText()).toBe('Linkquelle');
     await backlink.click();
     await browser.waitUntil(async () => (await activeDocumentId()) === source);
+  });
+
+  it('moves a document to the trash and back with its connections (stage 3)', async () => {
+    await selectInExplorer(linkSource, 'all');
+    await browser.keys('Delete');
+    await $(`[data-testid="tabs"] [data-tab="${linkSource}"]`).waitForExist({
+      reverse: true,
+      timeoutMsg: 'the deleted document stayed open',
+    });
+    // The trash keeps the file until it is emptied.
+    expect(savedText(linkSource)).toBe(`Siehe [Linkziel](pwrite://${linkTarget})\n`);
+    await $(`[data-testid="tabs"] [data-tab="${linkTarget}"]`).click();
+    await browser.waitUntil(async () => (await activeDocumentId()) === linkTarget);
+    await $('[data-testid="connections-empty"]').waitForDisplayed({
+      timeoutMsg: 'a document in the trash still links here',
+    });
+
+    // The trash is the last group, closed at start.
+    await browser.execute(() => {
+      document.getElementById('pw-explorer-list')?.focus();
+    });
+    await browser.keys('End');
+    expect(await explorerRow()).toEqual({ document: '', group: 'group:trash' });
+    await browser.keys('ArrowRight');
+    await browser.keys('End');
+    expect(await explorerRow()).toEqual({ document: linkSource, group: 'trash' });
+    await browser.keys('Enter');
+    const restore = $('[data-testid="context-menu"] [data-item="restore"]');
+    await restore.waitForDisplayed({ timeoutMsg: 'no menu for the document in the trash' });
+    expect(await restore.getText()).toContain('Stufe 3');
+    await restore.click();
+    const backlink = $(`[data-testid="connections"] [data-backlink="${linkSource}"]`);
+    await backlink.waitForDisplayed({ timeoutMsg: 'the restored document does not link here again' });
+    expect(await backlink.getText()).toBe('Linkquelle');
+    await expect($('[data-testid="explorer"] [data-group="trash"]')).toHaveText(expect.stringContaining('0'));
+  });
+
+  it('saves a named version, compares it and restores it, keeping the current state (stage 4)', async () => {
+    const id = await newDocument();
+    await (await activeEditor()).click();
+    await typeText('Erste Fassung');
+    await waitForSaved(id, 'Erste Fassung\n', 'the first text was not saved');
+    await runFromPalette('document.saveVersion');
+    const name = $('[data-testid="version-name"]');
+    await name.waitForDisplayed();
+    await name.setValue('Fassung 1');
+    await browser.keys('Enter');
+    await $('[data-testid="version-name-dialog"]').waitForExist({ reverse: true });
+
+    await appendText(' und mehr');
+    await waitForSaved(id, 'Erste Fassung und mehr\n', 'the change was not saved');
+    await runFromPalette('document.history');
+    await $('[data-testid="history-dialog"]').waitForDisplayed();
+    // The newest version against the current state: one line changed.
+    expect(await chosenVersion('history-left')).toContain('Fassung 1');
+    expect(await chosenVersion('history-right')).toBe('Aktueller Stand');
+    await expect($('[data-testid="history-counts"]')).toHaveText('1 Zeilen entfernt, 1 hinzugefügt');
+    await expect($('[data-testid="history-table"] [data-line="removed"]')).toHaveText(
+      expect.stringContaining('Erste Fassung'),
+    );
+    await expect($('[data-testid="history-table"] [data-line="added"]')).toHaveText(
+      expect.stringContaining('Erste Fassung und mehr'),
+    );
+    await $('[data-testid="history-restore"]').click();
+    await $('[data-testid="history-dialog"]').waitForExist({ reverse: true });
+    await waitForSaved(id, 'Erste Fassung\n', 'the version was not restored');
+    await browser.waitUntil(async () => (await (await activeEditor()).getText()).trim() === 'Erste Fassung', {
+      timeoutMsg: 'the editor does not show the restored text',
+    });
+
+    // The state before the restore is a version of its own.
+    await runFromPalette('document.history');
+    await $('[data-testid="history-dialog"]').waitForDisplayed();
+    expect(await chosenVersion('history-left')).toContain('Vor einer Wiederherstellung');
+    await expect($('[data-testid="history-table"] [data-line="removed"]')).toHaveText(
+      expect.stringContaining('Erste Fassung und mehr'),
+    );
+    await browser.keys('Escape');
+    await $('[data-testid="history-dialog"]').waitForExist({ reverse: true });
   });
 });
