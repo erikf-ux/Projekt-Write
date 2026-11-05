@@ -4,13 +4,22 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 5 – Dokumente und externe Dateien** (Abschnitte 9, 10, 12, 13): freigegeben am 4. November 2026 („Weiter“), **abgeschlossen** am 4. November 2026; Bericht: `docs/bericht-phase-5.md`. Wartet auf Freigabe von Phase 6.
+**Phase 6 – Wiederherstellung** (Abschnitte 4, 9, 13): freigegeben am 5. November 2026 („Du kannst nun starten“), in Arbeit.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Umfangsentscheidungen (ADR 0015): Löschen, Papierkorb und Archiv in Phase 6 (Abschnitt 25; ADR 0011 nannte Phase 5), Verschieben und Tags in Phase 7, Ordnerimport in Phase 8. Kodierungen ohne neue Abhängigkeit, Änderungen von außen per Abfrage statt Dateiwächter.
+Entscheidungen: ADR 0016. Stufe 5 (Backup) folgt in Phase 10; Zuordnungen zu Subnetzen und Tags (Phase 7) folgen demselben Muster wie die Links.
 
-CI: Die Läufe 78 bis 96 starteten keinen Job (Actions-Minuten verbraucht). **CI-Lauf 97** (von Hand gestartet am 4. November 2026, Commit `7e2cefe`, Code von Phase 5) ist auf allen vier Jobs grün: Windows, Linux (jeweils mit allen E2E-Tests), Abhängigkeitsprüfung, Release-Build ohne Test-Plugins.
+Plan Phase 6 (Reihenfolge):
+
+1. ADR 0016, Plan, `flate2` begründen.
+2. Papierkorb (Stufe 3) und Archiv: Löschen, Wiederherstellen, endgültig Löschen, Aufbewahrung mit simulierter Zeit, Explorer-Einträge.
+3. Dokumenthistorie (Stufe 4): Migration 0006, komprimierte Versionen, Aufbewahrung, Vergleich nebeneinander, Wiederherstellen mit Sicherung vorab.
+4. Recovery-Entwürfe (Stufe 2): höchstens 1 s nach der ersten ungespeicherten Eingabe, auch für externe Dateien; Angebot beim Start.
+5. Sitzung (Stufe 1): Tabs, aktiver Tab, Auswahl und Ansicht nach einem normalen Neustart.
+6. E2E (harter Abbruch beim Tippen, Papierkorb mit Verbindungen, Historie, Sitzung), Doku, Bericht.
+
+CI: läuft wieder seit Lauf 97 (grün). Reine Doku-Commits tragen `[skip ci]`.
 
 ## Stand Phase 5
 
