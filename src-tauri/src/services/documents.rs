@@ -32,6 +32,7 @@ use crate::filesystem::atomic;
 use crate::security::paths::{PathError, SafeRoot};
 use crate::services::history::{History, HistoryError, VersionKind, VersionSummary};
 use crate::services::pwrite;
+use crate::services::recovery::{self, Drafts};
 
 /// Largest document content accepted (64 MiB). A 50,000-word text is about
 /// 400 KB; the limit only protects memory.
@@ -667,6 +668,57 @@ impl DocumentRepository {
         )
     }
 
+    /// The recovery drafts of this library (stage 2).
+    pub fn drafts(&self) -> Drafts {
+        let dir = self
+            .root
+            .resolve(recovery::RECOVERY_DIR)
+            .unwrap_or_else(|_| self.root.path().join(recovery::RECOVERY_DIR));
+        Drafts::new(dir)
+    }
+
+    /// Whether `text` (as the editor holds it) is what the document stores.
+    pub async fn matches_stored(&self, id: Uuid, text: &str) -> Result<bool, DocumentError> {
+        let (meta, content) = self.read(id).await?;
+        if meta.format != DocumentFormat::Pwrite {
+            return Ok(content == text.as_bytes());
+        }
+        let Ok(draft) = serde_json::from_str::<serde_json::Value>(text) else {
+            return Ok(false);
+        };
+        Ok(match pwrite::parse(&content) {
+            Ok(parsed) => *parsed.content() == draft,
+            Err(_) => false,
+        })
+    }
+
+    /// Restores a recovery draft (stage 2): the current content becomes a
+    /// version `beforeRestore` first, then the draft is saved.
+    pub async fn apply_draft(&self, id: Uuid, text: &str) -> Result<DocumentMeta, DocumentError> {
+        let (meta, current) = self.read(id).await?;
+        if meta.deleted_at.is_some() {
+            return Err(DocumentError::InTrash);
+        }
+        self.history()
+            .record(
+                meta.id,
+                VersionKind::BeforeRestore,
+                None,
+                meta.format,
+                &current,
+            )
+            .await?;
+        let outcome = if meta.format == DocumentFormat::Pwrite {
+            let content: serde_json::Value =
+                serde_json::from_str(text).map_err(|_| DocumentError::InvalidPwrite)?;
+            self.save_pwrite(meta.id, content).await?
+        } else {
+            self.save(meta.id, text.as_bytes()).await?
+        };
+        log::info!("recovery draft of document {} restored", meta.id);
+        Ok(outcome.meta().clone())
+    }
+
     /// The history of this library's documents.
     pub fn history(&self) -> History {
         History::new(self.database.clone(), self.generators.clone())
@@ -874,6 +926,12 @@ impl DocumentRepository {
             && error.kind() != io::ErrorKind::NotFound
         {
             log::warn!("file of removed document {} not deleted: {error}", meta.id);
+        }
+        if let Err(error) = self.drafts().remove(&recovery::library_key(meta.id)) {
+            log::warn!(
+                "recovery draft of removed document {} not deleted: {error}",
+                meta.id
+            );
         }
         log::info!("document {} removed from the trash for good", meta.id);
         Ok(())

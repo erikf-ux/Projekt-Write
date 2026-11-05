@@ -364,6 +364,11 @@ impl LibrarySession {
         result
     }
 
+    /// The current time (ISO 8601), from the clock of the session.
+    pub fn now(&self) -> String {
+        self.generators.now().to_iso()
+    }
+
     /// Days documents stay in the trash, if a library is open.
     pub async fn trash_retention_days(&self) -> Option<u32> {
         let slot = self.slot.lock().await;

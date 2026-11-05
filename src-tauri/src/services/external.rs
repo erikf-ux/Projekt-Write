@@ -261,6 +261,12 @@ impl ExternalFiles {
         Ok(info(id, &path, format, metadata.len()))
     }
 
+    /// Whether a file is open in this session (its tab exists).
+    pub fn is_open(&self, path: &Path) -> bool {
+        let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        lock(&self.open).values().any(|file| file.path == path)
+    }
+
     /// The file behind an id.
     pub fn path(&self, id: &str) -> Result<PathBuf, ExternalError> {
         lock(&self.open)

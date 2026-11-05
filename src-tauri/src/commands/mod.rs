@@ -11,6 +11,7 @@ pub mod external;
 pub mod input;
 pub mod library;
 pub mod links;
+pub mod recovery;
 pub mod system;
 pub mod ui;
 
@@ -58,6 +59,11 @@ pub const COMMAND_NAMES: &[&str] = &[
     "document_version_save",
     "document_version_close",
     "document_version_restore",
+    "recovery_write",
+    "recovery_discard",
+    "recovery_list",
+    "recovery_restore",
+    "recovery_drop",
     "external_open",
     "external_read",
     "external_check",
@@ -117,6 +123,11 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         documents::document_version_save,
         documents::document_version_close,
         documents::document_version_restore,
+        recovery::recovery_write,
+        recovery::recovery_discard,
+        recovery::recovery_list,
+        recovery::recovery_restore,
+        recovery::recovery_drop,
         external::external_open,
         external::external_read,
         external::external_check,

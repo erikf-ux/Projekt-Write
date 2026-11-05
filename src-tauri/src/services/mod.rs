@@ -11,6 +11,7 @@ pub mod links;
 pub mod locale;
 pub mod opening;
 pub mod pwrite;
+pub mod recovery;
 pub mod session;
 pub mod settings;
 pub mod system;

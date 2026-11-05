@@ -2183,3 +2183,145 @@ fn versions_are_listed_compared_named_and_restored() {
     assert_error_code(&error, "VERSION_NOT_FOUND");
     app.shut_down();
 }
+
+#[test]
+fn recovery_drafts_are_offered_and_restored_after_saving_the_current_state() {
+    let app = app_with_library();
+    let id = call(
+        &app,
+        "document_create",
+        json!({ "title": "Absturz", "format": "md" }),
+    )
+    .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Gespeichert\n" }),
+    )
+    .unwrap();
+    let target = json!({ "kind": "library", "id": id });
+
+    // A draft equal to the saved state is not offered (and goes).
+    call(
+        &app,
+        "recovery_write",
+        json!({ "target": target, "text": "Gespeichert\n" }),
+    )
+    .unwrap();
+    assert_eq!(call(&app, "recovery_list", json!({})).unwrap(), json!([]));
+
+    call(
+        &app,
+        "recovery_write",
+        json!({ "target": target, "text": "Gespeichert\nUngesichert getippt\n" }),
+    )
+    .unwrap();
+    let draft_file = app.path(&format!("Dokumente/ProjectWrite/recovery/{id}.json"));
+    assert!(draft_file.exists());
+    let list = call(&app, "recovery_list", json!({})).unwrap();
+    assert_eq!(list[0]["key"], id.as_str());
+    assert_eq!(list[0]["title"], "Absturz");
+    assert_eq!(list[0]["external"], false);
+
+    let restored = call(&app, "recovery_restore", json!({ "key": id })).unwrap();
+    assert_eq!(restored["kind"], "library");
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["text"], "Gespeichert\nUngesichert getippt\n");
+    // The saved state is kept as a version (here the automatic one of the
+    // save; an equal "beforeRestore" is not stored twice).
+    let versions = call(&app, "document_versions", json!({ "id": id })).unwrap();
+    let saved = call(
+        &app,
+        "document_version_text",
+        json!({ "id": versions[0]["id"] }),
+    )
+    .unwrap();
+    assert_eq!(saved["text"], "Gespeichert\n");
+    assert!(!draft_file.exists());
+
+    // Discarding removes a draft.
+    call(
+        &app,
+        "recovery_write",
+        json!({ "target": target, "text": "x" }),
+    )
+    .unwrap();
+    call(&app, "recovery_discard", json!({ "target": target })).unwrap();
+    assert!(!draft_file.exists());
+
+    // External files: not offered while open, opened again with the draft.
+    let path = user_file(&app, "Notiz.txt", b"Gr\xF6\xDFe\r\n");
+    let info = open_external(&app, &path);
+    call(&app, "external_read", json!({ "id": info["id"] })).unwrap();
+    let external = json!({ "kind": "external", "id": info["id"] });
+    call(
+        &app,
+        "recovery_write",
+        json!({ "target": external, "text": "Größe und mehr\n", "encoding": "windows1252", "lineEnding": "crlf" }),
+    )
+    .unwrap();
+    assert_eq!(call(&app, "recovery_list", json!({})).unwrap(), json!([]));
+    call(&app, "external_close", json!({ "id": info["id"] })).unwrap();
+    let list = call(&app, "recovery_list", json!({})).unwrap();
+    assert_eq!(list[0]["title"], "Notiz.txt");
+    assert_eq!(list[0]["external"], true);
+    assert_eq!(list[0]["missing"], false);
+    let key = list[0]["key"].as_str().unwrap().to_owned();
+    let restored = call(&app, "recovery_restore", json!({ "key": key })).unwrap();
+    assert_eq!(restored["kind"], "external");
+    assert_eq!(restored["text"], "Größe und mehr\n");
+    assert_eq!(restored["file"]["name"], "Notiz.txt");
+    // The file is untouched until the tab saves.
+    assert_eq!(std::fs::read(&path).unwrap(), b"Gr\xF6\xDFe\r\n");
+    call(
+        &app,
+        "external_close",
+        json!({ "id": restored["file"]["id"] }),
+    )
+    .unwrap();
+
+    // A vanished file: the draft becomes a library document.
+    std::fs::remove_file(&path).unwrap();
+    let list = call(&app, "recovery_list", json!({})).unwrap();
+    assert_eq!(list[0]["missing"], true);
+    let created = call(&app, "recovery_restore", json!({ "key": key })).unwrap();
+    assert_eq!(created["kind"], "created");
+    assert_eq!(created["document"]["title"], "Notiz");
+    let read = call(
+        &app,
+        "document_read",
+        json!({ "id": created["document"]["id"] }),
+    )
+    .unwrap();
+    assert_eq!(read["text"], "Größe und mehr\n");
+    assert_eq!(call(&app, "recovery_list", json!({})).unwrap(), json!([]));
+
+    for (command, request, field) in [
+        (
+            "recovery_write",
+            json!({ "target": { "kind": "library", "id": "x" }, "text": "" }),
+            "id",
+        ),
+        (
+            "recovery_write",
+            json!({ "target": { "kind": "other", "id": id }, "text": "" }),
+            "request",
+        ),
+        ("recovery_write", json!({ "target": target }), "request"),
+        (
+            "recovery_discard",
+            json!({ "target": { "kind": "external", "id": "../a" } }),
+            "id",
+        ),
+        ("recovery_restore", json!({ "key": "../library" }), "key"),
+        ("recovery_drop", json!({ "key": "ext-zz" }), "key"),
+        ("recovery_list", json!({ "all": true }), "request"),
+    ] {
+        let error = call(&app, command, request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    app.shut_down();
+}
