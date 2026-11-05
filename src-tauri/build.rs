@@ -67,6 +67,7 @@ fn main() {
         "document_untag",
         "structure_undo",
         "structure_redo",
+        "structure_history",
         "external_open",
         "external_read",
         "external_check",

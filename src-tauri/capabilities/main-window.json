@@ -68,6 +68,7 @@
     "allow-document-untag",
     "allow-structure-undo",
     "allow-structure-redo",
+    "allow-structure-history",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",

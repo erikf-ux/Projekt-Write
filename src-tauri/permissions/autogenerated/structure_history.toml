@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-structure-history"
+description = "Enables the structure_history command without any pre-configured scope."
+commands.allow = ["structure_history"]
+
+[[permission]]
+identifier = "deny-structure-history"
+description = "Denies the structure_history command without any pre-configured scope."
+commands.deny = ["structure_history"]

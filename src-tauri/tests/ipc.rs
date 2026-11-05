@@ -2536,6 +2536,9 @@ fn subnets_memberships_and_tags_through_the_commands() {
 
     // Deleting a document is a step too.
     call(&app, "document_delete", json!({ "id": doc })).unwrap();
+    let history = call(&app, "structure_history", json!({})).unwrap();
+    assert_eq!(history["undo"]["action"], "documentDelete");
+    assert_eq!(history["undo"]["subject"], "Kapitel");
     let undone = call(&app, "structure_undo", json!({})).unwrap();
     assert_eq!(undone["step"]["action"], "documentDelete");
     assert_eq!(call(&app, "documents_trash", json!({})).unwrap(), json!([]));

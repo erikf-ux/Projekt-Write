@@ -790,6 +790,20 @@ async fn replay(state: &AppState, undo: bool) -> Result<Option<StructureUpdate>,
         .await
 }
 
+/// The next steps to undo and redo (after an action of another module,
+/// such as moving a document to the trash).
+#[tauri::command]
+pub async fn structure_history(
+    state: State<'_, AppState>,
+    request: Input<EmptyRequest>,
+) -> Result<UndoHistory, CommandError> {
+    let _ = request.into_inner();
+    state
+        .session
+        .with_structure(|structure, _| async move { Ok(structure.history()) })
+        .await
+}
+
 /// Undoes the last structural step (`null` if there is none).
 #[tauri::command]
 pub async fn structure_undo(
