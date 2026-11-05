@@ -21,3 +21,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0014](0014-editor-und-markdown-adapter.md)       | Editor: Schema, Markdown-Adapter und Verlustschutz                           | angenommen                                    |
 | [0015](0015-dokumente-und-externe-dateien.md)     | Dokumente und externe Dateien                                                | angenommen                                    |
 | [0016](0016-wiederherstellung.md)                 | Wiederherstellung, Papierkorb, Archiv und Historie                           | angenommen                                    |
+| [0017](0017-subnetze-und-tags.md)                 | Subnetze, Zuordnungen, Tags und Struktur-Undo                                | angenommen                                    |

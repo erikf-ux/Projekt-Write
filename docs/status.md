@@ -4,13 +4,21 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 6 – Wiederherstellung** (Abschnitte 4, 9, 13): umgesetzt und lokal geprüft; Bericht in `docs/bericht-phase-6.md`. Wartet auf die Freigabe von Phase 7.
+**Phase 7 – Subnetze und Tags** (Abschnitte 13, 16, 18): freigegeben am 5. November 2026 („Los geht’s“), in Arbeit.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0016. Stufe 5 (Backup) folgt in Phase 10; Zuordnungen zu Subnetzen und Tags (Phase 7) folgen demselben Muster wie die Links.
+Entscheidungen: ADR 0017. Medien (und ihre Zuordnungen) folgen in Phase 8, die Suche mit Filtern in Phase 9.
 
-CI: Lauf 99 grün (Abschluss Phase 6, Commit `90bf17d`); Lauf 98 rot an einem Zwischenstand (F-26). Zwischenstände und reine Doku-Commits tragen `[skip ci]`, damit sie keine Minuten kosten; CI läuft an Meilensteinen.
+Plan Phase 7 (Reihenfolge):
+
+1. ADR 0017, Plan.
+2. Migration 0007 (`subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger), Rust-Dienst mit Struktur-Undo, Befehle, Tests.
+3. Referenzbibliothek mit 500 Subnetzen und 1.000 Tags.
+4. Oberfläche: Explorer-Baum mit Subnetzen und „Nicht zugeordnet“, Breadcrumbs, Farben, Tags, Filter, Verschieben (Menü, Auswahl, Drag & Drop), Struktur-Undo, Beispiel-Subnetze beim ersten Start.
+5. E2E (Zyklen, ein Datensatz in zwei Subnetzen, Löschen ohne Elementverlust, Tags, Filter, Verschieben, Undo), Explorer-Messung mit der Referenzbibliothek, Doku, Bericht.
+
+CI: Lauf 99 grün (Abschluss Phase 6). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26).
 
 ## Stand Phase 6
 
@@ -167,4 +175,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 7 (Subnetze und Tags; Abschnitt 25).
+Phase 7 umsetzen (Plan oben); danach Bericht und Halt.
