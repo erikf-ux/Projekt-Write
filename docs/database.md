@@ -43,12 +43,12 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 | 3       | `0003_document_import.sql`      | `documents.original_name`                                                         | 3     |
 | 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent` | 5     |
 | 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                          | 5     |
+| 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                        | 6     |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
 | Phase | Inhalt                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 6     | `document_history`                                                                                                                         |
 | 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015)                                                                                 |
 | 7     | `subnets`, `subnet_memberships`, `tags`, `document_tags`                                                                                   |
 | 8     | `media`, `media_tags`, `document_media`                                                                                                    |
@@ -67,7 +67,7 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `application_settings`         | Bibliotheksweite Einstellungen                   | vorhanden (v1)     |
 | `documents`                    | Dokumente (TXT, MD, `.pwrite`)                   | vorhanden (v2–v4)  |
 | `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | vorhanden (v5)     |
-| `document_history`             | Versionen eines Dokuments                        | geplant (Phase 6)  |
+| `document_history`             | Versionen eines Dokuments                        | vorhanden (v6)     |
 | `subnets`                      | Hierarchische Gruppen                            | geplant (Phase 7)  |
 | `subnet_memberships`           | Zuordnung Element → Subnetz                      | geplant (Phase 7)  |
 | `tags`                         | Stichwörter                                      | geplant (Phase 7)  |
@@ -151,22 +151,29 @@ Schreibreihenfolge und Absturzverhalten: Abschnitt 6 und ADR 0007.
 
 Abweichungen vom Entwurf: `target_id` hat **keinen** Fremdschlüssel, weil ein Link auf ein (noch) fehlendes Dokument ein Link bleibt (zum Beispiel aus einer anderen Bibliothek importiert); die Spalte `count` entfällt, weil die Verbindungen nur zählen, ob ein Dokument verweist. Rückverweise aus dem Papierkorb zeigt die Abfrage nicht.
 
-### `document_history` – geplant (Phase 6)
+### `document_history` – vorhanden (Version 6)
 
-| Spalte           | Typ                   | Regeln                                                                        |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------- |
-| `id`             | TEXT, Primärschlüssel | UUID                                                                          |
-| `document_id`    | TEXT                  | → `documents(id)` ON DELETE CASCADE                                           |
-| `kind`           | TEXT                  | `auto`, `close`, `beforeConversion`, `beforeRestore`, `named`                 |
-| `name`           | TEXT NULL             | Pflicht bei `named` (`CHECK`)                                                 |
-| `format`         | TEXT                  | wie `documents.format`                                                        |
-| `content`        | BLOB                  | komprimiert (Abschnitt 13)                                                    |
-| `compression`    | TEXT                  | Verfahren, z. B. `deflate`                                                    |
-| `size_bytes`     | INTEGER               | unkomprimierte Größe                                                          |
-| `content_sha256` | TEXT                  | Prüfsumme des Inhalts; inhaltsgleiche Folgeversionen werden nicht gespeichert |
-| `created_at`     | TEXT                  | ISO 8601 UTC                                                                  |
+| Spalte           | Typ                   | Regeln                                                                                     |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------ |
+| `id`             | TEXT, Primärschlüssel | UUID (Kleinbuchstaben, `CHECK`)                                                            |
+| `document_id`    | TEXT                  | → `documents(id)` ON DELETE CASCADE                                                        |
+| `kind`           | TEXT                  | `auto`, `close`, `beforeConversion`, `beforeRestore`, `named` (`CHECK`)                    |
+| `name`           | TEXT NULL             | 1–200 Zeichen; gesetzt genau bei `named` (`CHECK ((kind = 'named') = (name IS NOT NULL))`) |
+| `format`         | TEXT                  | `txt`, `md`, `pwrite`: das Format zum Zeitpunkt der Version                                |
+| `content`        | BLOB                  | Inhalt der Datei, komprimiert                                                              |
+| `compression`    | TEXT                  | `deflate` (`flate2`, ADR 0016); weitere Verfahren nur mit neuer Migration                  |
+| `size_bytes`     | INTEGER               | unkomprimierte Größe, ≥ 0                                                                  |
+| `content_sha256` | TEXT                  | SHA-256 des unkomprimierten Inhalts (64 Hex-Zeichen); beim Lesen geprüft                   |
+| `created_at`     | TEXT                  | ISO 8601 UTC (`CHECK` auf das Muster)                                                      |
 
-Index `(document_id, created_at)`. Aufbewahrungsregeln (Abschnitt 13) in Rust; benannte Versionen bleiben.
+`STRICT`, Index `ix_document_history_document (document_id, created_at)`.
+
+Regeln in Rust (`services/history.rs`, ADR 0016, Entscheidung 4–7):
+
+- **Entstehen:** `auto` beim Speichern, wenn die neueste Version älter als 10 Minuten ist; `close` beim Schließen eines Tabs und der App; `beforeConversion` vor jedem Umwandeln (scheitert sie, wird nicht umgewandelt); `beforeRestore` vor jeder Wiederherstellung (Version, Entwurf); `named` mit „Version speichern …“.
+- **Keine Doppel:** Gleicht der Inhalt (Prüfsumme) der neuesten Version, entsteht keine Zeile; eine benannte Version gibt dann der neuesten ihren Namen.
+- **Aufbewahrung** (Bibliothekseinstellungen `history.keepAllHours` = 24, `history.dailyDays` = 30, `history.weeklyDays` = 365): alle Versionen der letzten 24 Stunden, danach die neueste je UTC-Tag bis 30 Tage, danach die neueste je ISO-Woche (ab Montag) bis 365 Tage; älteres fällt weg. Benannte Versionen und die neueste Version eines Dokuments bleiben immer. Angewandt nach jeder neuen Version und beim Öffnen der Bibliothek; getestet mit simulierter Zeit (`ManualClock`, `tests/history.rs`).
+- Endgültiges Löschen des Dokuments entfernt seine Versionen (`ON DELETE CASCADE`).
 
 ### `subnets` – geplant (Phase 7)
 
@@ -277,17 +284,22 @@ Hunspell-Wörterbücher selbst liegen als getrennte Datenpakete vor, nicht in de
 
 ## 5. Papierkorb und Archiv
 
-- Archivieren setzt `archived_at`, Löschen setzt `deleted_at`. Zeile, Datei, Zuordnungen und Verbindungen bleiben (Abschnitt 13); Wiederherstellen setzt die Spalte zurück.
-- Erst das endgültige Entfernen (Papierkorb leeren, nach `trash.retentionDays`) löscht die Zeile; `ON DELETE CASCADE` entfernt Zuordnungen, Links, Knoten und Positionen. Die Datei wird gelöscht, wenn keine Zeile mehr auf sie verweist (Abschnitt 9).
+Umgesetzt in Phase 6 (ADR 0016, Entscheidung 2 und 3):
+
+- Archivieren setzt `archived_at`, Löschen setzt `deleted_at`. Zeile, Datei, Versionen, Zuordnungen und Verbindungen bleiben (Abschnitt 13); Wiederherstellen setzt die Spalte zurück. Rückverweise aus dem Papierkorb zeigt die Abfrage nicht; nach dem Wiederherstellen sind sie wieder da, weil die Zeilen in `document_links` nie entfernt wurden.
+- Archivierte Dokumente fehlen in „Favoriten“, „Zuletzt verwendet“, „Alle Dokumente“ und in der Linkauswahl `[[`; sie stehen in der Gruppe „Archiv“ und öffnen normal. Gelöschte Dokumente öffnen nicht (`document_read` meldet `DOCUMENT_NOT_FOUND`).
+- Erst das endgültige Entfernen löscht die Zeile: von Hand („Endgültig löschen“, „Papierkorb leeren“, jeweils mit Rückfrage) oder nach `trash.retentionDays` (Bibliothekseinstellung, 1–3650, Standard 30) beim Öffnen der Bibliothek und beim Anzeigen des Papierkorbs. Reihenfolge: Zeile löschen (`ON DELETE CASCADE` entfernt Links, Versionen und künftig Zuordnungen, Knoten und Positionen) → Datei → Recovery-Entwurf. Ein Abbruch dazwischen hinterlässt höchstens eine Datei ohne Zeile, die das Öffnen meldet (Abschnitt 6 unten).
 - Standardlisten und Suche blenden archivierte und gelöschte Elemente aus (Indizes mit `WHERE deleted_at IS NULL`).
 
 ## 6. Dateien und Datenbank
 
-| Vorgang   | Reihenfolge                                                                      | Nach einem Absturz dazwischen                                                     |
-| --------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Anlegen   | Datei atomar schreiben → Zeile einfügen                                          | Datei ohne Zeile: beim Öffnen gemeldet, nicht gelöscht                            |
-| Speichern | Datei atomar ersetzen → `size_bytes`/`content_sha256`/`updated_at` aktualisieren | Neue Datei, alte Prüfsumme: das nächste Lesen erkennt es und korrigiert die Zeile |
-| Abbruch   | Temporärdatei `.<name>.<zufall>.pwtmp` bleibt liegen                             | Beim Öffnen entfernt; das Ziel ist unversehrt                                     |
+| Vorgang                  | Reihenfolge                                                                      | Nach einem Absturz dazwischen                                                     |
+| ------------------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Anlegen                  | Datei atomar schreiben → Zeile einfügen                                          | Datei ohne Zeile: beim Öffnen gemeldet, nicht gelöscht                            |
+| Speichern                | Datei atomar ersetzen → `size_bytes`/`content_sha256`/`updated_at` aktualisieren | Neue Datei, alte Prüfsumme: das nächste Lesen erkennt es und korrigiert die Zeile |
+| Abbruch                  | Temporärdatei `.<name>.<zufall>.pwtmp` bleibt liegen                             | Beim Öffnen entfernt; das Ziel ist unversehrt                                     |
+| Endgültig löschen        | Zeile löschen → Datei löschen → Entwurf löschen                                  | Datei ohne Zeile: beim Öffnen gemeldet                                            |
+| Version wiederherstellen | Aktuellen Stand als Version `beforeRestore` → Datei speichern                    | Neue Version, alte Datei: der Stand vor dem Wiederherstellen ist erhalten         |
 
 Beim Öffnen vergleicht die App die Dokumentordner mit der Tabelle: Temporärdateien werden entfernt, Dateien ohne Zeile und Zeilen ohne Datei gemeldet (Bibliotheksansicht), nie still gelöscht.
 

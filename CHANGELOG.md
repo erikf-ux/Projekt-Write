@@ -4,6 +4,19 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 6 – Wiederherstellung
+
+#### Hinzugefügt
+
+- Stufe 1, Sitzung: Offene Tabs, aktiver Tab, Ansicht und Auswahl jedes Tabs werden 2 s nach einer Änderung und beim Beenden gesichert und beim nächsten Start mit derselben Bibliothek wieder geöffnet; gelöschte Dokumente und verschwundene Dateien fallen weg.
+- Stufe 2, Absturz: Höchstens 1 s nach einer ungespeicherten Eingabe liegt der Text als Entwurf in `recovery/` der Bibliothek, auch während weiter getippt wird und auch für externe Dateien. Nach einem Absturz bietet der nächste Start „Wiederherstellen“, „Verwerfen“ oder „Später“ an; der jetzige Stand eines Dokuments wird vorher als Version gesichert.
+- Stufe 3, Papierkorb: „Löschen“ (`Entf` im Explorer, Kontextmenü, Befehl) verschiebt ein Dokument in den Papierkorb; Datei, Versionen und Verbindungen bleiben, „Wiederherstellen“ bringt alles zurück. „Endgültig löschen“ und „Papierkorb leeren“ fragen nach; nach 30 Tagen (einstellbar) entfernt die App Dokumente im Papierkorb beim Öffnen der Bibliothek.
+- Archiv: Archivierte Dokumente stehen nur in der Gruppe „Archiv“, nicht in Favoriten, Zuletzt verwendet, Alle Dokumente und der Linkauswahl.
+- Stufe 4, Dokumenthistorie: Versionen beim Bearbeiten (alle 10 Minuten), beim Schließen, vor dem Umwandeln, vor jeder Wiederherstellung und benannt („Version speichern …“), komprimiert und ohne Doppel. Aufbewahrung: alles der letzten 24 Stunden, danach eine Version je Tag bis 30 Tage und je Woche bis 365 Tage; benannte Versionen bleiben. Werte in den Bibliothekseinstellungen.
+- Dialog „Versionen“: zwei Stände nebeneinander mit markierten Zeilen und Zählung; „Diese Version wiederherstellen“ sichert den aktuellen Stand zuerst.
+- Migration 0006 (`document_history`).
+- E2E-Tests: harter Abbruch beim Tippen (höchstens 2 s Verlust, Angebot beim nächsten Start), Papierkorb mit Verbindungen, Historie, Sitzung über einen Neustart.
+
 ### Phase 5 – Dokumente und externe Dateien
 
 #### Hinzugefügt

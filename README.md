@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 5 – Dokumente und externe Dateien**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 6 – Wiederherstellung**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -48,6 +48,8 @@ Markdown-Dokumente bearbeiten Sie als Rich Text; Markdown-Kürzel wie `# ` oder 
 
 Neben Text (`.txt`) und Markdown (`.md`) gibt es Rich-Text-Dokumente im Format `.pwrite`; Dokumente lassen sich kopieren, als Favorit markieren und zwischen den Formaten umwandeln (die App nennt vorher, was verloren ginge). `[[` verlinkt ein anderes Dokument der Bibliothek; die Seitenleiste „Verbindungen“ zeigt, welche Dokumente auf das aktuelle verweisen.
 
+Nichts geht verloren, ohne dass Sie es wollen (vier Stufen): Beim nächsten Start sind die Tabs der letzten Sitzung wieder offen, mit Ansicht und Auswahl. Nach einem Absturz bietet die App an, was seit dem letzten Speichern getippt wurde (es fehlen höchstens die letzten ein bis zwei Sekunden). Gelöschte Dokumente liegen im Papierkorb des Explorers, bis Sie ihn leeren oder 30 Tage um sind; „Wiederherstellen“ bringt sie mit allen Verbindungen zurück. Ältere Stände eines Dokuments zeigt „Versionen …“ in der Befehlspalette, neben dem aktuellen Stand; „Version speichern …“ legt einen benannten Stand an, der bleibt. Vor jeder Wiederherstellung sichert die App den aktuellen Stand als Version. Dokumente, die Sie gerade nicht brauchen, legen Sie ins Archiv. Wie lange Papierkorb und Versionen aufbewahrt werden, stellen Sie unter Einstellungen › Bibliothek ein.
+
 Dateien außerhalb der Bibliothek öffnen Sie mit `Strg + O` (oder per Doppelklick auf eine `.pwrite`-Datei). Kodierung und Zeilenenden bleiben, wie sie sind; gespeichert wird mit `Strg + S` (automatisch nur, wenn Sie es unter Einstellungen › Allgemein einschalten). Ändert ein anderes Programm die Datei, fragt die App, welche Fassung gelten soll.
 
 | Aktion                                 | Kürzel (macOS: `Cmd` statt `Strg`)             |
@@ -58,6 +60,7 @@ Dateien außerhalb der Bibliothek öffnen Sie mit `Strg + O` (oder per Doppelkli
 | Dokument verlinken                     | `[[` tippen                                    |
 | Tab schließen, nächster/vorheriger     | `Strg + W`, `Strg + Bild ab/auf`               |
 | Dokument umbenennen                    | `F2`                                           |
+| Dokument in den Papierkorb             | `Entf` im Explorer                             |
 | Explorer, Seitenleiste ein/aus         | `Strg + Umschalt + E`, `Strg + Umschalt + B`   |
 | Fokusmodus                             | `F11` (Esc beendet ihn)                        |
 | Quelltextansicht ein/aus               | `Strg + /`                                     |
