@@ -54,7 +54,7 @@ async function activeEditor() {
 
 /**
  * Focuses the Explorer tree and moves with the arrow keys to the document
- * `title` in "Alle Dokumente" (the last entry).
+ * `title` in "Nicht zugeordnet" (Phase 7: no subnets in this library yet).
  */
 async function selectInExplorer(title: string) {
   await browser.execute(() => {
@@ -67,7 +67,7 @@ async function selectInExplorer(title: string) {
       const row = document.getElementById(tree?.getAttribute('aria-activedescendant') ?? '');
       return { title: row?.textContent ?? '', group: row?.getAttribute('data-group-member') ?? '' };
     });
-    if (current.group === 'all' && current.title === title) {
+    if (current.group === 'unassigned' && current.title === title) {
       return;
     }
     await browser.keys('ArrowUp');
@@ -86,7 +86,7 @@ async function tabTitles(): Promise<string[]> {
 
 /** Opens documents from the Explorer until at least `count` tabs are open. */
 async function ensureTabs(count: number) {
-  const options = await $$('[data-testid="explorer"] [data-group-member="all"]').getElements();
+  const options = await $$('[data-testid="explorer"] [data-group-member="unassigned"]').getElements();
   for (const option of options) {
     if ((await tabTitles()).length >= count) {
       return;
@@ -141,7 +141,7 @@ describe('Project Write – Phase 3 workbench', () => {
     }
     expect(commands).toEqual(['explorer.focus', 'editor.focus', 'settings.open']);
     // The document of the first start is in the Explorer.
-    await expect($('[data-testid="explorer"] [data-group-member="all"]')).toHaveText(
+    await expect($('[data-testid="explorer"] [data-group-member="unassigned"]')).toHaveText(
       expect.stringContaining('Unbenannt'),
     );
   });
@@ -201,7 +201,14 @@ describe('Project Write – Phase 3 workbench', () => {
     await browser.waitUntil(() =>
       browser.execute(() => document.activeElement?.getAttribute('data-testid') === 'shortcut-recorder'),
     );
-    await browser.keys(['Control', 'n']);
+    // The chord as one key event: the embedded WebDriver sometimes delivers
+    // Ctrl and N apart, and the recorder then waits on (F-27).
+    await browser.execute(() => {
+      const recorder = document.activeElement ?? document.body;
+      const options = { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true, cancelable: true };
+      recorder.dispatchEvent(new KeyboardEvent('keydown', options));
+      recorder.dispatchEvent(new KeyboardEvent('keyup', options));
+    });
     const question = $('[data-testid="shortcut-conflict-question"]');
     await expect(question).toHaveText(expect.stringContaining('Neues Dokument'));
     await question.$('button=Abbrechen').click();
@@ -316,7 +323,7 @@ describe('Project Write – Phase 3 workbench', () => {
   });
 
   it('operates Explorer and tabs with the keyboard', async () => {
-    // The tree: Favoriten, Zuletzt verwendet, Alle Dokumente (by title).
+    // The tree: Favoriten, Zuletzt verwendet, (subnets,) Nicht zugeordnet (by title).
     await selectInExplorer('Unbenannt');
     await browser.keys('Enter');
     await browser.waitUntil(async () => (await tabTitles()).includes('Unbenannt'), {
@@ -324,11 +331,11 @@ describe('Project Write – Phase 3 workbench', () => {
     });
     // Left goes to the entry, Left again closes it, Right opens it.
     await browser.keys('ArrowLeft');
-    await expect($('[data-group="all"]')).toHaveAttribute('aria-selected', 'true');
+    await expect($('[data-group="unassigned"]')).toHaveAttribute('aria-selected', 'true');
     await browser.keys('ArrowLeft');
-    await expect($('[data-group="all"]')).toHaveAttribute('aria-expanded', 'false');
+    await expect($('[data-group="unassigned"]')).toHaveAttribute('aria-expanded', 'false');
     await browser.keys('ArrowRight');
-    await expect($('[data-group="all"]')).toHaveAttribute('aria-expanded', 'true');
+    await expect($('[data-group="unassigned"]')).toHaveAttribute('aria-expanded', 'true');
     // F2 renames in place.
     await selectInExplorer('Unbenannt');
     await browser.keys('F2');

@@ -189,7 +189,7 @@ describe('Library documents (Phase 5 and 6)', () => {
   });
 
   it('moves a document to the trash and back with its connections (stage 3)', async () => {
-    await selectInExplorer(linkSource, 'all');
+    await selectInExplorer(linkSource, 'unassigned');
     await browser.keys('Delete');
     await $(`[data-testid="tabs"] [data-tab="${linkSource}"]`).waitForExist({
       reverse: true,

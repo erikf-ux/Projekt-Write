@@ -39,9 +39,11 @@ import {
   type ContextMenuState,
 } from '@/components/ContextMenu';
 import { useLocale, useT } from '@/i18n';
+import { useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
 import { colorValue, pathTo, type SubnetIndex } from '@/modules/structure/tree';
+import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import {
   explorerModel,
@@ -65,6 +67,27 @@ const MAX_TITLE = 300;
 export const EXPLORER_DRAG_TYPE = 'application/x-project-write-item';
 
 type DocumentRow = Extract<Row, { kind: 'document' }>;
+type DraggedItem = { kind: 'document' | 'subnet'; id: string };
+
+/** The row being dragged inside the Explorer, until it is dropped or the drag ends. */
+const drag: { item: DraggedItem | null } = { item: null };
+
+function rememberDrag(item: DraggedItem): void {
+  drag.item = item;
+}
+
+/** The dragged row, once; afterwards nothing is being dragged. */
+function takeDrag(): DraggedItem | null {
+  const item = drag.item;
+  drag.item = null;
+  return item;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('dragend', () => {
+    drag.item = null;
+  });
+}
 type SubnetRow = Extract<Row, { kind: 'subnet' }>;
 
 function FormatIcon({ format }: { format: DocumentFormat }) {
@@ -257,7 +280,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     const title = t('document.untitled');
     const id = await createDocument(title);
     if (id) {
-      await structure().assign(id, subnetId);
+      report(structure().assign(id, subnetId));
     }
   };
 
@@ -311,7 +334,9 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           id: 'delete',
           label: t('subnet.deleteItem'),
           shortcut: t('keys.delete'),
-          onSelect: () => void structure().deleteSubnet(subnet.id),
+          onSelect: () => {
+            report(structure().deleteSubnet(subnet.id));
+          },
         },
       ],
     });
@@ -390,13 +415,17 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         items.push({
           id: 'primary',
           label: t('structure.makePrimary', { subnet: subnetName(subnetId) }),
-          onSelect: () => void structure().setPrimary(document.id, subnetId),
+          onSelect: () => {
+            report(structure().setPrimary(document.id, subnetId));
+          },
         });
       }
       items.push({
         id: 'unassign',
         label: t('structure.removeFrom', { subnet: subnetName(subnetId) }),
-        onSelect: () => void structure().unassign(document.id, subnetId),
+        onSelect: () => {
+          report(structure().unassign(document.id, subnetId));
+        },
       });
     }
     items.push(
@@ -542,7 +571,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         } else if (current?.kind === 'document') {
           void deleteDocument(current.document.id);
         } else if (current?.kind === 'subnet') {
-          void structure().deleteSubnet(current.subnet.id);
+          report(structure().deleteSubnet(current.subnet.id));
         }
         break;
       default:
@@ -554,12 +583,31 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
 
   // --- Drag & drop inside the Explorer ---------------------------------------
 
-  const startDrag = (event: DragEvent<HTMLDivElement>, item: { kind: 'document' | 'subnet'; id: string }) => {
-    event.dataTransfer.setData(EXPLORER_DRAG_TYPE, JSON.stringify(item));
-    event.dataTransfer.effectAllowed = 'copyMove';
+  const startDrag = (event: DragEvent<HTMLDivElement>, item: DraggedItem) => {
+    // WebKit does not always hand custom types on: the item is kept here too.
+    rememberDrag(item);
+    try {
+      event.dataTransfer.setData(EXPLORER_DRAG_TYPE, JSON.stringify(item));
+      event.dataTransfer.effectAllowed = 'copyMove';
+    } catch {
+      // The kept item is enough.
+    }
   };
   const carriesItem = (event: DragEvent<HTMLDivElement>) =>
-    event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE);
+    event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE) ||
+    (drag.item !== null && !event.dataTransfer.types.includes('Files'));
+  const draggedItem = (event: DragEvent<HTMLDivElement>): { kind?: unknown; id?: unknown } | null => {
+    const kept = takeDrag();
+    try {
+      const data = event.dataTransfer.getData(EXPLORER_DRAG_TYPE);
+      if (data !== '') {
+        return JSON.parse(data) as { kind?: unknown; id?: unknown };
+      }
+    } catch {
+      // Falls back to the kept item.
+    }
+    return kept;
+  };
   const dropHandlers = (key: string, target: { subnetId: string | null }) => ({
     onDragOver: (event: DragEvent<HTMLDivElement>) => {
       if (!carriesItem(event)) {
@@ -579,24 +627,19 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
       event.preventDefault();
       event.stopPropagation();
       setDropTarget(null);
-      let item: { kind?: unknown; id?: unknown };
-      try {
-        item = JSON.parse(event.dataTransfer.getData(EXPLORER_DRAG_TYPE)) as typeof item;
-      } catch {
-        return;
-      }
-      if (typeof item.id !== 'string') {
+      const item = draggedItem(event);
+      if (!item || typeof item.id !== 'string') {
         return;
       }
       const id = item.id;
       if (item.kind === 'document') {
         if (target.subnetId && (event.ctrlKey || event.metaKey)) {
-          void structure().assign(id, target.subnetId);
+          report(structure().assign(id, target.subnetId));
         } else {
-          void structure().moveDocument(id, target.subnetId);
+          report(structure().moveDocument(id, target.subnetId));
         }
       } else if (item.kind === 'subnet' && target.subnetId && target.subnetId !== id) {
-        void structure().moveSubnet(id, target.subnetId);
+        report(structure().moveSubnet(id, target.subnetId));
       }
     },
   });
@@ -1047,6 +1090,15 @@ function DocumentRowView({
       ) : null}
     </div>
   );
+}
+
+/** Shows what went wrong in a structural action started from the Explorer. */
+function report(result: Promise<CommandError | null>): void {
+  void result.then((error) => {
+    if (error) {
+      useUi.getState().showNotice({ tone: 'error', key: 'structure.failed', error });
+    }
+  });
 }
 
 /** Opens the entries on the way to a document's primary place. */

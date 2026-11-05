@@ -26,12 +26,19 @@ export async function openSettings(section: 'general' | 'shortcuts' | 'library')
   await $(`[data-testid="settings-tab-${section}"]`).click();
 }
 
-/** Closes the settings dialog with Escape. */
+/**
+ * Closes the settings dialog with Escape. A shortcut still being recorded
+ * takes the first Escape, so it tries a few times: one failed test must not
+ * leave the dialog open for every file after it.
+ */
 export async function closeSettings(): Promise<void> {
   const dialog = $('[data-testid="settings-dialog"]');
-  if (await dialog.isExisting()) {
+  for (let attempt = 0; attempt < 3 && (await dialog.isExisting()); attempt += 1) {
     await browser.keys('Escape');
-    await dialog.waitForExist({ reverse: true, timeout: 20_000 });
+    await dialog.waitForExist({ reverse: true, timeout: 5_000 }).catch(() => undefined);
+  }
+  if (await dialog.isExisting()) {
+    throw new Error('the settings dialog stays open');
   }
 }
 
