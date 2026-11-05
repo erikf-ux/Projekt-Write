@@ -232,7 +232,8 @@ describe('Library documents (Phase 5 and 6)', () => {
     const name = $('[data-testid="version-name"]');
     await name.waitForDisplayed();
     await name.setValue('Fassung 1');
-    await browser.keys('Enter');
+    // The embedded WebDriver's synthetic Enter does not submit a form.
+    await $('[data-testid="version-name-dialog"] button[type="submit"]').click();
     await $('[data-testid="version-name-dialog"]').waitForExist({ reverse: true });
 
     await appendText(' und mehr');
