@@ -74,7 +74,7 @@ Keine bekannten.
 
 ## Behobene Fehler
 
-F-23 bis F-25 in `docs/status.md`: F-23 (Umwandeln-Test prüfte zu früh) und F-24 (synthetisches Enter) waren Fehler der Tests; F-25 (ein Dokument im Papierkorb ließ sich über `document_read` öffnen) fand der IPC-Test.
+F-23 bis F-26 in `docs/status.md`: F-23 (Umwandeln-Test prüfte zu früh) und F-24 (synthetisches Enter) waren Fehler der Tests; F-25 (ein Dokument im Papierkorb ließ sich über `document_read` öffnen) fand der IPC-Test. F-26 war ein Prozessfehler von mir: CI-Lauf 98 prüfte einen Zwischenstand, dessen Frontend-Testdaten erst im nächsten Commit kamen (Typprüfung rot); der Code danach war grün.
 
 ## Gefundene Widersprüche und Abweichungen
 
@@ -90,7 +90,7 @@ F-23 bis F-25 in `docs/status.md`: F-23 (Umwandeln-Test prüfte zu früh) und F-
 
 ## CI
 
-Zwischenstände trugen `[skip ci]`, um Actions-Minuten zu sparen. Der Abschluss läuft als ein CI-Lauf unter Windows und Linux; Ergebnis siehe Nachtrag unten.
+Zwischenstände trugen `[skip ci]`, um Actions-Minuten zu sparen. **Lauf 98** (Zwischenstand `1468541`, ohne `[skip ci]`) scheiterte an der Typprüfung (F-26). Den Abschluss prüft **Lauf 99** (von Hand gestartet, Commit des Berichts) unter Windows und Linux; Ergebnis siehe Nachtrag unten.
 
 ## Nächster Schritt
 
