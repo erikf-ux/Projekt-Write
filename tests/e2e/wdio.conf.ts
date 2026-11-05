@@ -43,8 +43,9 @@ export const config: WebdriverIO.Config = {
   // Fixed order: each file builds on the library the previous one left. The
   // Phase 1 smoke test needs the start screen, so it runs before a library
   // exists; library.e2e.ts ends the app, restart.e2e.ts gets a new process.
-  // So do session-quit.e2e.ts (window closed) and crash.e2e.ts (process
-  // killed): the files after them check the next start.
+  // So do session-quit.e2e.ts (window closed), crash.e2e.ts (process
+  // killed) and reference-prepare.e2e.ts (window closed, the reference
+  // library configured): the files after them check the next start.
   specs: [
     path.join(specs, 'smoke.e2e.ts'),
     path.join(specs, 'library.e2e.ts'),
@@ -59,6 +60,8 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'session-restored.e2e.ts'),
     path.join(specs, 'crash.e2e.ts'),
     path.join(specs, 'crash-recovered.e2e.ts'),
+    path.join(specs, 'reference-prepare.e2e.ts'),
+    path.join(specs, 'reference.e2e.ts'),
   ],
   maxInstances: 1,
   capabilities: [

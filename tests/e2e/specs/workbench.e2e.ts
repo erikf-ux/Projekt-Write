@@ -233,6 +233,11 @@ describe('Project Write – Phase 3 workbench', () => {
     await browser.refresh();
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
     await expect($('[data-testid="status-conflicts"]')).toHaveText(expect.stringContaining('1'));
+    // Stage 1 (Phase 6) opens the tabs of the session again after the reload;
+    // counted before that, a restored tab would look like a new one.
+    await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').waitForExist({
+      timeoutMsg: 'the tabs of the session did not come back',
+    });
     const tabsBefore = (await tabTitles()).length;
     await $('[data-testid="explorer"] [role="tree"]').click();
     await browser.keys(['Control', 'n']);

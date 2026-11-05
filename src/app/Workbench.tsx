@@ -26,7 +26,7 @@ import { findCommand, runCommand } from '@/modules/commands/registry';
 import type { CommandId } from '@/modules/commands/types';
 import { Connections } from '@/modules/documents/Connections';
 import { restoreSession, startSessionTracking, stopSessionTracking } from '@/modules/documents/sessionTabs';
-import { Explorer } from '@/modules/documents/Explorer';
+import { Explorer, EXPLORER_READY_MARK, LIBRARY_OPENING_MARK } from '@/modules/documents/Explorer';
 import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
 import {
   activeDocument,
@@ -87,14 +87,17 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       return;
     }
     void (async () => {
+      // Measured by the E2E test of the reference library (ADR 0017, decision 17).
+      performance.clearMarks(EXPLORER_READY_MARK);
+      performance.mark(LIBRARY_OPENING_MARK);
       stopSessionTracking();
       setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
       useStructure.getState().reset();
       useExplorer.getState().reset();
-      await useWorkspace.getState().refresh();
-      // Subnets and tags (Phase 7) before the tabs come back.
-      await useStructure.getState().load();
+      // Documents and their subnets and tags (Phase 7) load side by side,
+      // before the tabs come back.
+      await Promise.all([useWorkspace.getState().refresh(), useStructure.getState().load()]);
       await createSampleSubnets();
       void useWorkspace.getState().refreshTrash();
       // Stage 2: unsaved changes from a crash are offered first.

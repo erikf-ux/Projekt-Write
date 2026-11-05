@@ -48,3 +48,20 @@ export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
 
 /** What a spec file that ends the app leaves for the next one to check. */
 export const handover = path.join(sandbox, 'handover.json');
+
+/**
+ * The reference library of the Explorer measurement (Phase 7). Building it
+ * takes minutes, so it is kept between runs, inside the project folder
+ * (section 2) but outside the sandbox the launcher clears.
+ */
+export const referenceCache = path.join(root, 'tests', 'e2e', '.cache');
+
+/** The generator of the reference library (built by `scripts/reference-library.mjs`). */
+export const referenceGenerator = path.join(
+  root,
+  'src-tauri',
+  'target',
+  'debug',
+  'examples',
+  process.platform === 'win32' ? 'reference_library.exe' : 'reference_library',
+);

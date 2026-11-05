@@ -117,11 +117,27 @@ export function recentEntries(
     .map(({ entry }) => entry);
 }
 
-export function explorerModel(input: ModelInput): ExplorerModel {
-  const { locale, filter, placements } = input;
+/** What does not change with the filter: documents by title and the subnet index. */
+export interface ExplorerBase {
+  sorted: readonly DocumentSummary[];
+  index: SubnetIndex;
+}
+
+export function explorerBase(
+  documents: readonly DocumentSummary[],
+  subnets: readonly SubnetSummary[],
+  locale: string,
+): ExplorerBase {
   const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
-  const byTitle = (a: DocumentSummary, b: DocumentSummary) =>
-    collator.compare(a.title, b.title) || a.id.localeCompare(b.id);
+  const sorted = [...documents].sort(
+    (a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id),
+  );
+  return { sorted, index: buildIndex(subnets, locale) };
+}
+
+export function explorerModel(input: ModelInput, base?: ExplorerBase): ExplorerModel {
+  const { locale, filter, placements } = input;
+  const { sorted, index } = base ?? explorerBase(input.documents, input.subnets, locale);
   const text = filter.text.trim().toLocaleLowerCase(locale);
   const filtering = isFiltering(filter);
   const matches = (document: DocumentSummary) => {
@@ -135,8 +151,8 @@ export function explorerModel(input: ModelInput): ExplorerModel {
     return filter.tagIds.every((tag) => tags.includes(tag));
   };
 
-  const index = buildIndex(input.subnets, locale);
-  const visible = input.documents.filter(matches).sort(byTitle);
+  // Sorted once per change of the documents, not per filter.
+  const visible = filtering ? sorted.filter(matches) : sorted;
   const live = visible.filter((document) => document.archivedAt === null);
   const bySubnet = new Map<string, DocumentSummary[]>();
   const unassigned: DocumentSummary[] = [];

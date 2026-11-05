@@ -30,7 +30,19 @@ import {
   Star,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
+import { flushSync } from 'react-dom';
 import {
   ContextMenu,
   isContextMenuKey,
@@ -46,6 +58,7 @@ import { colorValue, pathTo, type SubnetIndex } from '@/modules/structure/tree';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import {
+  explorerBase,
   explorerModel,
   explorerRows,
   GROUPS_AFTER,
@@ -60,6 +73,9 @@ import { useWorkspace } from './workspaceStore';
 
 export { RECENT_LIMIT };
 export const EXPLORER_LIST_ID = 'pw-explorer-list';
+/** Performance marks: a library begins to open; the Explorer shows its tree. */
+export const LIBRARY_OPENING_MARK = 'pw:library-opening';
+export const EXPLORER_READY_MARK = 'pw:explorer-ready';
 const ROW_HEIGHT = 26;
 const OVERSCAN = 8;
 const MAX_TITLE = 300;
@@ -151,6 +167,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const createDocument = useWorkspace((state) => state.createDocument);
 
   const subnets = useStructure((state) => state.subnets);
+  const structureLoaded = useStructure((state) => state.loaded);
   const placements = useStructure((state) => state.byDocument);
   const tags = useStructure((state) => state.tags);
   const structure = useStructure.getState;
@@ -163,9 +180,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const reveal = useExplorer((state) => state.reveal);
   const explorer = useExplorer.getState;
 
+  const base = useMemo(() => explorerBase(documents, subnets, locale), [documents, subnets, locale]);
   const model = useMemo(
-    () => explorerModel({ documents, trash, recentFiles, subnets, placements, filter, locale }),
-    [documents, trash, recentFiles, subnets, placements, filter, locale],
+    () => explorerModel({ documents, trash, recentFiles, subnets, placements, filter, locale }, base),
+    [base, documents, trash, recentFiles, subnets, placements, filter, locale],
   );
   const rows = useMemo(
     () => explorerRows(model, collapsed, expanded, placements),
@@ -181,7 +199,6 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
-  const [scroll, setScroll] = useState({ top: 0, height: 400 });
 
   // Follow the active tab: its primary place opens and is selected.
   const [followed, setFollowed] = useState<string | null>(null);
@@ -228,6 +245,18 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renaming]);
 
+  // The tree of the library stands: documents and structure are there.
+  useEffect(() => {
+    if (
+      listLoaded &&
+      structureLoaded &&
+      performance.getEntriesByName(LIBRARY_OPENING_MARK).length > 0 &&
+      performance.getEntriesByName(EXPLORER_READY_MARK).length === 0
+    ) {
+      performance.mark(EXPLORER_READY_MARK);
+    }
+  }, [listLoaded, structureLoaded]);
+
   const selectedIndex = rows.findIndex((row) => row.key === selected);
   const current = rows[selectedIndex];
 
@@ -245,26 +274,6 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     }
   }, [selectedIndex]);
 
-  useEffect(() => {
-    const element = list.current;
-    if (!element) {
-      return;
-    }
-    const update = () => {
-      setScroll({ top: element.scrollTop, height: element.clientHeight || 400 });
-    };
-    update();
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
-    observer?.observe(element);
-    return () => {
-      observer?.disconnect();
-    };
-  }, []);
-
-  const first = Math.max(0, Math.floor(scroll.top / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(rows.length, Math.ceil((scroll.top + scroll.height) / ROW_HEIGHT) + OVERSCAN);
-  const visible = rows.slice(first, last);
-
   const select = (index: number) => {
     const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
     if (row) {
@@ -273,7 +282,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   };
 
   const groupLabel = (group: ExplorerGroup) => t(`explorer.group.${group}`);
-  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  const dateTime = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+    [locale],
+  );
   const subnetName = (id: string | null) => (id ? (model.index.byId.get(id)?.name ?? '') : '');
 
   const newDocumentIn = async (subnetId: string) => {
@@ -472,7 +484,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     if (renaming) {
       return;
     }
-    const page = Math.max(1, Math.floor(scroll.height / ROW_HEIGHT) - 1);
+    const page = Math.max(1, Math.floor((list.current?.clientHeight ?? 400) / ROW_HEIGHT) - 1);
     const index = selectedIndex < 0 ? -1 : selectedIndex;
     const control = event.ctrlKey || event.metaKey;
     if (control && !event.altKey && (event.key === 'z' || event.key === 'Z' || event.key === 'y')) {
@@ -644,6 +656,80 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     },
   });
 
+  const labels = useMemo<RowLabels>(
+    () => ({
+      group: (group) => t(`explorer.group.${group}`),
+      subnet: (name, description) =>
+        description ? `${name}, ${t('subnet.label')}: ${description}` : `${name}, ${t('subnet.label')}`,
+      subnetName: (id) => (id ? (model.index.byId.get(id)?.name ?? '') : ''),
+      externalFile: (folder) => t('explorer.externalFile', { folder }),
+      fileMissing: t('explorer.fileMissing'),
+      secondary: (subnet) => t('explorer.secondary', { subnet }),
+      favorite: t('explorer.isFavorite'),
+      deletedAt: (iso) => t('explorer.deletedAt', { date: dateTime.format(new Date(iso)) }),
+      rename: t('explorer.renameLabel'),
+    }),
+    // `t` follows the language.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale, model.index, dateTime],
+  );
+
+  const actions: RowActions = {
+    click: (row) => {
+      setSelected(row.key);
+      if (row.kind === 'group') {
+        if (row.count > 0) {
+          explorer().toggleGroup(row.group);
+        }
+      } else if (row.kind === 'subnet') {
+        if (row.hasContent) {
+          explorer().toggleSubnet(row.subnet.id);
+        }
+      } else if (row.kind === 'file') {
+        void openRecentFile(row.file.id, row.file.name);
+      } else if (row.group !== 'trash') {
+        void openDocument(row.document.id);
+      }
+    },
+    menu: (row, position) => {
+      if (row.kind === 'group') {
+        openGroupMenu(row, position);
+      } else if (row.kind === 'subnet') {
+        openSubnetMenu(row, position);
+      } else {
+        openMenu(row, position);
+      }
+    },
+    renamed: (row, title) => {
+      if (title === null || title === row.document.title) {
+        setRenaming(null);
+      } else {
+        void rename(row.document.id, title);
+      }
+      list.current?.focus();
+    },
+    dragStart: (event, row) => {
+      if (row.kind === 'subnet') {
+        startDrag(event, { kind: 'subnet', id: row.subnet.id });
+      } else if (row.kind === 'document') {
+        startDrag(event, { kind: 'document', id: row.document.id });
+      }
+    },
+    dragOver: (event, row) => {
+      dropHandlers(row.key, { subnetId: row.kind === 'subnet' ? row.subnet.id : null }).onDragOver(event);
+    },
+    dragLeave: (row) => {
+      dropHandlers(row.key, { subnetId: null }).onDragLeave();
+    },
+    drop: (event, row) => {
+      dropHandlers(row.key, { subnetId: row.kind === 'subnet' ? row.subnet.id : null }).onDrop(event);
+    },
+  };
+  const actionsRef = useRef(actions);
+  useLayoutEffect(() => {
+    actionsRef.current = actions;
+  });
+
   const tagName = (id: string) => tags.find((tag) => tag.id === id)?.name ?? '';
   const [tagQuery, setTagQuery] = useState('');
   const [tagListOpen, setTagListOpen] = useState(false);
@@ -813,9 +899,6 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         aria-label={t('explorer.documents')}
         aria-activedescendant={current ? rowId(current.key) : undefined}
         className="relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-offset-[-2px]"
-        onScroll={(event) => {
-          setScroll({ top: event.currentTarget.scrollTop, height: event.currentTarget.clientHeight || 400 });
-        }}
         onKeyDown={onKeyDown}
         onFocus={() => {
           if (selectedIndex < 0) {
@@ -823,174 +906,18 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           }
         }}
       >
-        <div style={{ height: rows.length * ROW_HEIGHT }} className="relative">
-          {visible.map((row, offset) => {
-            const index = first + offset;
-            const isSelected = row.key === selected;
-            const style = { top: index * ROW_HEIGHT, height: ROW_HEIGHT };
-            const base = `text-ui absolute inset-x-0 flex cursor-default items-center gap-1.5 ${
-              isSelected ? 'bg-surface text-fg' : 'text-fg'
-            } ${dropTarget === row.key ? 'outline-2 outline-offset-[-2px] outline-accent outline-dashed' : ''}`;
-            if (row.kind === 'group') {
-              const Chevron = row.expanded ? ChevronDown : ChevronRight;
-              const position =
-                row.group === 'favorites' || row.group === 'recent'
-                  ? GROUPS_BEFORE.indexOf(row.group) + 1
-                  : GROUPS_BEFORE.length + roots + GROUPS_AFTER.indexOf(row.group) + 1;
-              return (
-                <div
-                  key={row.key}
-                  id={rowId(row.key)}
-                  role="treeitem"
-                  aria-level={1}
-                  aria-setsize={topLevel}
-                  aria-posinset={position}
-                  aria-expanded={row.count > 0 ? row.expanded : undefined}
-                  aria-selected={isSelected}
-                  data-group={row.group}
-                  className={`${base} px-1.5 font-semibold`}
-                  style={style}
-                  onClick={() => {
-                    setSelected(row.key);
-                    if (row.count > 0) {
-                      explorer().toggleGroup(row.group);
-                    }
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    openGroupMenu(row, { x: event.clientX, y: event.clientY });
-                  }}
-                  {...(row.group === 'unassigned' ? dropHandlers(row.key, { subnetId: null }) : {})}
-                >
-                  <Chevron
-                    aria-hidden="true"
-                    className={`size-3.5 shrink-0 text-muted ${row.count > 0 ? '' : 'invisible'}`}
-                  />
-                  <span className="truncate">{groupLabel(row.group)}</span>
-                  <span className="ml-auto pr-2 font-normal text-muted">{row.count}</span>
-                </div>
-              );
-            }
-            if (row.kind === 'subnet') {
-              const Chevron = row.expanded ? ChevronDown : ChevronRight;
-              const { subnet } = row;
-              return (
-                <div
-                  key={row.key}
-                  id={rowId(row.key)}
-                  role="treeitem"
-                  aria-level={row.level}
-                  aria-setsize={row.level === 1 ? topLevel : row.size}
-                  aria-posinset={row.level === 1 ? GROUPS_BEFORE.length + row.position : row.position}
-                  aria-expanded={row.hasContent ? row.expanded : undefined}
-                  aria-selected={isSelected}
-                  aria-label={
-                    subnet.description
-                      ? `${subnet.name}, ${t('subnet.label')}: ${subnet.description}`
-                      : `${subnet.name}, ${t('subnet.label')}`
-                  }
-                  data-subnet={subnet.id}
-                  title={subnet.description || undefined}
-                  draggable
-                  className={`${base} pr-3`}
-                  style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 }}
-                  onClick={() => {
-                    setSelected(row.key);
-                    if (row.hasContent) {
-                      explorer().toggleSubnet(subnet.id);
-                    }
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    openSubnetMenu(row, { x: event.clientX, y: event.clientY });
-                  }}
-                  onDragStart={(event) => {
-                    startDrag(event, { kind: 'subnet', id: subnet.id });
-                  }}
-                  {...dropHandlers(row.key, { subnetId: subnet.id })}
-                >
-                  <Chevron
-                    aria-hidden="true"
-                    className={`size-3.5 shrink-0 text-muted ${row.hasContent ? '' : 'invisible'}`}
-                  />
-                  <ColorDot color={subnet.color} />
-                  <span className="truncate">{subnet.name}</span>
-                  {row.count > 0 ? <span className="ml-auto text-muted">{row.count}</span> : null}
-                </div>
-              );
-            }
-            if (row.kind === 'file') {
-              const { file } = row;
-              return (
-                <div
-                  key={row.key}
-                  id={rowId(row.key)}
-                  role="treeitem"
-                  aria-level={2}
-                  aria-setsize={row.size}
-                  aria-posinset={row.position}
-                  aria-selected={isSelected}
-                  data-recent-file={file.id}
-                  data-group-member={row.group}
-                  data-missing={file.missing ? true : undefined}
-                  title={t('explorer.externalFile', { folder: file.folder })}
-                  className={`${base} pr-3 pl-7 ${file.missing ? 'text-muted' : ''}`}
-                  style={style}
-                  onClick={() => {
-                    setSelected(row.key);
-                    void openRecentFile(file.id, file.name);
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    openMenu(row, { x: event.clientX, y: event.clientY });
-                  }}
-                >
-                  <FormatIcon format={file.format} />
-                  <span className={`truncate ${file.missing ? 'line-through' : ''}`}>{file.name}</span>
-                  {file.missing ? <span className="sr-only">({t('explorer.fileMissing')})</span> : null}
-                  <HardDrive
-                    role="img"
-                    aria-label={t('explorer.externalFile', { folder: file.folder })}
-                    className="ml-auto size-3 shrink-0 text-muted"
-                  />
-                </div>
-              );
-            }
-            return (
-              <DocumentRowView
-                key={row.key}
-                row={row}
-                isSelected={isSelected}
-                base={base}
-                style={style}
-                active={row.document.id === active}
-                renaming={renaming === row.document.id && isSelected}
-                dateTime={dateTime}
-                subnetName={subnetName}
-                onSelect={() => {
-                  setSelected(row.key);
-                  if (row.group !== 'trash') {
-                    void openDocument(row.document.id);
-                  }
-                }}
-                onMenu={(position) => {
-                  openMenu(row, position);
-                }}
-                onRenamed={(title) => {
-                  if (title === null || title === row.document.title) {
-                    setRenaming(null);
-                  } else {
-                    void rename(row.document.id, title);
-                  }
-                  list.current?.focus();
-                }}
-                onDragStart={(event) => {
-                  startDrag(event, { kind: 'document', id: row.document.id });
-                }}
-              />
-            );
-          })}
-        </div>
+        <VisibleRows
+          list={list}
+          rows={rows}
+          selected={selected}
+          dropTarget={dropTarget}
+          active={active}
+          renaming={renaming}
+          topLevel={topLevel}
+          roots={roots}
+          labels={labels}
+          actions={actionsRef}
+        />
         {listLoaded && documents.length === 0 && subnets.length === 0 ? (
           <p className="text-ui px-3 py-2 text-muted" data-testid="explorer-empty">
             {t('explorer.empty')}
@@ -1009,46 +936,258 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   );
 }
 
-interface DocumentRowViewProps {
-  row: DocumentRow;
-  isSelected: boolean;
-  base: string;
-  style: { top: number; height: number };
-  active: boolean;
-  renaming: boolean;
-  dateTime: Intl.DateTimeFormat;
-  subnetName: (id: string | null) => string;
-  onSelect: () => void;
-  onMenu: (position: { x: number; y: number }) => void;
-  onRenamed: (title: string | null) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+interface VisibleRowsProps {
+  list: RefObject<HTMLDivElement | null>;
+  rows: readonly Row[];
+  selected: string | null;
+  dropTarget: string | null;
+  active: string | null;
+  renaming: string | null;
+  topLevel: number;
+  roots: number;
+  labels: RowLabels;
+  actions: RefObject<RowActions>;
 }
 
-function DocumentRowView({
-  row,
-  isSelected,
-  base,
-  style,
+/**
+ * The rows in view (plus a margin). It follows the scrolling of the list on
+ * its own, so scrolling renders only this part, not the whole Explorer.
+ */
+function VisibleRows({
+  list,
+  rows,
+  selected,
+  dropTarget,
   active,
   renaming,
-  dateTime,
-  subnetName,
-  onSelect,
-  onMenu,
-  onRenamed,
-  onDragStart,
-}: DocumentRowViewProps) {
-  const t = useT();
+  topLevel,
+  roots,
+  labels,
+  actions,
+}: VisibleRowsProps) {
+  const [range, setRange] = useState({ first: 0, last: 60 });
+  useEffect(() => {
+    const element = list.current;
+    if (!element) {
+      return;
+    }
+    const update = () => {
+      const top = element.scrollTop;
+      const height = element.clientHeight || 400;
+      const first = Math.max(0, Math.floor(top / ROW_HEIGHT) - OVERSCAN);
+      const last = Math.ceil((top + height) / ROW_HEIGHT) + OVERSCAN;
+      // In the same frame as the scrolling, so no row is missing when it is drawn.
+      flushSync(() => {
+        setRange((previous) =>
+          previous.first === first && previous.last === last ? previous : { first, last },
+        );
+      });
+    };
+    element.addEventListener('scroll', update, { passive: true });
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+    observer?.observe(element);
+    return () => {
+      element.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [list]);
+  const visible = rows.slice(range.first, Math.min(rows.length, range.last));
+  return (
+    <div style={{ height: rows.length * ROW_HEIGHT }} className="relative [contain:layout_paint]">
+      {visible.map((row, offset) => (
+        <RowView
+          key={row.key}
+          row={row}
+          index={range.first + offset}
+          selected={row.key === selected}
+          dropTarget={dropTarget === row.key}
+          active={row.kind === 'document' && row.document.id === active}
+          renaming={row.kind === 'document' && renaming === row.document.id && row.key === selected}
+          topLevel={topLevel}
+          roots={roots}
+          labels={labels}
+          actions={actions}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** What a row needs to say, made once per language and tree. */
+interface RowLabels {
+  group: (group: ExplorerGroup) => string;
+  subnet: (name: string, description: string) => string;
+  subnetName: (id: string | null) => string;
+  externalFile: (folder: string) => string;
+  fileMissing: string;
+  secondary: (subnet: string) => string;
+  favorite: string;
+  deletedAt: (iso: string) => string;
+  rename: string;
+}
+
+/** The handlers of the rows; one stable object, so rows can skip rendering. */
+interface RowActions {
+  click: (row: Row) => void;
+  menu: (row: Row, position: { x: number; y: number }) => void;
+  renamed: (row: DocumentRow, title: string | null) => void;
+  dragStart: (event: DragEvent<HTMLDivElement>, row: Row) => void;
+  dragOver: (event: DragEvent<HTMLDivElement>, row: Row) => void;
+  dragLeave: (row: Row) => void;
+  drop: (event: DragEvent<HTMLDivElement>, row: Row) => void;
+}
+
+interface RowViewProps {
+  row: Row;
+  index: number;
+  selected: boolean;
+  dropTarget: boolean;
+  active: boolean;
+  renaming: boolean;
+  topLevel: number;
+  roots: number;
+  labels: RowLabels;
+  actions: RefObject<RowActions>;
+}
+
+/**
+ * One row. Memoised: while scrolling only rows that come into view render
+ * (ADR 0017, decision 17).
+ */
+const RowView = memo(function RowView({
+  row,
+  index,
+  selected,
+  dropTarget,
+  active,
+  renaming,
+  topLevel,
+  roots,
+  labels,
+  actions,
+}: RowViewProps) {
+  const style = { top: index * ROW_HEIGHT, height: ROW_HEIGHT };
+  // Fixed size: each row is laid out and painted on its own (`contain: strict`).
+  const base = `text-ui absolute inset-x-0 flex cursor-default items-center gap-1.5 [contain:strict] ${
+    selected ? 'bg-surface text-fg' : 'text-fg'
+  } ${dropTarget ? 'outline-2 outline-offset-[-2px] outline-accent outline-dashed' : ''}`;
+  const common = {
+    id: rowId(row.key),
+    role: 'treeitem',
+    'aria-selected': selected,
+    onClick: () => {
+      actions.current.click(row);
+    },
+    onContextMenu: (event: MouseEvent) => {
+      event.preventDefault();
+      actions.current.menu(row, { x: event.clientX, y: event.clientY });
+    },
+  } as const;
+  const drop = {
+    onDragOver: (event: DragEvent<HTMLDivElement>) => {
+      actions.current.dragOver(event, row);
+    },
+    onDragLeave: () => {
+      actions.current.dragLeave(row);
+    },
+    onDrop: (event: DragEvent<HTMLDivElement>) => {
+      actions.current.drop(event, row);
+    },
+  };
+  const dragStart = (event: DragEvent<HTMLDivElement>) => {
+    actions.current.dragStart(event, row);
+  };
+
+  if (row.kind === 'group') {
+    const Chevron = row.expanded ? ChevronDown : ChevronRight;
+    const position =
+      row.group === 'favorites' || row.group === 'recent'
+        ? GROUPS_BEFORE.indexOf(row.group) + 1
+        : GROUPS_BEFORE.length + roots + GROUPS_AFTER.indexOf(row.group) + 1;
+    return (
+      <div
+        {...common}
+        aria-level={1}
+        aria-setsize={topLevel}
+        aria-posinset={position}
+        aria-expanded={row.count > 0 ? row.expanded : undefined}
+        data-group={row.group}
+        className={`${base} px-1.5 font-semibold`}
+        style={style}
+        {...(row.group === 'unassigned' ? drop : {})}
+      >
+        <Chevron
+          aria-hidden="true"
+          className={`size-3.5 shrink-0 text-muted ${row.count > 0 ? '' : 'invisible'}`}
+        />
+        <span className="truncate">{labels.group(row.group)}</span>
+        <span className="ml-auto pr-2 font-normal text-muted">{row.count}</span>
+      </div>
+    );
+  }
+  if (row.kind === 'subnet') {
+    const Chevron = row.expanded ? ChevronDown : ChevronRight;
+    const { subnet } = row;
+    return (
+      <div
+        {...common}
+        aria-level={row.level}
+        aria-setsize={row.level === 1 ? topLevel : row.size}
+        aria-posinset={row.level === 1 ? GROUPS_BEFORE.length + row.position : row.position}
+        aria-expanded={row.hasContent ? row.expanded : undefined}
+        aria-label={labels.subnet(subnet.name, subnet.description)}
+        data-subnet={subnet.id}
+        title={subnet.description || undefined}
+        draggable
+        className={`${base} pr-3`}
+        style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 }}
+        onDragStart={dragStart}
+        {...drop}
+      >
+        <Chevron
+          aria-hidden="true"
+          className={`size-3.5 shrink-0 text-muted ${row.hasContent ? '' : 'invisible'}`}
+        />
+        <ColorDot color={subnet.color} />
+        <span className="truncate">{subnet.name}</span>
+        {row.count > 0 ? <span className="ml-auto text-muted">{row.count}</span> : null}
+      </div>
+    );
+  }
+  if (row.kind === 'file') {
+    const { file } = row;
+    return (
+      <div
+        {...common}
+        aria-level={2}
+        aria-setsize={row.size}
+        aria-posinset={row.position}
+        data-recent-file={file.id}
+        data-group-member={row.group}
+        data-missing={file.missing ? true : undefined}
+        title={labels.externalFile(file.folder)}
+        className={`${base} pr-3 pl-7 ${file.missing ? 'text-muted' : ''}`}
+        style={style}
+      >
+        <FormatIcon format={file.format} />
+        <span className={`truncate ${file.missing ? 'line-through' : ''}`}>{file.name}</span>
+        {file.missing ? <span className="sr-only">({labels.fileMissing})</span> : null}
+        <HardDrive
+          role="img"
+          aria-label={labels.externalFile(file.folder)}
+          className="ml-auto size-3 shrink-0 text-muted"
+        />
+      </div>
+    );
+  }
   const { document } = row;
   const inTrash = row.group === 'trash';
   return (
     <div
-      id={rowId(row.key)}
-      role="treeitem"
+      {...common}
       aria-level={row.level}
       aria-setsize={row.size}
       aria-posinset={row.position}
-      aria-selected={isSelected}
       data-document={document.id}
       data-group-member={row.group}
       data-subnet-member={row.subnetId ?? undefined}
@@ -1056,41 +1195,38 @@ function DocumentRowView({
       draggable={!inTrash && !renaming}
       title={
         inTrash && document.deletedAt
-          ? t('explorer.deletedAt', { date: dateTime.format(new Date(document.deletedAt)) })
+          ? labels.deletedAt(document.deletedAt)
           : (document.originalName ?? undefined)
       }
       className={`${base} pr-3 ${active ? 'font-semibold' : ''} ${inTrash ? 'text-muted' : ''}`}
       style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 + 8 }}
-      onClick={onSelect}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onMenu({ x: event.clientX, y: event.clientY });
-      }}
-      onDragStart={onDragStart}
+      onDragStart={dragStart}
     >
       <FormatIcon format={document.format} />
       {renaming ? (
-        <RenameInput initial={document.title} label={t('explorer.renameLabel')} onDone={onRenamed} />
+        <RenameInput
+          initial={document.title}
+          label={labels.rename}
+          onDone={(title) => {
+            actions.current.renamed(row, title);
+          }}
+        />
       ) : (
         <span className="truncate">{document.title}</span>
       )}
       {row.secondary ? (
         <Link2
           role="img"
-          aria-label={t('explorer.secondary', { subnet: subnetName(row.subnetId) })}
+          aria-label={labels.secondary(labels.subnetName(row.subnetId))}
           className="size-3 shrink-0 text-muted"
         />
       ) : null}
       {document.favoritedAt !== null && row.group !== 'favorites' ? (
-        <Star
-          role="img"
-          aria-label={t('explorer.isFavorite')}
-          className="ml-auto size-3 shrink-0 text-muted"
-        />
+        <Star role="img" aria-label={labels.favorite} className="ml-auto size-3 shrink-0 text-muted" />
       ) : null}
     </div>
   );
-}
+});
 
 /** Shows what went wrong in a structural action started from the Explorer. */
 function report(result: Promise<CommandError | null>): void {
