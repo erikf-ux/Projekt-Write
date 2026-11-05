@@ -34,3 +34,30 @@ export async function closeSettings(): Promise<void> {
     await dialog.waitForExist({ reverse: true, timeout: 20_000 });
   }
 }
+
+/**
+ * After the app ended (window closed or process killed): the runner's last
+ * `deleteSession` would fail, and the next spec file may only start once
+ * the embedded WebDriver no longer answers (then the test service starts
+ * the app again; CI run 77).
+ */
+export async function waitUntilAppEnded(): Promise<void> {
+  const overwrite = browser.overwriteCommand as (name: string, command: () => Promise<void>) => void;
+  overwrite('deleteSession', async () => {
+    // The session ended with the app.
+  });
+  const status = `http://${browser.options.hostname ?? '127.0.0.1'}:${String(browser.options.port ?? 4445)}/status`;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(status, { signal: AbortSignal.timeout(1_000) });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    } catch (error) {
+      // A refused connection means the server is gone; a timeout, that it is ending.
+      if (!(error instanceof DOMException && error.name === 'TimeoutError')) {
+        return;
+      }
+    }
+  }
+  throw new Error('the app did not end');
+}

@@ -45,3 +45,6 @@ export const pickedFiles = {
 
 /** Passed to a second start of the app (not a dialog answer). */
 export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
+
+/** What a spec file that ends the app leaves for the next one to check. */
+export const handover = path.join(sandbox, 'handover.json');

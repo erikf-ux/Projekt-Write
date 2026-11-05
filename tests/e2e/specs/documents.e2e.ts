@@ -106,11 +106,11 @@ describe('Converting documents (Phase 5)', () => {
     );
 
     await runFromPalette('document.convertToRichText');
-    await browser.waitUntil(() => fs.existsSync(documentFile(id, 'pwrite')), {
-      timeout: 10_000,
-      timeoutMsg: 'no .pwrite file after converting',
-    });
-    expect(fs.existsSync(documentFile(id, 'md'))).toBe(false);
+    // Rust writes the new file, changes the row and removes the old file last.
+    await browser.waitUntil(
+      () => fs.existsSync(documentFile(id, 'pwrite')) && !fs.existsSync(documentFile(id, 'md')),
+      { timeout: 10_000, timeoutMsg: 'no .pwrite file, or the .md file stayed, after converting' },
+    );
     const envelope = JSON.parse(fs.readFileSync(documentFile(id, 'pwrite'), 'utf8')) as Record<
       string,
       unknown
@@ -126,10 +126,10 @@ describe('Converting documents (Phase 5)', () => {
     await prompt.waitForDisplayed();
     expect(await prompt.getText()).toContain('Formatierung');
     await $('[data-testid="convert-prompt"] [data-choice="convert"]').click();
-    await browser.waitUntil(() => fs.existsSync(documentFile(id, 'txt')), {
-      timeout: 10_000,
-      timeoutMsg: 'no .txt file after converting',
-    });
+    await browser.waitUntil(
+      () => fs.existsSync(documentFile(id, 'txt')) && !fs.existsSync(documentFile(id, 'pwrite')),
+      { timeout: 10_000, timeoutMsg: 'no .txt file, or the .pwrite file stayed, after converting' },
+    );
     expect(fs.readFileSync(documentFile(id, 'txt'), 'utf8')).toBe('Kapitel eins');
     expect(fs.existsSync(documentFile(id, 'pwrite'))).toBe(false);
     expect(await $('[data-testid="status-bar"]').getText()).toContain('Text');
