@@ -42,7 +42,7 @@ E2E: neu `fixtures.ts` (PNG, ZIP/DOCX, PDF, CVE-Test-PDF, SVG mit Skript – ohn
 - `zip` 9.5.0 (MIT): Office-Prüfung; Phase 10 braucht es für `.pwritepack` und `.pwbackup`.
 - `pdfjs-dist` 6.5.438 (Apache-2.0): PDF-Ansicht, wie Abschnitt 7 sie vorsieht.
 
-Die Lizenzliste wächst um 17 Crates (darunter `moxcms` und `pxfm` unter BSD-3-Clause OR Apache-2.0, beide in `deny.toml` erlaubt) und 3 npm-Pakete.
+Die Lizenzliste wächst um 17 Crates (darunter `moxcms` und `pxfm` unter BSD-3-Clause OR Apache-2.0, beide in `deny.toml` erlaubt) und ein npm-Paket (`pdfjs-dist`). `@napi-rs/canvas`, die nur unter Node.js genutzte optionale Abhängigkeit von PDF.js, lässt das Skript aus: Sie wird nicht ausgeliefert, und npm installiert je Plattform eine andere Variante (F-41).
 
 ## Welche Tests wurden durchgeführt?
 
@@ -122,12 +122,13 @@ Keine bekannten. Offen ist die Messung der Galerie auf dem Referenzgerät (F-40,
 
 ## Behobene Fehler
 
-F-34 bis F-40 in `docs/status.md`:
+F-34 bis F-42 in `docs/status.md`:
 
 - **F-34 und F-36 waren Fehler der App**, gefunden von den E2E-Tests unter WebKitGTK: Ein Klick auf eine Galerie-Kachel brachte den Fokus nicht in die Liste; ein Klick wählte ein Bild im Text nicht aus.
 - **F-35 und F-37 waren Fehler der Tests:** veraltete Elementverweise unter WebKitGTK und eine Erwartung der Phase 3, die nach der Umstellung des Ablegens nicht mehr stimmte (der offene Dialog riss dann alle folgenden Dateien im selben Prozess mit).
 - **F-38 und F-39** betrafen den Generator der Referenzbibliothek: zu große Testbilder, und zu viele Favoriten (129 Medien unter „Favoriten“ schoben die Subnetze aus dem ersten Bild des Explorers, die Explorer-Messung lief in die Zeitgrenze).
 - **F-40 war ein Leistungsfehler der App:** PDF-Vorschaubilder entstanden während des Scrollens auf dem Hauptthread (siehe „Galerie-Messung“).
+- **F-41 und F-42 fand CI-Lauf 102:** eine Lizenzliste, die von der Maschine abhing (eine nur unter Node.js genutzte Abhängigkeit von PDF.js in einer weiteren Variante), und eine nur unter Windows ungenutzte Variable in einem Test. Die Windows-Prüfung mit Clippy hatte ich lokal diesmal ausgelassen, weil das Windows-Ziel wegen Platzmangels gelöscht war.
 
 Die Tippverzögerung der Phase 4 lag im vollständigen Lauf bei 95 % ≤ 66 ms (Ziel 50 ms), weil ich währenddessen die Typprüfung auf denselben vier Kernen laufen ließ. Auf der ruhigen Maschine wiederholt: 95 % ≤ 34 ms, Öffnen von 50.000 Wörtern 267–323 ms – wie in Phase 4.
 

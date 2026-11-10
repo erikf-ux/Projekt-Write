@@ -348,6 +348,8 @@ async fn originals_stay_byte_identical_and_the_copies_equal_them() {
 async fn files_off_the_positive_list_are_skipped_with_a_reason() {
     let dir = common::temp_dir("pw-media-types-");
     let folder = dir.path().join("Mappe");
+    // Only the symbolic link below (Unix) needs the original's path.
+    #[cfg_attr(not(unix), allow(unused_variables))]
     let good = write_original(&folder, "gut.png", &png(10, 10, 3));
     write_original(&folder, "Programm.png", b"MZ\x90\0\x03\0\0\0 not an image");
     write_original(&folder, "falsch.jpg", &png(10, 10, 4));

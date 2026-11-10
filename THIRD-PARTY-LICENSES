@@ -38,9 +38,9 @@ Licence summary:
      1  BSD-3-Clause/MIT
      1  Zlib
 
-npm packages (production dependencies): 68
+npm packages (production dependencies): 66
 Licence summary:
-    65  MIT
+    63  MIT
      1  Apache-2.0
      1  Apache-2.0 OR MIT
      1  ISC
@@ -492,8 +492,6 @@ npm packages
 @floating-ui/core 1.8.0                    MIT
 @floating-ui/dom 1.8.0                     MIT
 @floating-ui/utils 0.2.12                  MIT
-@napi-rs/canvas 1.1.0                      MIT
-@napi-rs/canvas-linux-x64-gnu 1.1.0        MIT
 @tauri-apps/api 2.12.4                     Apache-2.0 OR MIT
 @tiptap/core 3.32.2                        MIT
 @tiptap/extension-blockquote 3.32.2        MIT

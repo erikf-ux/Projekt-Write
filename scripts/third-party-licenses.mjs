@@ -5,7 +5,8 @@
  *
  * * Rust: normal (non-dev, non-build) dependencies for all target platforms,
  *   default features only – the optional test plugin is therefore excluded.
- * * npm: production dependencies (`npm query .prod`).
+ * * npm: production dependencies (`npm query .prod`), without packages that
+ *   only serve Node.js and never reach the bundle (`NOT_SHIPPED`).
  *
  * The output is deterministic so CI can verify that the committed file is
  * current: `node scripts/third-party-licenses.mjs && git diff --exit-code`.
@@ -61,10 +62,19 @@ function rustComponents() {
   return [...components.values()];
 }
 
+/**
+ * Production packages that do not ship: `@napi-rs/canvas` is an optional
+ * dependency of `pdfjs-dist` for rendering under Node.js; the app bundle
+ * never imports it (ADR 0019). npm installs a different native variant per
+ * platform, so listing it would also make this file depend on the machine.
+ */
+const NOT_SHIPPED = [/^@napi-rs\/canvas(-.+)?$/];
+
 function npmComponents() {
   const packages = JSON.parse(run('npm', ['query', '.prod'], { shell: isWindows }));
   return packages
     .filter((pkg) => pkg.location !== '')
+    .filter((pkg) => !NOT_SHIPPED.some((pattern) => pattern.test(pkg.name)))
     .map((pkg) => ({ name: pkg.name, version: pkg.version, license: pkg.license ?? 'UNKNOWN' }));
 }
 
