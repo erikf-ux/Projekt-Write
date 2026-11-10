@@ -89,6 +89,18 @@ function newBatchId(): string {
   return crypto.randomUUID();
 }
 
+/** Dropped files waiting while the dialog asks about the one before them. */
+let queuedDrop: { files: readonly File[]; subnetId: string | null } | null = null;
+
+/** Goes on with the dropped files after the dialog of one was closed. */
+function continueDrop(store: () => MediaStore) {
+  const next = queuedDrop;
+  queuedDrop = null;
+  if (next && next.files.length > 0) {
+    void store().importFiles(next.files, next.subnetId);
+  }
+}
+
 /** Bytes of a file for the import (Rust checks type and size). */
 async function bytesOf(file: File): Promise<Uint8Array> {
   return new Uint8Array(await file.arrayBuffer());
@@ -126,6 +138,7 @@ export const useMedia = create<MediaStore>((set, get) => ({
   },
 
   reset: () => {
+    queuedDrop = null;
     set({
       loaded: false,
       media: [],
@@ -333,7 +346,11 @@ export const useMedia = create<MediaStore>((set, get) => ({
   },
 
   importFiles: async (files, subnetId = null) => {
-    let last: ImportOutcome | null = null;
+    if (get().importing) {
+      return null;
+    }
+    const items: ImportOutcome['items'] = [];
+    let asking = false;
     for (const file of files) {
       const prepared = await importMediaBytes(file.name, await bytesOf(file));
       if (!prepared.ok) {
@@ -341,15 +358,14 @@ export const useMedia = create<MediaStore>((set, get) => ({
         continue;
       }
       const preview = prepared.value;
-      if (preview.items.length === 0) {
-        // Refused: the reason is in the preview.
+      if (preview.items.length === 0 || preview.items.some((item) => item.duplicate !== null)) {
+        // Refused (the dialog names the reason) or a duplicate, which is
+        // asked about (section 9). The files after it wait until the
+        // dialog is closed, either way.
+        queuedDrop = { files: files.slice(files.indexOf(file) + 1), subnetId };
         set({ importing: { phase: 'review', preview, source: 'drop', committing: false } });
-        return null;
-      }
-      if (preview.items.some((item) => item.duplicate !== null)) {
-        // Section 9: a duplicate is asked about.
-        set({ importing: { phase: 'review', preview, source: 'drop', committing: false } });
-        return null;
+        asking = true;
+        break;
       }
       const committed = await call('media_import_commit', {
         batchId: preview.batchId,
@@ -360,13 +376,17 @@ export const useMedia = create<MediaStore>((set, get) => ({
         showError(committed.error);
         continue;
       }
-      last = committed.value;
+      items.push(...committed.value.items);
     }
-    if (last) {
-      await get().refresh();
-      await useStructure.getState().load();
+    if (items.length === 0) {
+      return null;
     }
-    return last;
+    await Promise.all([get().refresh(), useStructure.getState().load()]);
+    const outcome: ImportOutcome = { items, subnetId: null };
+    if (!asking) {
+      set({ lastImport: outcome });
+    }
+    return outcome;
   },
 
   commitImport: async (choice) => {
@@ -389,6 +409,7 @@ export const useMedia = create<MediaStore>((set, get) => ({
     set({ importing: null });
     if (!result.ok) {
       showError(result.error);
+      continueDrop(get);
       return null;
     }
     set({ lastImport: result.value });
@@ -399,6 +420,7 @@ export const useMedia = create<MediaStore>((set, get) => ({
       key: 'media.import.done',
       params: { count: result.value.items.length, created },
     });
+    continueDrop(get);
     return result.value;
   },
 
@@ -410,6 +432,8 @@ export const useMedia = create<MediaStore>((set, get) => ({
     } else if (state?.phase === 'review') {
       await call('media_import_cancel', { batchId: state.preview.batchId });
     }
+    // Closing the dialog of one dropped file leaves out that file only.
+    continueDrop(get);
   },
 }));
 

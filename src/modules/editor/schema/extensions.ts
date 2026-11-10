@@ -81,7 +81,7 @@ export function markdownExtensions(): AnyExtension[] {
       autolink: true,
       linkOnPaste: true,
       shouldAutoLink: isWebAddress,
-      protocols: [...LINK_PROTOCOLS, 'pwrite'],
+      protocols: [...LINK_PROTOCOLS, 'pwrite', 'pwmedia'],
       HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: null },
     }),
     LinkedImages,

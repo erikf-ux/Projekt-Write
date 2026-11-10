@@ -81,6 +81,18 @@ export async function importFiles(
   return summary;
 }
 
+/** Endings of text documents (Rust: `DOCUMENT_EXTENSIONS` of the media import). */
+const DOCUMENT_EXTENSIONS = ['txt', 'md', 'markdown', 'pwrite'];
+
+/**
+ * Whether a dropped file is a text document (document import) rather than
+ * a medium (media import, Phase 8). Rust checks the content either way.
+ */
+export function isDocumentFile(name: string): boolean {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && DOCUMENT_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+}
+
 /** Whether a drag carries files from outside (not a tab of this window). */
 export function carriesFiles(dataTransfer: DataTransfer | null): boolean {
   return dataTransfer !== null && dataTransfer.types.includes('Files');

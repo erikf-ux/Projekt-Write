@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { Dialog } from '@/components/Dialog';
 import { useT } from '@/i18n';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
+import { parseMediaReference } from '@/modules/media/mediaUrl';
 import { internalLinkTarget } from './schema/extensions';
 import { getSession } from './session';
 
@@ -36,6 +37,9 @@ export function isAllowedLink(href: string): boolean {
   }
   if (value.toLowerCase().startsWith('pwrite:')) {
     return internalLinkTarget(value) !== null;
+  }
+  if (value.toLowerCase().startsWith('pwmedia:')) {
+    return parseMediaReference(value) !== null;
   }
   const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(value)?.[1]?.toLowerCase();
   return scheme === undefined || scheme === 'http' || scheme === 'https' || scheme === 'mailto';

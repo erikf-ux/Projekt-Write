@@ -1,22 +1,43 @@
 /**
  * Drag and drop of files onto the window (section 11). Works with
  * `dragDropEnabled: false` (HTML5 drag and drop, needed on Windows).
- * Folders are refused; files are imported (see `importFiles`).
+ * Folders are refused; text documents are imported as documents (see
+ * `importFiles`), every other file goes to the media import (Phase 8),
+ * which checks it and asks about duplicates.
  */
 import { FileDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errorText } from '@/components/errorText';
 import { useT } from '@/i18n';
+import { useMedia } from '@/modules/media/mediaStore';
 import { useUi } from '@/modules/settings/uiStore';
 import type { DocumentSummary } from '@/types/generated/DocumentSummary';
-import { carriesFiles, importFiles, type DuplicateAnswer } from './importFiles';
+import { carriesFiles, importFiles, isDocumentFile, type DuplicateAnswer } from './importFiles';
 import { useWorkspace } from './workspaceStore';
 
 interface Question {
   file: string;
   existing: DocumentSummary;
   answer: (answer: DuplicateAnswer) => void;
+}
+
+/** Dropped media: imported at once, or through the import dialog when it asks. */
+async function importMedia(files: File[]) {
+  const outcome = await useMedia.getState().importFiles(files);
+  if (!outcome) {
+    return;
+  }
+  const created = outcome.items.filter((item) => item.created).length;
+  useUi.getState().showNotice({
+    tone: 'info',
+    key: 'media.import.done',
+    params: { count: outcome.items.length, created },
+  });
+  const first = outcome.items[0];
+  if (first && outcome.items.length === 1) {
+    useWorkspace.getState().openMedia(first.id);
+  }
 }
 
 export function DropZone({ children }: { children: ReactNode }) {
@@ -113,7 +134,11 @@ export function DropZone({ children }: { children: ReactNode }) {
         useUi.getState().showNotice({ tone: 'error', key: 'import.noFolders' });
         return;
       }
-      void run(files);
+      void run(files.filter((file) => isDocumentFile(file.name)));
+      const media = files.filter((file) => !isDocumentFile(file.name));
+      if (media.length > 0) {
+        void importMedia(media);
+      }
     };
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragleave', onDragLeave);

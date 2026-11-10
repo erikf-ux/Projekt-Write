@@ -406,8 +406,15 @@ describe('Project Write – Phase 3 workbench', () => {
     await expect(dialog).not.toBeExisting();
     expect(await activeDocumentId()).toBe(id);
 
+    // Anything but a text document goes to the media import (Phase 8),
+    // which names why a broken image is not taken over (too short to be
+    // recognised as a PNG, so its type is refused).
     await drop('bild.png', '\u0089PNG\r\n\u001a\n\u0000\u0000', 'image/png');
-    await expect($('[data-testid="notice"]')).toHaveText(expect.stringContaining('bild.png'));
+    const refused = $('[data-testid="media-import"]');
+    await refused.waitForDisplayed();
+    expect(await $('[data-skipped="bild.png"] [data-reason]').getAttribute('data-reason')).toBe('type');
+    await $('[data-testid="media-import-cancel"]').click();
+    await refused.waitForExist({ reverse: true });
     const titles = await $('[data-testid="explorer"]').getText();
     expect(titles).not.toContain('Kopie');
     expect(titles).not.toContain('bild');
