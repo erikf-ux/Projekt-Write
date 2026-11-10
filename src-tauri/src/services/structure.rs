@@ -4,7 +4,7 @@
 //! Every structural action runs in one transaction. Before and after the
 //! change it takes a snapshot of what the action touches: the subnet and
 //! tag rows by id, and memberships, tags and trash/archive state of the
-//! documents involved. Undo writes the snapshot before, redo the one after,
+//! elements involved – documents and media (ADR 0019, decision 12). Undo writes the snapshot before, redo the one after,
 //! once the current state is checked to equal the expected one.
 //!
 //! Writing a whole snapshot cannot rely on the order of single updates:
@@ -25,8 +25,9 @@ use uuid::Uuid;
 use crate::clock::Generators;
 use crate::database::Database;
 use crate::database::structure::{
-    self as rows, DocumentState, DocumentTagRow, MembershipRow, SubnetRow, TagRow,
+    self as rows, ElementState, ElementTagRow, MembershipRow, SubnetRow, TagRow,
 };
+pub use crate::database::structure::{Element, ElementKind};
 use crate::services::themes::contrast_ratio;
 
 pub const MAX_SUBNET_NAME_CHARS: usize = 200;
@@ -49,9 +50,11 @@ pub enum StructureError {
     TagNotFound,
     #[error("document not found")]
     DocumentNotFound,
-    #[error("document is in the trash")]
+    #[error("medium not found")]
+    MediaNotFound,
+    #[error("element is in the trash")]
     InTrash,
-    #[error("document is not in the trash")]
+    #[error("element is not in the trash")]
     NotInTrash,
     #[error("a subnet cannot lie below itself")]
     Cycle,
@@ -65,7 +68,7 @@ pub enum StructureError {
     InvalidDescription(&'static str),
     #[error("invalid colour: {0}")]
     InvalidColor(&'static str),
-    #[error("the document is not in this subnet")]
+    #[error("the element is not in this subnet")]
     NotMember,
     #[error("a tag cannot be merged into itself")]
     SameTag,
@@ -87,7 +90,8 @@ impl From<sqlx::Error> for StructureError {
     }
 }
 
-/// A structural action, as the undo journal names it.
+/// A structural action, as the undo journal names it. The `Document…`
+/// actions apply to media as well (the subject names the element).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -130,12 +134,12 @@ pub struct UndoHistory {
     pub redo: Option<UndoStep>,
 }
 
-/// Subnets and tags of one document: the primary subnet first, then the
+/// Subnets and tags of one element: the primary subnet first, then the
 /// others by age; tags in the order they were given.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub struct DocumentStructure {
+pub struct ElementStructure {
     pub id: String,
     pub subnet_ids: Vec<String>,
     pub tag_ids: Vec<String>,
@@ -146,8 +150,8 @@ pub struct DocumentStructure {
 pub struct Outcome {
     /// The step, if anything changed.
     pub step: Option<UndoStep>,
-    /// Documents whose structure or state may have changed.
-    pub documents: Vec<String>,
+    /// Elements whose structure or state may have changed.
+    pub elements: Vec<Element>,
     /// The subnet or tag the action created or worked on.
     pub subject_id: Option<String>,
 }
@@ -157,14 +161,14 @@ pub struct Outcome {
 struct Keys {
     subnets: BTreeSet<String>,
     tags: BTreeSet<String>,
-    documents: BTreeSet<String>,
+    elements: BTreeSet<Element>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct DocumentSnapshot {
+struct ElementSnapshot {
     memberships: Vec<MembershipRow>,
-    tags: Vec<DocumentTagRow>,
-    state: DocumentState,
+    tags: Vec<ElementTagRow>,
+    state: ElementState,
 }
 
 /// The rows of [`Keys`] at one moment (`None`: the row does not exist).
@@ -172,7 +176,7 @@ struct DocumentSnapshot {
 struct Snapshot {
     subnets: BTreeMap<String, Option<SubnetRow>>,
     tags: BTreeMap<String, Option<TagRow>>,
-    documents: BTreeMap<String, Option<DocumentSnapshot>>,
+    elements: BTreeMap<Element, Option<ElementSnapshot>>,
 }
 
 #[derive(Debug, Clone)]
@@ -287,6 +291,20 @@ fn id_text(id: Uuid) -> String {
     id.hyphenated().to_string()
 }
 
+fn element_of(kind: ElementKind, id: Uuid) -> Element {
+    Element {
+        kind,
+        id: id_text(id),
+    }
+}
+
+fn not_found(kind: ElementKind) -> StructureError {
+    match kind {
+        ElementKind::Document => StructureError::DocumentNotFound,
+        ElementKind::Media => StructureError::MediaNotFound,
+    }
+}
+
 /// The structure of one open library.
 #[derive(Debug, Clone)]
 pub struct Structure {
@@ -328,40 +346,53 @@ impl Structure {
         Ok(rows::list_tags(self.database.reader()).await?)
     }
 
-    /// Subnets and tags of every document that has any.
-    pub async fn all_documents(&self) -> Result<Vec<DocumentStructure>, StructureError> {
-        let mut by_document: BTreeMap<String, (Vec<MembershipRow>, Vec<String>)> = BTreeMap::new();
+    /// Subnets and tags of every element that has any: documents and media.
+    pub async fn all_elements(
+        &self,
+    ) -> Result<(Vec<ElementStructure>, Vec<ElementStructure>), StructureError> {
+        let mut by_element: BTreeMap<Element, (Vec<MembershipRow>, Vec<String>)> = BTreeMap::new();
         for membership in rows::all_memberships(self.database.reader()).await? {
-            by_document
-                .entry(membership.document_id.clone())
+            by_element
+                .entry(membership.element.clone())
                 .or_default()
                 .0
                 .push(membership);
         }
-        for tag in rows::all_document_tags(self.database.reader()).await? {
-            by_document
-                .entry(tag.document_id)
+        for tag in rows::all_element_tags(self.database.reader()).await? {
+            by_element
+                .entry(tag.element)
                 .or_default()
                 .1
                 .push(tag.tag_id);
         }
-        Ok(by_document
-            .into_iter()
-            .map(|(id, (memberships, tag_ids))| DocumentStructure {
-                id,
+        let mut documents = Vec::new();
+        let mut media = Vec::new();
+        for (element, (memberships, tag_ids)) in by_element {
+            let structure = ElementStructure {
+                id: element.id,
                 subnet_ids: ordered_subnets(&memberships),
                 tag_ids,
-            })
-            .collect())
+            };
+            match element.kind {
+                ElementKind::Document => documents.push(structure),
+                ElementKind::Media => media.push(structure),
+            }
+        }
+        Ok((documents, media))
     }
 
     /// Subnets and tags of one document.
-    pub async fn document(&self, id: &str) -> Result<DocumentStructure, StructureError> {
+    pub async fn document(&self, id: &str) -> Result<ElementStructure, StructureError> {
+        self.element(&Element::document(id)).await
+    }
+
+    /// Subnets and tags of one element.
+    pub async fn element(&self, element: &Element) -> Result<ElementStructure, StructureError> {
         let mut connection = self.database.reader().acquire().await?;
-        let memberships = rows::memberships_of(&mut connection, id).await?;
-        let tags = rows::tags_of(&mut connection, id).await?;
-        Ok(DocumentStructure {
-            id: id.to_owned(),
+        let memberships = rows::memberships_of(&mut connection, element).await?;
+        let tags = rows::tags_of(&mut connection, element).await?;
+        Ok(ElementStructure {
+            id: element.id.clone(),
             subnet_ids: ordered_subnets(&memberships),
             tag_ids: tags.into_iter().map(|tag| tag.tag_id).collect(),
         })
@@ -572,16 +603,16 @@ impl Structure {
         if with_children {
             deleted.extend(below.iter().cloned());
         }
-        let mut documents = BTreeSet::new();
+        let mut elements = BTreeSet::new();
         for subnet in &deleted {
-            documents.extend(rows::members_of(&mut connection, subnet).await?);
+            elements.extend(rows::members_of(&mut connection, subnet).await?);
         }
         drop(connection);
         let keys = Keys {
             subnets: std::iter::once(id.clone())
                 .chain(below.iter().cloned())
                 .collect(),
-            documents: documents.clone(),
+            elements: elements.clone(),
             ..Keys::default()
         };
         let step = UndoStep {
@@ -618,9 +649,9 @@ impl Structure {
                 }
                 rows::delete_subnet(connection, &id).await?;
                 // Memberships went with the subnets: the primary one moves on.
-                for document in &documents {
-                    let memberships = rows::memberships_of(connection, document).await?;
-                    rows::replace_memberships(connection, document, &with_primary(memberships))
+                for element in &elements {
+                    let memberships = rows::memberships_of(connection, element).await?;
+                    rows::replace_memberships(connection, element, &with_primary(memberships))
                         .await?;
                 }
                 Ok(None)
@@ -631,26 +662,37 @@ impl Structure {
 
     // --- Memberships -------------------------------------------------------------
 
-    /// Adds a membership; the first one of a document is primary.
+    /// Adds a membership of a document; see [`Self::assign_element`].
     pub async fn assign(&self, document: Uuid, subnet: Uuid) -> Result<Outcome, StructureError> {
+        self.assign_element(ElementKind::Document, document, subnet)
+            .await
+    }
+
+    /// Adds a membership; the first one of an element is primary.
+    pub async fn assign_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
+        subnet: Uuid,
+    ) -> Result<Outcome, StructureError> {
         let subnet = id_text(subnet);
         let now = self.generators.now().to_iso();
-        self.document_change(
-            document,
+        self.element_change(
+            element_of(kind, id),
             StructureAction::DocumentAssign,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
                     ensure_subnet(connection, &subnet).await?;
-                    let mut memberships = rows::memberships_of(connection, &document).await?;
+                    let mut memberships = rows::memberships_of(connection, &element).await?;
                     if !memberships.iter().any(|m| m.subnet_id == subnet) {
                         let first = memberships.is_empty();
                         memberships.push(MembershipRow {
                             subnet_id: subnet.clone(),
-                            document_id: document.clone(),
+                            element: element.clone(),
                             is_primary: first,
                             created_at: now,
                         });
-                        rows::replace_memberships(connection, &document, &memberships).await?;
+                        rows::replace_memberships(connection, &element, &memberships).await?;
                     }
                     Ok(Some(subnet))
                 })
@@ -659,15 +701,26 @@ impl Structure {
         .await
     }
 
-    /// Removes a membership; the oldest remaining one becomes primary.
+    /// Removes a membership of a document; see [`Self::unassign_element`].
     pub async fn unassign(&self, document: Uuid, subnet: Uuid) -> Result<Outcome, StructureError> {
+        self.unassign_element(ElementKind::Document, document, subnet)
+            .await
+    }
+
+    /// Removes a membership; the oldest remaining one becomes primary.
+    pub async fn unassign_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
+        subnet: Uuid,
+    ) -> Result<Outcome, StructureError> {
         let subnet = id_text(subnet);
-        self.document_change(
-            document,
+        self.element_change(
+            element_of(kind, id),
             StructureAction::DocumentUnassign,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
-                    let memberships = rows::memberships_of(connection, &document).await?;
+                    let memberships = rows::memberships_of(connection, &element).await?;
                     if !memberships.iter().any(|m| m.subnet_id == subnet) {
                         return Err(StructureError::NotMember);
                     }
@@ -675,7 +728,7 @@ impl Structure {
                         .into_iter()
                         .filter(|m| m.subnet_id != subnet)
                         .collect();
-                    rows::replace_memberships(connection, &document, &with_primary(rest)).await?;
+                    rows::replace_memberships(connection, &element, &with_primary(rest)).await?;
                     Ok(Some(subnet))
                 })
             },
@@ -683,27 +736,38 @@ impl Structure {
         .await
     }
 
-    /// "Verschieben" (section 13): the document leaves its primary subnet
-    /// and is primary in `target`; other memberships stay. Without a
-    /// target it leaves every subnet ("Nicht zugeordnet").
+    /// Moves a document; see [`Self::move_element`].
     pub async fn move_document(
         &self,
         document: Uuid,
         target: Option<Uuid>,
     ) -> Result<Outcome, StructureError> {
+        self.move_element(ElementKind::Document, document, target)
+            .await
+    }
+
+    /// "Verschieben" (section 13): the element leaves its primary subnet
+    /// and is primary in `target`; other memberships stay. Without a
+    /// target it leaves every subnet ("Nicht zugeordnet").
+    pub async fn move_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
+        target: Option<Uuid>,
+    ) -> Result<Outcome, StructureError> {
         let target = target.map(id_text);
         let now = self.generators.now().to_iso();
-        self.document_change(
-            document,
+        self.element_change(
+            element_of(kind, id),
             StructureAction::DocumentMove,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
                     let Some(target) = target else {
-                        rows::replace_memberships(connection, &document, &[]).await?;
+                        rows::replace_memberships(connection, &element, &[]).await?;
                         return Ok(None);
                     };
                     ensure_subnet(connection, &target).await?;
-                    let memberships = rows::memberships_of(connection, &document).await?;
+                    let memberships = rows::memberships_of(connection, &element).await?;
                     if memberships
                         .iter()
                         .any(|m| m.subnet_id == target && m.is_primary)
@@ -719,12 +783,12 @@ impl Structure {
                     } else {
                         next.push(MembershipRow {
                             subnet_id: target.clone(),
-                            document_id: document.clone(),
+                            element: element.clone(),
                             is_primary: true,
                             created_at: now,
                         });
                     }
-                    rows::replace_memberships(connection, &document, &next).await?;
+                    rows::replace_memberships(connection, &element, &next).await?;
                     Ok(Some(target))
                 })
             },
@@ -732,26 +796,37 @@ impl Structure {
         .await
     }
 
-    /// Makes an existing membership the primary one.
+    /// Makes a membership of a document primary; see [`Self::set_primary_element`].
     pub async fn set_primary(
         &self,
         document: Uuid,
         subnet: Uuid,
     ) -> Result<Outcome, StructureError> {
+        self.set_primary_element(ElementKind::Document, document, subnet)
+            .await
+    }
+
+    /// Makes an existing membership the primary one.
+    pub async fn set_primary_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
+        subnet: Uuid,
+    ) -> Result<Outcome, StructureError> {
         let subnet = id_text(subnet);
-        self.document_change(
-            document,
+        self.element_change(
+            element_of(kind, id),
             StructureAction::DocumentPrimary,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
-                    let mut memberships = rows::memberships_of(connection, &document).await?;
+                    let mut memberships = rows::memberships_of(connection, &element).await?;
                     if !memberships.iter().any(|m| m.subnet_id == subnet) {
                         return Err(StructureError::NotMember);
                     }
                     for membership in &mut memberships {
                         membership.is_primary = membership.subnet_id == subnet;
                     }
-                    rows::replace_memberships(connection, &document, &memberships).await?;
+                    rows::replace_memberships(connection, &element, &memberships).await?;
                     Ok(Some(subnet))
                 })
             },
@@ -852,7 +927,7 @@ impl Structure {
         let target_row = rows::get_tag(&mut connection, &target)
             .await?
             .ok_or(StructureError::TagNotFound)?;
-        let documents: BTreeSet<String> = rows::tagged_with(&mut connection, &source)
+        let elements: BTreeSet<Element> = rows::tagged_with(&mut connection, &source)
             .await?
             .into_iter()
             .collect();
@@ -863,14 +938,14 @@ impl Structure {
         };
         let keys = Keys {
             tags: BTreeSet::from([source.clone(), target.clone()]),
-            documents: documents.clone(),
+            elements: elements.clone(),
             ..Keys::default()
         };
         self.change(step, keys, |connection| {
             Box::pin(async move {
-                for document in &documents {
-                    let tags = rows::tags_of(connection, document).await?;
-                    let mut next: Vec<DocumentTagRow> = Vec::new();
+                for element in &elements {
+                    let tags = rows::tags_of(connection, element).await?;
+                    let mut next: Vec<ElementTagRow> = Vec::new();
                     for mut tag in tags {
                         if tag.tag_id == source {
                             tag.tag_id.clone_from(&target);
@@ -879,7 +954,7 @@ impl Structure {
                             next.push(tag);
                         }
                     }
-                    rows::replace_document_tags(connection, document, &next).await?;
+                    rows::replace_tags(connection, element, &next).await?;
                 }
                 rows::delete_tag(connection, &source).await?;
                 Ok(Some(target))
@@ -888,14 +963,14 @@ impl Structure {
         .await
     }
 
-    /// Deletes a tag; documents only lose it.
+    /// Deletes a tag; elements only lose it.
     pub async fn delete_tag(&self, id: Uuid) -> Result<Outcome, StructureError> {
         let id = id_text(id);
         let mut connection = self.database.reader().acquire().await?;
         let row = rows::get_tag(&mut connection, &id)
             .await?
             .ok_or(StructureError::TagNotFound)?;
-        let documents: BTreeSet<String> = rows::tagged_with(&mut connection, &id)
+        let elements: BTreeSet<Element> = rows::tagged_with(&mut connection, &id)
             .await?
             .into_iter()
             .collect();
@@ -906,7 +981,7 @@ impl Structure {
         };
         let keys = Keys {
             tags: BTreeSet::from([id.clone()]),
-            documents,
+            elements,
             ..Keys::default()
         };
         self.change(step, keys, |connection| {
@@ -918,10 +993,21 @@ impl Structure {
         .await
     }
 
-    /// Gives a document the tag named `name`; a new name makes a new tag.
+    /// Gives a document a tag; see [`Self::tag_element`].
     pub async fn tag_document(
         &self,
         document: Uuid,
+        name: &str,
+    ) -> Result<Outcome, StructureError> {
+        self.tag_element(ElementKind::Document, document, name)
+            .await
+    }
+
+    /// Gives an element the tag named `name`; a new name makes a new tag.
+    pub async fn tag_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
         name: &str,
     ) -> Result<Outcome, StructureError> {
         let name = validate_tag_name(name)?;
@@ -941,23 +1027,23 @@ impl Structure {
             updated_at: now.clone(),
         });
         let tags = BTreeSet::from([tag_id.clone()]);
-        self.document_change_with(
-            document,
+        self.element_change_with(
+            element_of(kind, id),
             StructureAction::DocumentTag,
             tags,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
                     if let Some(row) = &new_tag {
                         rows::insert_tag(connection, row).await?;
                     }
-                    let mut tags = rows::tags_of(connection, &document).await?;
+                    let mut tags = rows::tags_of(connection, &element).await?;
                     if !tags.iter().any(|t| t.tag_id == tag_id) {
-                        tags.push(DocumentTagRow {
-                            document_id: document.clone(),
+                        tags.push(ElementTagRow {
+                            element: element.clone(),
                             tag_id: tag_id.clone(),
                             created_at: now,
                         });
-                        rows::replace_document_tags(connection, &document, &tags).await?;
+                        rows::replace_tags(connection, &element, &tags).await?;
                     }
                     Ok(Some(tag_id))
                 })
@@ -966,22 +1052,33 @@ impl Structure {
         .await
     }
 
-    /// Takes a tag from a document; the tag itself stays.
+    /// Takes a tag from a document; see [`Self::untag_element`].
     pub async fn untag_document(
         &self,
         document: Uuid,
         tag: Uuid,
     ) -> Result<Outcome, StructureError> {
+        self.untag_element(ElementKind::Document, document, tag)
+            .await
+    }
+
+    /// Takes a tag from an element; the tag itself stays.
+    pub async fn untag_element(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
+        tag: Uuid,
+    ) -> Result<Outcome, StructureError> {
         let tag = id_text(tag);
-        self.document_change(
-            document,
+        self.element_change(
+            element_of(kind, id),
             StructureAction::DocumentUntag,
-            move |connection, document| {
+            move |connection, element| {
                 Box::pin(async move {
-                    let tags = rows::tags_of(connection, &document).await?;
-                    let rest: Vec<DocumentTagRow> =
+                    let tags = rows::tags_of(connection, &element).await?;
+                    let rest: Vec<ElementTagRow> =
                         tags.into_iter().filter(|t| t.tag_id != tag).collect();
-                    rows::replace_document_tags(connection, &document, &rest).await?;
+                    rows::replace_tags(connection, &element, &rest).await?;
                     Ok(Some(tag))
                 })
             },
@@ -991,11 +1088,23 @@ impl Structure {
 
     // --- Trash and archive -------------------------------------------------------------
 
-    /// Moves a document to the trash or takes it out (stage 3), as a step
-    /// of the journal.
+    /// Moves a document to the trash or takes it out; see
+    /// [`Self::set_element_deleted`].
     pub async fn set_deleted(
         &self,
         document: Uuid,
+        deleted: bool,
+    ) -> Result<Outcome, StructureError> {
+        self.set_element_deleted(ElementKind::Document, document, deleted)
+            .await
+    }
+
+    /// Moves an element to the trash or takes it out (stage 3), as a step
+    /// of the journal.
+    pub async fn set_element_deleted(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
         deleted: bool,
     ) -> Result<Outcome, StructureError> {
         let now = self.generators.now().to_iso();
@@ -1004,7 +1113,7 @@ impl Structure {
         } else {
             StructureAction::DocumentRestore
         };
-        self.state_change(document, action, move |state| {
+        self.state_change(element_of(kind, id), action, move |state| {
             if deleted {
                 if state.deleted_at.is_some() {
                     return Err(StructureError::InTrash);
@@ -1021,10 +1130,21 @@ impl Structure {
         .await
     }
 
-    /// Archives a document or takes it out of the archive.
+    /// Archives a document or takes it out; see [`Self::set_element_archived`].
     pub async fn set_archived(
         &self,
         document: Uuid,
+        archived: bool,
+    ) -> Result<Outcome, StructureError> {
+        self.set_element_archived(ElementKind::Document, document, archived)
+            .await
+    }
+
+    /// Archives an element or takes it out of the archive.
+    pub async fn set_element_archived(
+        &self,
+        kind: ElementKind,
+        id: Uuid,
         archived: bool,
     ) -> Result<Outcome, StructureError> {
         let now = self.generators.now().to_iso();
@@ -1033,7 +1153,7 @@ impl Structure {
         } else {
             StructureAction::DocumentUnarchive
         };
-        self.state_change(document, action, move |state| {
+        self.state_change(element_of(kind, id), action, move |state| {
             if archived {
                 if state.archived_at.is_none() {
                     state.archived_at = Some(now);
@@ -1051,8 +1171,8 @@ impl Structure {
     /// Gives a copy the subnets (same primary) and tags of the original
     /// (section 13). Not a step of its own: the copy is new.
     pub async fn copy_to(&self, from: Uuid, to: Uuid) -> Result<(), StructureError> {
-        let from = id_text(from);
-        let to = id_text(to);
+        let from = element_of(ElementKind::Document, from);
+        let to = element_of(ElementKind::Document, to);
         let now = self.generators.now().to_iso();
         let _guard = self.write_lock.lock().await;
         let mut transaction = self.database.writer().begin().await?;
@@ -1060,22 +1180,22 @@ impl Structure {
             .await?
             .into_iter()
             .map(|m| MembershipRow {
-                document_id: to.clone(),
+                element: to.clone(),
                 created_at: now.clone(),
                 ..m
             })
             .collect();
         rows::replace_memberships(&mut transaction, &to, &memberships).await?;
-        let tags: Vec<DocumentTagRow> = rows::tags_of(&mut transaction, &from)
+        let tags: Vec<ElementTagRow> = rows::tags_of(&mut transaction, &from)
             .await?
             .into_iter()
-            .map(|t| DocumentTagRow {
-                document_id: to.clone(),
+            .map(|t| ElementTagRow {
+                element: to.clone(),
                 created_at: now.clone(),
                 ..t
             })
             .collect();
-        rows::replace_document_tags(&mut transaction, &to, &tags).await?;
+        rows::replace_tags(&mut transaction, &to, &tags).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -1087,7 +1207,7 @@ impl Structure {
         document: Uuid,
         names: &[String],
     ) -> Result<(), StructureError> {
-        let document = id_text(document);
+        let document = element_of(ElementKind::Document, document);
         let now = self.generators.now().to_iso();
         let _guard = self.write_lock.lock().await;
         let mut transaction = self.database.writer().begin().await?;
@@ -1116,14 +1236,14 @@ impl Structure {
                 }
             };
             if !tags.iter().any(|t| t.tag_id == tag_id) {
-                tags.push(DocumentTagRow {
-                    document_id: document.clone(),
+                tags.push(ElementTagRow {
+                    element: document.clone(),
                     tag_id,
                     created_at: now.clone(),
                 });
             }
         }
-        rows::replace_document_tags(&mut transaction, &document, &tags).await?;
+        rows::replace_tags(&mut transaction, &document, &tags).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -1189,7 +1309,7 @@ impl Structure {
         }
         let outcome = Outcome {
             step: Some(change.step.clone()),
-            documents: change.keys.documents.iter().cloned().collect(),
+            elements: change.keys.elements.iter().cloned().collect(),
             subject_id: None,
         };
         let mut journal = self.journal();
@@ -1229,7 +1349,7 @@ impl Structure {
         let after = capture(&mut transaction, &keys).await?;
         transaction.commit().await?;
         let changed = before != after;
-        let documents = keys.documents.iter().cloned().collect();
+        let elements = keys.elements.iter().cloned().collect();
         if changed {
             self.journal().record(Change {
                 step: step.clone(),
@@ -1240,22 +1360,22 @@ impl Structure {
         }
         Ok(Outcome {
             step: changed.then_some(step),
-            documents,
+            elements,
             subject_id,
         })
     }
 
-    /// A step on one document that must exist and not be in the trash.
-    async fn document_change<F>(
+    /// A step on one element that must exist and not be in the trash.
+    async fn element_change<F>(
         &self,
-        document: Uuid,
+        element: Element,
         action: StructureAction,
         operation: F,
     ) -> Result<Outcome, StructureError>
     where
         F: for<'c> FnOnce(
             &'c mut SqliteConnection,
-            String,
+            Element,
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<Output = Result<Option<String>, StructureError>>
@@ -1264,13 +1384,13 @@ impl Structure {
             >,
         >,
     {
-        self.document_change_with(document, action, BTreeSet::new(), operation)
+        self.element_change_with(element, action, BTreeSet::new(), operation)
             .await
     }
 
-    async fn document_change_with<F>(
+    async fn element_change_with<F>(
         &self,
-        document: Uuid,
+        element: Element,
         action: StructureAction,
         tags: BTreeSet<String>,
         operation: F,
@@ -1278,7 +1398,7 @@ impl Structure {
     where
         F: for<'c> FnOnce(
             &'c mut SqliteConnection,
-            String,
+            Element,
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<Output = Result<Option<String>, StructureError>>
@@ -1287,40 +1407,36 @@ impl Structure {
             >,
         >,
     {
-        let document = id_text(document);
-        let title = self.live_document_title(&document).await?;
+        let title = self.live_title(&element).await?;
         let keys = Keys {
             tags,
-            documents: BTreeSet::from([document.clone()]),
+            elements: BTreeSet::from([element.clone()]),
             ..Keys::default()
         };
         let step = UndoStep {
             action,
             subject: title,
         };
-        self.change(step, keys, move |connection| {
-            operation(connection, document)
-        })
-        .await
+        self.change(step, keys, move |connection| operation(connection, element))
+            .await
     }
 
     async fn state_change<F>(
         &self,
-        document: Uuid,
+        element: Element,
         action: StructureAction,
         update: F,
     ) -> Result<Outcome, StructureError>
     where
-        F: FnOnce(&mut DocumentState) -> Result<(), StructureError> + Send + 'static,
+        F: FnOnce(&mut ElementState) -> Result<(), StructureError> + Send + 'static,
     {
-        let document = id_text(document);
         let mut connection = self.database.reader().acquire().await?;
-        let title = rows::document_title(&mut connection, &document)
+        let title = rows::element_title(&mut connection, &element)
             .await?
-            .ok_or(StructureError::DocumentNotFound)?;
+            .ok_or_else(|| not_found(element.kind))?;
         drop(connection);
         let keys = Keys {
-            documents: BTreeSet::from([document.clone()]),
+            elements: BTreeSet::from([element.clone()]),
             ..Keys::default()
         };
         let step = UndoStep {
@@ -1329,26 +1445,26 @@ impl Structure {
         };
         self.change(step, keys, move |connection| {
             Box::pin(async move {
-                let mut state = rows::document_state(connection, &document)
+                let mut state = rows::element_state(connection, &element)
                     .await?
-                    .ok_or(StructureError::DocumentNotFound)?;
+                    .ok_or_else(|| not_found(element.kind))?;
                 update(&mut state)?;
-                rows::set_document_state(connection, &document, &state).await?;
+                rows::set_element_state(connection, &element, &state).await?;
                 Ok(None)
             })
         })
         .await
     }
 
-    /// Title of a document that exists and is not in the trash.
-    async fn live_document_title(&self, document: &str) -> Result<String, StructureError> {
+    /// Title of an element that exists and is not in the trash.
+    async fn live_title(&self, element: &Element) -> Result<String, StructureError> {
         let mut connection = self.database.reader().acquire().await?;
-        let title = rows::document_title(&mut connection, document)
+        let title = rows::element_title(&mut connection, element)
             .await?
-            .ok_or(StructureError::DocumentNotFound)?;
-        let state = rows::document_state(&mut connection, document)
+            .ok_or_else(|| not_found(element.kind))?;
+        let state = rows::element_state(&mut connection, element)
             .await?
-            .ok_or(StructureError::DocumentNotFound)?;
+            .ok_or_else(|| not_found(element.kind))?;
         if state.deleted_at.is_some() {
             return Err(StructureError::InTrash);
         }
@@ -1434,16 +1550,16 @@ async fn capture(
             .tags
             .insert(id.clone(), rows::get_tag(connection, id).await?);
     }
-    for id in &keys.documents {
-        let document = match rows::document_state(connection, id).await? {
-            Some(state) => Some(DocumentSnapshot {
-                memberships: rows::memberships_of(connection, id).await?,
-                tags: rows::tags_of(connection, id).await?,
+    for element in &keys.elements {
+        let snapshot_of = match rows::element_state(connection, element).await? {
+            Some(state) => Some(ElementSnapshot {
+                memberships: rows::memberships_of(connection, element).await?,
+                tags: rows::tags_of(connection, element).await?,
                 state,
             }),
             None => None,
         };
-        snapshot.documents.insert(id.clone(), document);
+        snapshot.elements.insert(element.clone(), snapshot_of);
     }
     Ok(snapshot)
 }
@@ -1454,10 +1570,10 @@ async fn apply(
     keys: &Keys,
     target: &Snapshot,
 ) -> Result<(), StructureError> {
-    // Documents removed for good cannot come back.
-    for id in &keys.documents {
-        if target.documents.get(id).is_some_and(Option::is_some)
-            && rows::document_state(connection, id).await?.is_none()
+    // Elements removed for good cannot come back.
+    for element in &keys.elements {
+        if target.elements.get(element).is_some_and(Option::is_some)
+            && rows::element_state(connection, element).await?.is_none()
         {
             return Err(StructureError::Changed);
         }
@@ -1521,14 +1637,14 @@ async fn apply(
         rows::update_tag(connection, row).await?;
     }
 
-    // Documents: memberships, tags and state as they were.
-    for (id, document) in &target.documents {
-        let Some(document) = document else {
+    // Elements: memberships, tags and state as they were.
+    for (element, snapshot) in &target.elements {
+        let Some(snapshot) = snapshot else {
             continue;
         };
-        rows::replace_memberships(connection, id, &document.memberships).await?;
-        rows::replace_document_tags(connection, id, &document.tags).await?;
-        rows::set_document_state(connection, id, &document.state).await?;
+        rows::replace_memberships(connection, element, &snapshot.memberships).await?;
+        rows::replace_tags(connection, element, &snapshot.tags).await?;
+        rows::set_element_state(connection, element, &snapshot.state).await?;
     }
     Ok(())
 }
@@ -1578,7 +1694,7 @@ mod tests {
     fn the_oldest_membership_becomes_primary() {
         let row = |subnet: &str, primary: bool| MembershipRow {
             subnet_id: subnet.to_owned(),
-            document_id: "d".to_owned(),
+            element: Element::document("d"),
             is_primary: primary,
             created_at: String::new(),
         };

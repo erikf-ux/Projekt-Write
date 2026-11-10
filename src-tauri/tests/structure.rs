@@ -14,7 +14,7 @@ use project_write_lib::services::documents::DocumentFormat;
 use project_write_lib::services::library::Library;
 use project_write_lib::services::pwrite;
 use project_write_lib::services::structure::{
-    DocumentStructure, Structure, StructureAction, StructureError,
+    ElementStructure, Structure, StructureAction, StructureError,
 };
 use uuid::Uuid;
 
@@ -59,7 +59,7 @@ async fn subnet(structure: &Structure, name: &str, parent: Option<Uuid>) -> Uuid
 struct State {
     subnets: Vec<SubnetRow>,
     tags: Vec<TagRow>,
-    documents: Vec<DocumentStructure>,
+    documents: Vec<ElementStructure>,
     trash: Vec<String>,
     archive: Vec<String>,
 }
@@ -80,7 +80,7 @@ async fn state(f: &Fixture) -> State {
     State {
         subnets: structure.subnets().await.unwrap(),
         tags: structure.tags().await.unwrap(),
-        documents: structure.all_documents().await.unwrap(),
+        documents: structure.all_elements().await.unwrap().0,
         trash,
         archive,
     }
@@ -364,7 +364,7 @@ async fn tags_are_unique_without_case_and_can_be_merged() {
     // Deleting a tag keeps the documents.
     structure.delete_tag(fruit).await.unwrap();
     assert_eq!(documents.list().await.unwrap().len(), 2);
-    assert!(structure.all_documents().await.unwrap().is_empty());
+    assert!(structure.all_elements().await.unwrap().0.is_empty());
     f.library.close().await;
 }
 
@@ -550,7 +550,7 @@ async fn trash_copy_and_purge_treat_memberships_and_tags_right() {
     // Removed for good: the rows go with the document; undo is refused.
     structure.set_deleted(doc.id, true).await.unwrap();
     documents.purge(doc.id).await.unwrap();
-    let left = structure.all_documents().await.unwrap();
+    let left = structure.all_elements().await.unwrap().0;
     assert_eq!(left.len(), 1);
     assert_eq!(left[0].id, copy.id.to_string());
     assert!(matches!(

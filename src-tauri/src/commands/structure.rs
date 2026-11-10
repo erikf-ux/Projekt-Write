@@ -2,7 +2,10 @@
 //!
 //! Every changing command answers with a [`StructureUpdate`]: all subnets
 //! and tags (a few hundred rows; the Explorer redraws from them), the
-//! structure of the documents involved, and the next undo and redo step.
+//! structure of the elements involved, and the next undo and redo step.
+//! Memberships and tags work on documents and media alike: the request
+//! names the element by `id` and `kind` (`document` if left out; ADR 0019,
+//! decision 12).
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -13,7 +16,7 @@ use crate::commands::input::{EmptyRequest, Input, Validate};
 use crate::database::structure::{SubnetRow, TagRow};
 use crate::error::{CommandError, ErrorCode};
 use crate::services::structure::{
-    self, DocumentStructure, Outcome, Structure, StructureError, UndoHistory, UndoStep,
+    self, ElementKind, ElementStructure, Outcome, Structure, StructureError, UndoHistory, UndoStep,
 };
 use crate::state::AppState;
 
@@ -76,7 +79,9 @@ pub struct StructureState {
     pub subnets: Vec<SubnetSummary>,
     pub tags: Vec<TagSummary>,
     /// Documents with at least one subnet or tag (also in the trash).
-    pub documents: Vec<DocumentStructure>,
+    pub documents: Vec<ElementStructure>,
+    /// Media with at least one subnet or tag (also in the trash).
+    pub media: Vec<ElementStructure>,
     pub history: UndoHistory,
 }
 
@@ -88,7 +93,9 @@ pub struct StructureUpdate {
     pub subnets: Vec<SubnetSummary>,
     pub tags: Vec<TagSummary>,
     /// The documents involved, as they are now.
-    pub documents: Vec<DocumentStructure>,
+    pub documents: Vec<ElementStructure>,
+    /// The media involved, as they are now.
+    pub media: Vec<ElementStructure>,
     pub history: UndoHistory,
     /// What was done (or undone, redone); `None` if nothing changed.
     pub step: Option<UndoStep>,
@@ -122,6 +129,7 @@ pub(crate) fn structure_error(error: StructureError) -> CommandError {
         StructureError::DocumentNotFound | StructureError::InTrash => {
             CommandError::new(ErrorCode::DocumentNotFound)
         }
+        StructureError::MediaNotFound => CommandError::new(ErrorCode::MediaNotFound),
         StructureError::NotInTrash => CommandError::invalid_input("id", "not in the trash"),
         StructureError::Cycle => CommandError::new(ErrorCode::SubnetCycle),
         StructureError::SubnetNameTaken { existing } => {
@@ -174,8 +182,13 @@ async fn update_from(
     outcome: Outcome,
 ) -> Result<StructureUpdate, CommandError> {
     let mut documents = Vec::new();
-    for id in &outcome.documents {
-        documents.push(structure.document(id).await.map_err(structure_error)?);
+    let mut media = Vec::new();
+    for element in &outcome.elements {
+        let current = structure.element(element).await.map_err(structure_error)?;
+        match element.kind {
+            ElementKind::Document => documents.push(current),
+            ElementKind::Media => media.push(current),
+        }
     }
     Ok(StructureUpdate {
         subnets: structure
@@ -193,6 +206,7 @@ async fn update_from(
             .map(TagSummary::from)
             .collect(),
         documents,
+        media,
         history: structure.history(),
         step: outcome.step,
         subject_id: outcome.subject_id,
@@ -209,6 +223,7 @@ pub async fn structure_state(
     state
         .session
         .with_structure(|structure, _| async move {
+            let (documents, media) = structure.all_elements().await.map_err(structure_error)?;
             Ok(StructureState {
                 subnets: structure
                     .subnets()
@@ -224,38 +239,46 @@ pub async fn structure_state(
                     .into_iter()
                     .map(TagSummary::from)
                     .collect(),
-                documents: structure.all_documents().await.map_err(structure_error)?,
+                documents,
+                media,
                 history: structure.history(),
             })
         })
         .await
 }
 
-/// Request naming one document.
+/// Request naming one element.
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(export)]
 pub struct StructureDocumentRequest {
     pub id: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ElementKind>,
 }
 
 impl Validate for StructureDocumentRequest {
     fn validate(&self) -> Result<(), CommandError> {
-        parse_uuid("id", &self.id, "document").map(|_| ())
+        parse_uuid("id", &self.id, "element").map(|_| ())
     }
 }
 
-/// Subnets and tags of one document (after copying or importing it).
+/// Subnets and tags of one element (after copying or importing it).
 #[tauri::command]
 pub async fn structure_document(
     state: State<'_, AppState>,
     request: Input<StructureDocumentRequest>,
-) -> Result<DocumentStructure, CommandError> {
-    let id = request.into_inner().id;
+) -> Result<ElementStructure, CommandError> {
+    let request = request.into_inner();
+    let element = structure::Element {
+        kind: request.kind.unwrap_or_default(),
+        id: request.id,
+    };
     state
         .session
         .with_structure(|structure, _| async move {
-            structure.document(&id).await.map_err(structure_error)
+            structure.element(&element).await.map_err(structure_error)
         })
         .await
 }
@@ -456,12 +479,15 @@ pub async fn subnet_delete(
 #[ts(export)]
 pub struct MembershipRequest {
     pub id: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ElementKind>,
     pub subnet_id: String,
 }
 
 impl Validate for MembershipRequest {
     fn validate(&self) -> Result<(), CommandError> {
-        parse_uuid("id", &self.id, "document")?;
+        parse_uuid("id", &self.id, "element")?;
         parse_uuid("subnetId", &self.subnet_id, "subnet")?;
         Ok(())
     }
@@ -473,12 +499,15 @@ impl Validate for MembershipRequest {
 #[ts(export)]
 pub struct MoveDocumentRequest {
     pub id: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ElementKind>,
     pub subnet_id: Option<String>,
 }
 
 impl Validate for MoveDocumentRequest {
     fn validate(&self) -> Result<(), CommandError> {
-        parse_uuid("id", &self.id, "document")?;
+        parse_uuid("id", &self.id, "element")?;
         parse_optional("subnetId", self.subnet_id.as_ref(), "subnet")?;
         Ok(())
     }
@@ -496,15 +525,16 @@ async fn change_membership(
     request: MembershipRequest,
     change: MembershipChange,
 ) -> Result<StructureUpdate, CommandError> {
-    let document = parse_uuid("id", &request.id, "document")?;
+    let id = parse_uuid("id", &request.id, "element")?;
+    let kind = request.kind.unwrap_or_default();
     let subnet = parse_uuid("subnetId", &request.subnet_id, "subnet")?;
     state
         .session
         .with_structure(|structure, _| async move {
             let outcome = match change {
-                MembershipChange::Assign => structure.assign(document, subnet).await,
-                MembershipChange::Unassign => structure.unassign(document, subnet).await,
-                MembershipChange::Primary => structure.set_primary(document, subnet).await,
+                MembershipChange::Assign => structure.assign_element(kind, id, subnet).await,
+                MembershipChange::Unassign => structure.unassign_element(kind, id, subnet).await,
+                MembershipChange::Primary => structure.set_primary_element(kind, id, subnet).await,
             }
             .map_err(structure_error)?;
             update_from(&structure, outcome).await
@@ -546,13 +576,14 @@ pub async fn document_move(
     request: Input<MoveDocumentRequest>,
 ) -> Result<StructureUpdate, CommandError> {
     let request = request.into_inner();
-    let document = parse_uuid("id", &request.id, "document")?;
+    let id = parse_uuid("id", &request.id, "element")?;
+    let kind = request.kind.unwrap_or_default();
     let subnet = parse_optional("subnetId", request.subnet_id.as_ref(), "subnet")?;
     state
         .session
         .with_structure(|structure, _| async move {
             let outcome = structure
-                .move_document(document, subnet)
+                .move_element(kind, id, subnet)
                 .await
                 .map_err(structure_error)?;
             update_from(&structure, outcome).await
@@ -632,12 +663,15 @@ impl Validate for MergeTagsRequest {
 #[ts(export)]
 pub struct DocumentTagRequest {
     pub id: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ElementKind>,
     pub name: String,
 }
 
 impl Validate for DocumentTagRequest {
     fn validate(&self) -> Result<(), CommandError> {
-        parse_uuid("id", &self.id, "document")?;
+        parse_uuid("id", &self.id, "element")?;
         check(structure::validate_tag_name(&self.name))
     }
 }
@@ -648,12 +682,15 @@ impl Validate for DocumentTagRequest {
 #[ts(export)]
 pub struct DocumentUntagRequest {
     pub id: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ElementKind>,
     pub tag_id: String,
 }
 
 impl Validate for DocumentUntagRequest {
     fn validate(&self) -> Result<(), CommandError> {
-        parse_uuid("id", &self.id, "document")?;
+        parse_uuid("id", &self.id, "element")?;
         parse_uuid("tagId", &self.tag_id, "tag")?;
         Ok(())
     }
@@ -737,12 +774,13 @@ pub async fn document_tag(
     request: Input<DocumentTagRequest>,
 ) -> Result<StructureUpdate, CommandError> {
     let request = request.into_inner();
-    let document = parse_uuid("id", &request.id, "document")?;
+    let id = parse_uuid("id", &request.id, "element")?;
+    let kind = request.kind.unwrap_or_default();
     state
         .session
         .with_structure(|structure, _| async move {
             let outcome = structure
-                .tag_document(document, &request.name)
+                .tag_element(kind, id, &request.name)
                 .await
                 .map_err(structure_error)?;
             update_from(&structure, outcome).await
@@ -756,13 +794,14 @@ pub async fn document_untag(
     request: Input<DocumentUntagRequest>,
 ) -> Result<StructureUpdate, CommandError> {
     let request = request.into_inner();
-    let document = parse_uuid("id", &request.id, "document")?;
+    let id = parse_uuid("id", &request.id, "element")?;
+    let kind = request.kind.unwrap_or_default();
     let tag = parse_uuid("tagId", &request.tag_id, "tag")?;
     state
         .session
         .with_structure(|structure, _| async move {
             let outcome = structure
-                .untag_document(document, tag)
+                .untag_element(kind, id, tag)
                 .await
                 .map_err(structure_error)?;
             update_from(&structure, outcome).await

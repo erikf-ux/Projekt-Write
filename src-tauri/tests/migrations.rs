@@ -87,6 +87,25 @@ const FIXTURES: &[(i64, &str, &str)] = &[
          JOIN tags AS t ON t.id = d.tag_id \
          WHERE s.name = 'Projekte' AND m.is_primary = 1 AND t.name = 'Äpfel'",
     ),
+    (
+        8,
+        "INSERT INTO media (id, kind, mime_type, extension, title, original_name, import_folder, size_bytes, sha256, \
+                            width, height, created_at, updated_at) \
+         VALUES ('6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f', 'image', 'image/png', 'png', 'Skizze', 'skizze.png', \
+                 'Bilder', 67, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, 1, \
+                 '2026-11-10T10:00:00.000Z', '2026-11-10T10:00:00.000Z'); \
+         INSERT INTO subnet_memberships (subnet_id, media_id, is_primary, created_at) \
+         VALUES ('7a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d', '6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f', 1, '2026-11-10T10:00:00.000Z'); \
+         INSERT INTO media_tags (media_id, tag_id, created_at) \
+         VALUES ('6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f', '8b2c3d4e-5f6a-4b7c-9d8e-1f2a3b4c5d6e', '2026-11-10T10:00:00.000Z'); \
+         INSERT INTO document_media (document_id, media_id, page) \
+         VALUES ('5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', '6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f', 0)",
+        "SELECT count(*) FROM media AS x \
+         JOIN subnet_memberships AS m ON m.media_id = x.id AND m.document_id IS NULL \
+         JOIN media_tags AS g ON g.media_id = x.id \
+         JOIN document_media AS d ON d.media_id = x.id \
+         WHERE x.title = 'Skizze' AND m.is_primary = 1 AND d.page = 0",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -126,6 +145,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         7,
         "subnets and tags",
         "b8eb8bd196ae4b39c4c9c5d7cb3c294587e1e3acc8dfdd3215bb5779c0edb394afd6c2c24fb51c0e83b7cebd7f986536",
+    ),
+    (
+        8,
+        "media",
+        "874c21ba69336c1a9fe3cdc69e497a66fc25cfcf4be418082a9e5c362ad3b046ea1c214a085908b44d40173d2d8708a2",
     ),
 ];
 

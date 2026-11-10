@@ -131,11 +131,23 @@ pub enum ErrorCode {
     TagNameTaken,
     /// The structure changed since a step of the undo journal.
     StructureChanged,
+    /// No medium with this id.
+    MediaNotFound,
+    /// A file not on the positive list of section 20 (`details.reason`: `type`, `extension`, `macro`, `content`).
+    MediaTypeRefused,
+    /// A medium above a limit (`details.limit`: `bytes` or `megapixels`, `details.max`).
+    MediaTooLarge,
+    /// A medium still used by documents is not removed for good (`details.documents`).
+    MediaInUse,
+    /// No prepared import with this id (cancelled, finished or the library changed).
+    ImportNotFound,
+    /// The system could not open a medium with its standard program.
+    MediaOpenFailed,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 55] = [
+    pub const ALL: [ErrorCode; 61] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -191,6 +203,12 @@ impl ErrorCode {
         ErrorCode::TagNotFound,
         ErrorCode::TagNameTaken,
         ErrorCode::StructureChanged,
+        ErrorCode::MediaNotFound,
+        ErrorCode::MediaTypeRefused,
+        ErrorCode::MediaTooLarge,
+        ErrorCode::MediaInUse,
+        ErrorCode::ImportNotFound,
+        ErrorCode::MediaOpenFailed,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -251,6 +269,12 @@ impl ErrorCode {
             ErrorCode::TagNotFound => "error.tagNotFound",
             ErrorCode::TagNameTaken => "error.tagNameTaken",
             ErrorCode::StructureChanged => "error.structureChanged",
+            ErrorCode::MediaNotFound => "error.mediaNotFound",
+            ErrorCode::MediaTypeRefused => "error.mediaTypeRefused",
+            ErrorCode::MediaTooLarge => "error.mediaTooLarge",
+            ErrorCode::MediaInUse => "error.mediaInUse",
+            ErrorCode::ImportNotFound => "error.importNotFound",
+            ErrorCode::MediaOpenFailed => "error.mediaOpenFailed",
         }
     }
 }

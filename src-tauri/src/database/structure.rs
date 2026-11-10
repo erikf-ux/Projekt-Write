@@ -1,10 +1,50 @@
-//! SQL for subnets, memberships and tags (migration 0007; ADR 0017). Only
-//! the structure service (`services::structure`) calls these functions.
-//! Writes take a connection, so the service runs them in one transaction
-//! with the snapshots of its undo journal.
+//! SQL for subnets, memberships and tags (migrations 0007 and 0008;
+//! ADR 0017 and 0019). Only the structure service (`services::structure`)
+//! calls these functions. Writes take a connection, so the service runs
+//! them in one transaction with the snapshots of its undo journal.
+//!
+//! Memberships, tags and the trash and archive state belong to elements:
+//! documents and media (section 18). Each kind has its own static SQL.
 
+use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqliteConnection, SqlitePool};
+use ts_rs::TS;
+
+/// The two kinds of element (glossary, section 4).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ElementKind {
+    #[default]
+    Document,
+    Media,
+}
+
+/// A document or a medium, by id.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Element {
+    pub kind: ElementKind,
+    pub id: String,
+}
+
+impl Element {
+    pub fn document(id: impl Into<String>) -> Self {
+        Self {
+            kind: ElementKind::Document,
+            id: id.into(),
+        }
+    }
+
+    pub fn media(id: impl Into<String>) -> Self {
+        Self {
+            kind: ElementKind::Media,
+            id: id.into(),
+        }
+    }
+}
 
 /// One row of `subnets`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +63,7 @@ pub struct SubnetRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MembershipRow {
     pub subnet_id: String,
-    pub document_id: String,
+    pub element: Element,
     pub is_primary: bool,
     pub created_at: String,
 }
@@ -38,18 +78,18 @@ pub struct TagRow {
     pub updated_at: String,
 }
 
-/// One row of `document_tags`.
+/// One row of `document_tags` or `media_tags`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentTagRow {
-    pub document_id: String,
+pub struct ElementTagRow {
+    pub element: Element,
     pub tag_id: String,
     pub created_at: String,
 }
 
-/// Trash and archive state of a document (the part of `documents` the
-/// structural undo restores).
+/// Trash and archive state of an element (the part of `documents` and
+/// `media` the structural undo restores).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentState {
+pub struct ElementState {
     pub deleted_at: Option<String>,
     pub archived_at: Option<String>,
 }
@@ -58,15 +98,6 @@ macro_rules! select_subnets {
     ($tail:literal) => {
         concat!(
             "SELECT id, name, name_key, description, color, parent_id, created_at, updated_at FROM subnets ",
-            $tail
-        )
-    };
-}
-
-macro_rules! select_memberships {
-    ($tail:literal) => {
-        concat!(
-            "SELECT subnet_id, document_id, is_primary, created_at FROM subnet_memberships ",
             $tail
         )
     };
@@ -94,10 +125,25 @@ fn subnet_from(row: &SqliteRow) -> Result<SubnetRow, sqlx::Error> {
     })
 }
 
+/// The element of a row with a `document_id` and a `media_id` column, one
+/// of them set (the CHECK of migration 0008).
+fn element_from(row: &SqliteRow) -> Result<Element, sqlx::Error> {
+    if let Some(id) = row.try_get::<Option<String>, _>("document_id")? {
+        return Ok(Element::document(id));
+    }
+    match row.try_get::<Option<String>, _>("media_id")? {
+        Some(id) => Ok(Element::media(id)),
+        None => Err(sqlx::Error::ColumnDecode {
+            index: "media_id".to_owned(),
+            source: "a row without an element".into(),
+        }),
+    }
+}
+
 fn membership_from(row: &SqliteRow) -> Result<MembershipRow, sqlx::Error> {
     Ok(MembershipRow {
         subnet_id: row.try_get("subnet_id")?,
-        document_id: row.try_get("document_id")?,
+        element: element_from(row)?,
         is_primary: row.try_get::<i64, _>("is_primary")? == 1,
         created_at: row.try_get("created_at")?,
     })
@@ -113,9 +159,9 @@ fn tag_from(row: &SqliteRow) -> Result<TagRow, sqlx::Error> {
     })
 }
 
-fn document_tag_from(row: &SqliteRow) -> Result<DocumentTagRow, sqlx::Error> {
-    Ok(DocumentTagRow {
-        document_id: row.try_get("document_id")?,
+fn element_tag_from(row: &SqliteRow) -> Result<ElementTagRow, sqlx::Error> {
+    Ok(ElementTagRow {
+        element: element_from(row)?,
         tag_id: row.try_get("tag_id")?,
         created_at: row.try_get("created_at")?,
     })
@@ -265,9 +311,10 @@ pub async fn delete_subnet(
 // --- Memberships -------------------------------------------------------------
 
 pub async fn all_memberships(pool: &SqlitePool) -> Result<Vec<MembershipRow>, sqlx::Error> {
-    sqlx::query(select_memberships!(
-        "ORDER BY document_id, created_at, subnet_id"
-    ))
+    sqlx::query(
+        "SELECT subnet_id, document_id, media_id, is_primary, created_at FROM subnet_memberships \
+         ORDER BY document_id, media_id, created_at, subnet_id",
+    )
     .fetch_all(pool)
     .await?
     .iter()
@@ -275,56 +322,77 @@ pub async fn all_memberships(pool: &SqlitePool) -> Result<Vec<MembershipRow>, sq
     .collect()
 }
 
-/// Memberships of a document, oldest first.
+/// Memberships of an element, oldest first.
 pub async fn memberships_of(
     connection: &mut SqliteConnection,
-    document_id: &str,
+    element: &Element,
 ) -> Result<Vec<MembershipRow>, sqlx::Error> {
-    sqlx::query(select_memberships!(
-        "WHERE document_id = ?1 ORDER BY created_at, subnet_id"
-    ))
-    .bind(document_id)
-    .fetch_all(&mut *connection)
-    .await?
-    .iter()
-    .map(membership_from)
-    .collect()
+    let sql = match element.kind {
+        ElementKind::Document => {
+            "SELECT subnet_id, document_id, media_id, is_primary, created_at FROM subnet_memberships \
+             WHERE document_id = ?1 ORDER BY created_at, subnet_id"
+        }
+        ElementKind::Media => {
+            "SELECT subnet_id, document_id, media_id, is_primary, created_at FROM subnet_memberships \
+             WHERE media_id = ?1 ORDER BY created_at, subnet_id"
+        }
+    };
+    sqlx::query(sql)
+        .bind(&element.id)
+        .fetch_all(&mut *connection)
+        .await?
+        .iter()
+        .map(membership_from)
+        .collect()
 }
 
-/// Documents with a membership in this subnet.
+/// Elements with a membership in this subnet.
 pub async fn members_of(
     connection: &mut SqliteConnection,
     subnet_id: &str,
-) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT document_id FROM subnet_memberships WHERE subnet_id = ?1 ORDER BY document_id",
+) -> Result<Vec<Element>, sqlx::Error> {
+    sqlx::query(
+        "SELECT document_id, media_id FROM subnet_memberships WHERE subnet_id = ?1 \
+         ORDER BY document_id, media_id",
     )
     .bind(subnet_id)
     .fetch_all(&mut *connection)
-    .await
+    .await?
+    .iter()
+    .map(element_from)
+    .collect()
 }
 
-/// Replaces the memberships of a document.
+/// Replaces the memberships of an element.
 pub async fn replace_memberships(
     connection: &mut SqliteConnection,
-    document_id: &str,
+    element: &Element,
     rows: &[MembershipRow],
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM subnet_memberships WHERE document_id = ?1")
-        .bind(document_id)
+    let (delete, insert) = match element.kind {
+        ElementKind::Document => (
+            "DELETE FROM subnet_memberships WHERE document_id = ?1",
+            "INSERT INTO subnet_memberships (subnet_id, document_id, is_primary, created_at) \
+             VALUES (?1, ?2, ?3, ?4)",
+        ),
+        ElementKind::Media => (
+            "DELETE FROM subnet_memberships WHERE media_id = ?1",
+            "INSERT INTO subnet_memberships (subnet_id, media_id, is_primary, created_at) \
+             VALUES (?1, ?2, ?3, ?4)",
+        ),
+    };
+    sqlx::query(delete)
+        .bind(&element.id)
         .execute(&mut *connection)
         .await?;
     for row in rows {
-        sqlx::query(
-            "INSERT INTO subnet_memberships (subnet_id, document_id, is_primary, created_at) \
-             VALUES (?1, ?2, ?3, ?4)",
-        )
-        .bind(&row.subnet_id)
-        .bind(document_id)
-        .bind(i64::from(row.is_primary))
-        .bind(&row.created_at)
-        .execute(&mut *connection)
-        .await?;
+        sqlx::query(insert)
+            .bind(&row.subnet_id)
+            .bind(&element.id)
+            .bind(i64::from(row.is_primary))
+            .bind(&row.created_at)
+            .execute(&mut *connection)
+            .await?;
     }
     Ok(())
 }
@@ -417,32 +485,43 @@ pub async fn delete_tag(connection: &mut SqliteConnection, id: &str) -> Result<u
         .rows_affected())
 }
 
-pub async fn all_document_tags(pool: &SqlitePool) -> Result<Vec<DocumentTagRow>, sqlx::Error> {
+/// Tags of every element, documents first.
+pub async fn all_element_tags(pool: &SqlitePool) -> Result<Vec<ElementTagRow>, sqlx::Error> {
     sqlx::query(
-        "SELECT document_id, tag_id, created_at FROM document_tags ORDER BY document_id, created_at, tag_id",
+        "SELECT document_id, NULL AS media_id, tag_id, created_at FROM document_tags \
+         UNION ALL \
+         SELECT NULL AS document_id, media_id, tag_id, created_at FROM media_tags \
+         ORDER BY document_id, media_id, created_at, tag_id",
     )
     .fetch_all(pool)
     .await?
     .iter()
-    .map(document_tag_from)
+    .map(element_tag_from)
     .collect()
 }
 
-/// Tags of a document, in the order they were given.
+/// Tags of an element, in the order they were given.
 pub async fn tags_of(
     connection: &mut SqliteConnection,
-    document_id: &str,
-) -> Result<Vec<DocumentTagRow>, sqlx::Error> {
-    sqlx::query(
-        "SELECT document_id, tag_id, created_at FROM document_tags \
-         WHERE document_id = ?1 ORDER BY created_at, tag_id",
-    )
-    .bind(document_id)
-    .fetch_all(&mut *connection)
-    .await?
-    .iter()
-    .map(document_tag_from)
-    .collect()
+    element: &Element,
+) -> Result<Vec<ElementTagRow>, sqlx::Error> {
+    let sql = match element.kind {
+        ElementKind::Document => {
+            "SELECT document_id, NULL AS media_id, tag_id, created_at FROM document_tags \
+             WHERE document_id = ?1 ORDER BY created_at, tag_id"
+        }
+        ElementKind::Media => {
+            "SELECT NULL AS document_id, media_id, tag_id, created_at FROM media_tags \
+             WHERE media_id = ?1 ORDER BY created_at, tag_id"
+        }
+    };
+    sqlx::query(sql)
+        .bind(&element.id)
+        .fetch_all(&mut *connection)
+        .await?
+        .iter()
+        .map(element_tag_from)
+        .collect()
 }
 
 /// Names of the tags of a document, by name (for the `.pwrite` envelope).
@@ -459,63 +538,87 @@ pub async fn tag_names_of(
     .await
 }
 
-/// Documents that carry this tag.
+/// Elements that carry this tag.
 pub async fn tagged_with(
     connection: &mut SqliteConnection,
     tag_id: &str,
-) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT document_id FROM document_tags WHERE tag_id = ?1 ORDER BY document_id",
+) -> Result<Vec<Element>, sqlx::Error> {
+    sqlx::query(
+        "SELECT document_id, NULL AS media_id FROM document_tags WHERE tag_id = ?1 \
+         UNION ALL \
+         SELECT NULL AS document_id, media_id FROM media_tags WHERE tag_id = ?1 \
+         ORDER BY document_id, media_id",
     )
     .bind(tag_id)
     .fetch_all(&mut *connection)
-    .await
+    .await?
+    .iter()
+    .map(element_from)
+    .collect()
 }
 
-pub async fn replace_document_tags(
+pub async fn replace_tags(
     connection: &mut SqliteConnection,
-    document_id: &str,
-    rows: &[DocumentTagRow],
+    element: &Element,
+    rows: &[ElementTagRow],
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM document_tags WHERE document_id = ?1")
-        .bind(document_id)
+    let (delete, insert) = match element.kind {
+        ElementKind::Document => (
+            "DELETE FROM document_tags WHERE document_id = ?1",
+            "INSERT INTO document_tags (document_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+        ),
+        ElementKind::Media => (
+            "DELETE FROM media_tags WHERE media_id = ?1",
+            "INSERT INTO media_tags (media_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+        ),
+    };
+    sqlx::query(delete)
+        .bind(&element.id)
         .execute(&mut *connection)
         .await?;
     for row in rows {
-        sqlx::query(
-            "INSERT INTO document_tags (document_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
-        )
-        .bind(document_id)
-        .bind(&row.tag_id)
-        .bind(&row.created_at)
-        .execute(&mut *connection)
-        .await?;
+        sqlx::query(insert)
+            .bind(&element.id)
+            .bind(&row.tag_id)
+            .bind(&row.created_at)
+            .execute(&mut *connection)
+            .await?;
     }
     Ok(())
 }
 
-// --- Documents -------------------------------------------------------------------
+// --- Elements ----------------------------------------------------------------------
 
-pub async fn document_title(
+/// Title of a document or a medium.
+pub async fn element_title(
     connection: &mut SqliteConnection,
-    id: &str,
+    element: &Element,
 ) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query_scalar("SELECT title FROM documents WHERE id = ?1")
-        .bind(id)
+    let sql = match element.kind {
+        ElementKind::Document => "SELECT title FROM documents WHERE id = ?1",
+        ElementKind::Media => "SELECT title FROM media WHERE id = ?1",
+    };
+    sqlx::query_scalar(sql)
+        .bind(&element.id)
         .fetch_optional(&mut *connection)
         .await
 }
 
-pub async fn document_state(
+/// Trash and archive state; `None` if the element does not exist.
+pub async fn element_state(
     connection: &mut SqliteConnection,
-    id: &str,
-) -> Result<Option<DocumentState>, sqlx::Error> {
-    let row = sqlx::query("SELECT deleted_at, archived_at FROM documents WHERE id = ?1")
-        .bind(id)
+    element: &Element,
+) -> Result<Option<ElementState>, sqlx::Error> {
+    let sql = match element.kind {
+        ElementKind::Document => "SELECT deleted_at, archived_at FROM documents WHERE id = ?1",
+        ElementKind::Media => "SELECT deleted_at, archived_at FROM media WHERE id = ?1",
+    };
+    let row = sqlx::query(sql)
+        .bind(&element.id)
         .fetch_optional(&mut *connection)
         .await?;
     row.map(|row| {
-        Ok(DocumentState {
+        Ok(ElementState {
             deleted_at: row.try_get("deleted_at")?,
             archived_at: row.try_get("archived_at")?,
         })
@@ -523,18 +626,22 @@ pub async fn document_state(
     .transpose()
 }
 
-pub async fn set_document_state(
+pub async fn set_element_state(
     connection: &mut SqliteConnection,
-    id: &str,
-    state: &DocumentState,
+    element: &Element,
+    state: &ElementState,
 ) -> Result<u64, sqlx::Error> {
-    Ok(
-        sqlx::query("UPDATE documents SET deleted_at = ?2, archived_at = ?3 WHERE id = ?1")
-            .bind(id)
-            .bind(&state.deleted_at)
-            .bind(&state.archived_at)
-            .execute(&mut *connection)
-            .await?
-            .rows_affected(),
-    )
+    let sql = match element.kind {
+        ElementKind::Document => {
+            "UPDATE documents SET deleted_at = ?2, archived_at = ?3 WHERE id = ?1"
+        }
+        ElementKind::Media => "UPDATE media SET deleted_at = ?2, archived_at = ?3 WHERE id = ?1",
+    };
+    Ok(sqlx::query(sql)
+        .bind(&element.id)
+        .bind(&state.deleted_at)
+        .bind(&state.archived_at)
+        .execute(&mut *connection)
+        .await?
+        .rows_affected())
 }

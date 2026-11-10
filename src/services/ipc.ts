@@ -232,6 +232,12 @@ const errorCodes: Record<ErrorCode, true> = {
   TAG_NOT_FOUND: true,
   TAG_NAME_TAKEN: true,
   STRUCTURE_CHANGED: true,
+  MEDIA_NOT_FOUND: true,
+  MEDIA_TYPE_REFUSED: true,
+  MEDIA_TOO_LARGE: true,
+  MEDIA_IN_USE: true,
+  IMPORT_NOT_FOUND: true,
+  MEDIA_OPEN_FAILED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };
