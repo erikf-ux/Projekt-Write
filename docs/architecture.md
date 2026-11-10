@@ -278,7 +278,8 @@ Tests schreiben nur in temporäre Ordner innerhalb des Projekts (`src-tauri/targ
 │   ├── icons/
 │   ├── migrations/            0001_application_settings.sql, 0002_documents.sql
 │   ├── src/                   commands/, database/, filesystem/, security/, services/, clock.rs, error.rs, logging.rs, state.rs, lib.rs, main.rs
-│   └── tests/                 Integrationstests (siehe Abschnitt 8)
+│   ├── tests/                 Integrationstests (siehe Abschnitt 8)
+│   └── vendor/                sqlx-sqlite mit angehobener SQLite-Grenze, vorübergehend (ADR 0018)
 └── tests/e2e/                 wdio.conf.ts, sandbox.ts, session.ts, specs/, manual/
 ```
 

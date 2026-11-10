@@ -2,7 +2,9 @@
 
 Stand: 10. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig). Entwicklungsumgebung: Cloud-Container, Ubuntu 24.04, 4 vCPU, 15 GB RAM, keine GPU (Xvfb, Software-Rendering), WebKitGTK, Rust 1.99.1, Node.js 22. CI: GitHub Actions `windows-latest` und `ubuntu-24.04`; macOS ist auf Wunsch des Auftraggebers zurückgestellt. Entwickelt und geprüft wurde lokal unter Linux; den CI-Lauf nennt der Abschnitt „CI“.
 
-**Zur Messung „flüssig“** (Abschnitt „Explorer-Messung“): Auf der Container-Maschine vor der Pause verfehlte das Scrollen das Ziel. Auf der jetzigen Maschine erreichen nach den Optimierungen alle Werte ihr Ziel, in drei Läufen. Das Ergebnis hängt also deutlich an der Maschine; die Bestätigung auf dem Referenzgerät steht aus.
+**Zur Messung „flüssig“** (Abschnitt „Explorer-Messung“): Auf der Container-Maschine vor der Pause verfehlte das Scrollen das Ziel. Auf der jetzigen Maschine und auf dem Linux-Rechner der CI erreichen nach den Optimierungen alle Werte ihr Ziel. Das Ergebnis hängt also deutlich an der Maschine; die Bestätigung auf dem Referenzgerät steht aus.
+
+**Zum Abschluss kam eine Sicherheitsmeldung zu SQLite** (F-32), keine Folge dieser Phase. Behoben mit einer gepatchten Kopie von `sqlx-sqlite`, die SQLite 3.54.1 einbindet (ADR 0018). Das ist eine Entscheidung, die du kennen solltest; siehe „Gefundene Widersprüche und Abweichungen“, Punkt 7.
 
 ## Was wurde implementiert?
 
@@ -28,7 +30,9 @@ Rust, neu: `services/structure.rs` (Dienst und Undo-Journal), `database/structur
 
 Frontend, neu: `modules/structure/` (`structureStore.ts`, `tree.ts`, `dialogStore.ts`, `SubnetDialog.tsx`, `SubnetPicker.tsx`, `TagsDialog.tsx`, `TagManager.tsx`, `Breadcrumbs.tsx`, `sampleSubnets.ts`, Test `structure.test.tsx`), `modules/documents/{explorerRows.ts,explorerStore.ts,explorerRows.test.ts}`. Geändert: `modules/documents/{Explorer.tsx,workspaceStore.ts,importFiles.ts,Explorer.test.tsx}`, `app/{Workbench.tsx,commands.ts}`, `modules/commands/types.ts`, `components/NoticeBar.tsx` (Schaltfläche im Hinweis), `modules/settings/uiStore.ts`, `modules/library/LibraryPanel.tsx`, `services/ipc.ts`, `i18n/{de,en}.json`, erzeugte Typen.
 
-E2E: neu `specs/{structure,reference-prepare,reference}.e2e.ts`; geändert `specs/{workbench,documents}.e2e.ts`, `session.ts`, `sandbox.ts`, `wdio.conf.ts`, `.gitignore` (`tests/e2e/.cache/`). Doku: ADR 0017, `docs/{architecture,database,status}.md`, dieser Bericht, `CHANGELOG.md`, `README.md`. **Keine neue Abhängigkeit.**
+E2E: neu `specs/{structure,reference-prepare,reference}.e2e.ts`; geändert `specs/{workbench,documents}.e2e.ts`, `session.ts`, `sandbox.ts`, `wdio.conf.ts`, `.gitignore` (`tests/e2e/.cache/`). Doku: ADR 0017 und 0018, `docs/{architecture,database,dependencies,status}.md`, dieser Bericht, `CHANGELOG.md`, `README.md`.
+
+Abhängigkeiten: **keine neue.** `libsqlite3-sys` steigt von 0.37.0 auf 0.39.1 (SQLite 3.51.3 → 3.54.1). Dafür liegt `sqlx-sqlite` 0.9.0 mit einer geänderten Zeile in `src-tauri/vendor/sqlx-sqlite/` und wird über `[patch.crates-io]` eingebunden (ADR 0018). Geändert: `src-tauri/{Cargo.toml,Cargo.lock}`, `THIRD-PARTY-LICENSES`.
 
 ## Welche Tests wurden durchgeführt?
 
@@ -41,10 +45,13 @@ Lokal (Linux-Container, Xvfb, D-Bus-Sitzung), alle ausgeführt und bestanden:
 | Prettier, ESLint (`--max-warnings 0`), TypeScript (App und Node-Teil), Vitest (695)                                                     | bestanden                                                                                                                                             |
 | rustfmt, Clippy `-D warnings` (Linux, Linux + `e2e`, Windows-Ziel `x86_64-pc-windows-gnu`)                                              | bestanden                                                                                                                                             |
 | Rust-Tests (348), darunter die 100 harten Abbrüche und die Migrationen ab jeder früheren Version (0 bis 6 → 7)                          | bestanden                                                                                                                                             |
-| Erzeugte TypeScript-Typen neu geschrieben und unverändert; Lizenzliste unverändert                                                      | bestanden                                                                                                                                             |
+| Erzeugte TypeScript-Typen neu geschrieben und unverändert; Lizenzliste nur mit `libsqlite3-sys` 0.39.1 statt 0.37.0                     | bestanden                                                                                                                                             |
+| `cargo audit` (0.22.2) und `cargo deny` (0.20.2), lokal aus dem Quelltext gebaut                                                        | bestanden: keine Schwachstelle, 5 erlaubte Warnungen (transitiv über Tauri); advisories, bans, licenses, sources ok                                   |
 | Referenzbibliothek zweimal gebaut, gleicher Fingerabdruck (10.000 Dokumente, 500 Subnetze, 1.000 Tags)                                  | bestanden (je Lauf 86–138 s, vorher 31 s: jede der rund 37.000 Strukturaktionen ist eine eigene Transaktion mit `fsync`, derselbe Weg wie in der App) |
 | E2E (56) in 15 Dateien, darunter Struktur (4) und Explorer-Messung (3)                                                                  | bestanden; mehrere vollständige Läufe                                                                                                                 |
 | Release-Build ohne Test-Plugins; `npm audit --omit=dev` (ausgelieferte Pakete); `npm audit` (mit Entwicklungswerkzeugen, nur berichtet) | bestanden; 0 Funde; 34 Funde (20 mittel, 14 hoch), unverändert, bewertet in `docs/dependencies.md`                                                    |
+
+Nach dem Sicherheitsupdate von SQLite (F-32) liefen alle Prüfungen der Tabelle erneut, mit SQLite 3.54.1. Die Referenzbibliothek hat denselben Fingerabdruck wie vorher (`cf56e8ae…`).
 
 Was die Tests zeigen, im Einzelnen:
 
@@ -95,7 +102,7 @@ Mein Vorschlag: einmal auf dem Referenzgerät messen (Release-Build, Hardware-Re
 
 ## Was konnte nicht getestet werden und warum?
 
-- **Windows:** läuft in CI (Rust, Vitest, E2E mit 2.000 Dokumenten für die Explorer-Messung, weil Windows jede Datei synchron schreibt). Lokal nur Clippy für das Windows-Ziel.
+- **Windows:** läuft in CI (Rust, Vitest, E2E). Seit F-33 misst Windows mit der vollen Referenzbibliothek. Lokal nur Clippy für das Windows-Ziel.
 - **Echtes Drag & Drop mit der Maus:** Der eingebettete WebDriver erzeugt nur synthetische Ereignisse (ADR 0003); getestet sind die Ereignisfolge im echten Programm und die Logik in Vitest.
 - **Screenreader mit dem verschachtelten Baum:** ARIA-Rollen und -Stufen sind gesetzt und in Tests geprüft, nicht mit einem echten Screenreader.
 - **Referenzgerät:** nicht verfügbar; alle Leistungswerte stammen aus dem Container (siehe oben).
@@ -108,13 +115,15 @@ Keine bekannten. F-28 (Explorer-Messung) ist auf der jetzigen Maschine erfüllt;
 
 ## Behobene Fehler
 
-F-27 bis F-31 in `docs/status.md`:
+F-27 bis F-33 in `docs/status.md`:
 
 - **F-29 war ein Fehler der App:** Ein abgelehnter Zyklus beim Ziehen blieb still. Der E2E-Test hat ihn gefunden.
 - **F-27, F-30 und F-31 waren Fehler oder Wackler der Tests:**
   - F-27: Die Kürzelaufnahme blieb hängen und riss die Suite mit.
   - F-30: Wettlauf mit der Sitzungswiederherstellung.
   - F-31: Synthetisches Drag & Drop unter WebKitGTK. Die Abhilfe hilft auch bei echten Drags.
+- **F-32 war eine neue Sicherheitsmeldung** zu SQLite vor 3.54.0 (RUSTSEC-2026-0459, CVE-2026-119375, mittel), vom 30. Oktober 2026. CI-Lauf 100 hat sie gemeldet. Behoben mit ADR 0018.
+- **F-33 war ein Fehler im Test:** Unter Windows bekam die Explorer-Messung nur 2.000 Dokumente, die Mindestzahl an Zeilen galt aber für 10.000. Windows misst jetzt mit der vollen Referenzbibliothek.
 
 ## Gefundene Widersprüche und Abweichungen
 
@@ -128,10 +137,12 @@ F-27 bis F-31 in `docs/status.md`:
 4. **Struktur-Undo nur im Speicher:** Nach einem Neustart ist es leer. Dafür fragt das Löschen eines Subnetzes vorher; Stufe 5 (Backup, Phase 10) holt sonst Verlorenes zurück.
 5. **„Flüssig“ ohne Zahlenwert im Auftrag:** Die Ziele stammen aus ADR 0017, Punkt 17, angelehnt an das Mesh (30 Bilder pro Sekunde).
 6. **Ein Zweig je Phase** (Abschnitt 24): weiterhin nur der erlaubte Zweig.
+7. **SQLite-Sicherheitsupdate über eine gepatchte Kopie von `sqlx-sqlite`** (ADR 0018): SQLite vor 3.54.0 kann beim Öffnen einer präparierten Datenbank mit `-wal`-Datei alten Speicher zurückgeben (lokaler Angriff, etwa über eine fremde, kopierte Bibliothek). Die behobene Fassung steckt in `libsqlite3-sys` 0.39. `sqlx-sqlite` 0.9.0, die neueste Version, lässt nur Versionen unter 0.38 zu. Ich habe deshalb `sqlx-sqlite` unverändert ins Projekt kopiert und nur diese Grenze angehoben; alle Tests bestehen damit. Die Alternative wäre, die Meldung bis zu einer neuen SQLx-Version zu unterdrücken und ein bekannt verwundbares SQLite auszuliefern. Die Kopie fliegt raus, sobald SQLx nachzieht (offene Aufgabe). Wenn du lieber auf SQLx warten willst, sag es mir.
 
 ## Entscheidungen (ADR)
 
-0017 Subnetze, Zuordnungen, Tags und Struktur-Undo (18 Punkte), mit Nachträgen aus der Umsetzung.
+- 0017 Subnetze, Zuordnungen, Tags und Struktur-Undo (18 Punkte), mit Nachträgen aus der Umsetzung.
+- 0018 Sicherheitsupdate von SQLite über eine gepatchte Kopie von `sqlx-sqlite` (vorübergehend).
 
 ## CI
 

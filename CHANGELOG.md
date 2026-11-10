@@ -25,6 +25,10 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 - „Alle Dokumente“ im Explorer entfällt; der Subnetz-Baum und „Nicht zugeordnet“ zeigen zusammen jedes Dokument.
 
+#### Sicherheit
+
+- Gebündeltes SQLite 3.54.1 statt 3.51.3 (RUSTSEC-2026-0459, CVE-2026-119375: alter Speicher bei einer präparierten `-wal`-Datei). Bis SQLx die neue Version zulässt, über eine gepatchte Kopie von `sqlx-sqlite` (ADR 0018).
+
 ### Phase 6 – Wiederherstellung
 
 #### Hinzugefügt

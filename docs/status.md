@@ -8,7 +8,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0017. Medien (und ihre Zuordnungen) folgen in Phase 8, die Suche mit Filtern in Phase 9.
+Entscheidungen: ADR 0017; Sicherheitsupdate von SQLite über eine gepatchte Kopie von `sqlx-sqlite`: ADR 0018. Medien (und ihre Zuordnungen) folgen in Phase 8, die Suche mit Filtern in Phase 9.
 
 CI: Lauf 99 grün (Abschluss Phase 6). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26).
 
@@ -140,6 +140,8 @@ CI: Lauf 99 grün (Abschluss Phase 6). Zwischenstände und reine Doku-Commits tr
 | F-29 | Ein Zyklus beim Ziehen eines Subnetzes wurde still abgelehnt                                                                                                                                                                       | Vom E2E-Test gefunden: Rust lehnte ab, aber der Explorer zeigte Fehler aus Drag & Drop und Kontextmenü nicht an. Jetzt erscheint jeder Fehler als Hinweis; Unit- und E2E-Test                                                                                                                                                                                                                                                                                             |
 | F-30 | E2E: Der Phase-3-Test zählte nach dem Neuladen einen Tab zu viel                                                                                                                                                                   | Wettlauf mit Stufe 1 (Phase 6): Die Sitzung stellte den Tab erst nach dem Zählen wieder her. Der Test wartet auf den wiederhergestellten Tab                                                                                                                                                                                                                                                                                                                              |
 | F-31 | E2E: Ein künstliches Drag & Drop im Explorer kam unter WebKitGTK nicht an                                                                                                                                                          | Ein selbst erzeugtes `DataTransfer` reicht eigene Datentypen nicht weiter. Der Explorer merkt sich die gezogene Zeile zusätzlich selbst (das hilft auch bei echten Drags)                                                                                                                                                                                                                                                                                                 |
+| F-32 | CI-Lauf 100: `cargo audit` meldete RUSTSEC-2026-0459 für `libsqlite3-sys` 0.37.0 (SQLite vor 3.54.0 gibt bei einer `-wal`-Datei mit abweichender Seitengröße nicht initialisierten Speicher zurück)                                | Neue Meldung vom 30. Oktober 2026, keine Folge dieser Phase. `sqlx-sqlite` 0.9.0, die neueste Version, lässt die behobene Version 0.39 nicht zu. Eine Kopie von `sqlx-sqlite`, die nur diese Grenze ändert, bindet SQLite 3.54.1 ein (ADR 0018). Rust-Tests, Clippy, E2E-Tests und Fingerabdruck der Referenzbibliothek unverändert; `cargo audit` und `cargo deny` laufen jetzt auch lokal (aus dem Quelltext gebaut)                                                    |
+| F-33 | CI-Lauf 100 (Windows): Der Scroll-Test der Explorer-Messung fand 251 statt mehr als 500 Zeilen                                                                                                                                     | Fehler im Test: Windows bekam nur 2.000 Dokumente, die Grenze galt für 10.000. Windows misst jetzt mit der vollen Referenzbibliothek (10.000 Dokumente, etwa 100 s zum Erzeugen). Mit 2.000 Dokumenten lagen dort Aufbau bei 199–202 ms, Auf- und Zuklappen bei 32 ms, Filter bei 32 ms und Scrollen bei 15,7 ms je Bild (95 %)                                                                                                                                           |
 
 ## Offene Aufgaben
 
@@ -155,13 +157,14 @@ CI: Lauf 99 grün (Abschluss Phase 6). Zwischenstände und reine Doku-Commits tr
 - Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
 - Explorer-Messung (F-28) auf dem Referenzgerät wiederholen (Release-Build, Hardware-Rendering); danach die Regressionsgrenzen im E2E-Test durch die Zielwerte ersetzen.
+- Gepatchte Kopie von `sqlx-sqlite` entfernen (`src-tauri/vendor/sqlx-sqlite/`, `[patch.crates-io]`), sobald eine SQLx-Version `libsqlite3-sys` 0.39 oder neuer zulässt (ADR 0018, F-32).
 - Phase 8: `subnet_memberships` mit `media_id` neu aufbauen, `media_tags`, Explorer-Eintrag „Medien“, Zuordnungen und Tags für Medien.
 - Archiv „im Mesh grau“ (Phase 11); Archiv in der Standardsuche ausblenden (Phase 9).
 - Neue Befehle der Phase 7 stehen in Befehlspalette und Kontextmenüs, noch nicht im nativen Menü.
 - Phase 10: Wiederherstellung Stufe 5 (Backup); während des Backups schreibt Autosave nur nach `recovery/` (Abschnitt 21).
 - Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
 - Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
-- Referenzbibliothek ergänzen: Medien, Subnetze, Tags und Verbindungen mit ihren Tabellen (Phasen 7, 8, 11), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
+- Referenzbibliothek ergänzen: Medien und Verbindungen mit ihren Tabellen (Phasen 8, 11; Subnetze und Tags seit Phase 7), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).
 - Echte Sync-Clients (OneDrive, Dropbox) und Netzlaufwerke auf einem Testgerät prüfen; CI hat keine.
 - Unter macOS schreibt der Webview der E2E-Tests Caches in den Benutzerordner der CI-Maschine (ADR 0003).

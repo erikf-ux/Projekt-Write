@@ -3,10 +3,10 @@
  * half: provides the reference library (section 6; ADR 0010 and 0017) and
  * makes it the library of the next start. reference.e2e.ts measures there.
  *
- * Full size on Linux (10,000 documents, 500 subnets, 1,000 tags); Windows
- * writes every file synchronously and gets 2,000 documents with 100
- * subnets and 200 tags, as for the check of the generator in CI. A library
- * built by an earlier run with the same size is used again.
+ * Full size on every platform: 10,000 documents, 500 subnets, 1,000 tags.
+ * Windows writes every file synchronously and needs about 100 s for it
+ * (F-33). A library built by an earlier run with the same size is used
+ * again.
  *
  * Runs after crash-recovered.e2e.ts; ends the app.
  */
@@ -17,7 +17,8 @@ import { browser, expect } from '@wdio/globals';
 import { appDirs, referenceCache, referenceGenerator } from '../sandbox';
 import { pinMainWindow, waitUntilAppEnded } from '../session';
 
-export const REFERENCE_DOCUMENTS = process.platform === 'win32' ? 2_000 : 10_000;
+/** The full reference library (section 6). */
+const REFERENCE_DOCUMENTS = 10_000;
 const library = path.join(referenceCache, `reference-library-${String(REFERENCE_DOCUMENTS)}`);
 
 /** Whether `library` holds a reference library of this size and seed. */
