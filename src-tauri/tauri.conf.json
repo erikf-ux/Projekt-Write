@@ -31,7 +31,7 @@
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' pwmedia: http://pwmedia.localhost",
         "font-src": "'self'",
-        "connect-src": "ipc: http://ipc.localhost pwmedia: http://pwmedia.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost pwmedia: http://pwmedia.localhost",
         "worker-src": "'self'",
         "object-src": "'none'",
         "base-uri": "'none'",

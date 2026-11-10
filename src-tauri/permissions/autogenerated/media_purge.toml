@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-purge"
+description = "Enables the media_purge command without any pre-configured scope."
+commands.allow = ["media_purge"]
+
+[[permission]]
+identifier = "deny-media-purge"
+description = "Denies the media_purge command without any pre-configured scope."
+commands.deny = ["media_purge"]

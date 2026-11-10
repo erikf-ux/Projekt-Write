@@ -83,6 +83,26 @@
     "allow-open-requests-take",
     "allow-theme-import",
     "allow-theme-remove",
-    "allow-link-open"
+    "allow-link-open",
+    "allow-media-list",
+    "allow-media-trash-list",
+    "allow-media-get",
+    "allow-media-update",
+    "allow-media-set-favorite",
+    "allow-media-mark-opened",
+    "allow-media-delete",
+    "allow-media-restore",
+    "allow-media-archive",
+    "allow-media-purge",
+    "allow-media-empty-trash",
+    "allow-media-uses",
+    "allow-media-set-page-count",
+    "allow-media-store-thumbnail",
+    "allow-media-open-external",
+    "allow-media-import-files",
+    "allow-media-import-folder",
+    "allow-media-import-bytes",
+    "allow-media-import-commit",
+    "allow-media-import-cancel"
   ]
 }

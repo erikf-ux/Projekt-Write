@@ -9,6 +9,7 @@
 //! document uses any more.
 
 pub mod detect;
+pub mod handler;
 pub mod import;
 pub mod thumbnails;
 

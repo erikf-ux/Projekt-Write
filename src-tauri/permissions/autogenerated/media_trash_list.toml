@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-trash-list"
+description = "Enables the media_trash_list command without any pre-configured scope."
+commands.allow = ["media_trash_list"]
+
+[[permission]]
+identifier = "deny-media-trash-list"
+description = "Denies the media_trash_list command without any pre-configured scope."
+commands.deny = ["media_trash_list"]

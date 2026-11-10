@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-restore"
+description = "Enables the media_restore command without any pre-configured scope."
+commands.allow = ["media_restore"]
+
+[[permission]]
+identifier = "deny-media-restore"
+description = "Denies the media_restore command without any pre-configured scope."
+commands.deny = ["media_restore"]

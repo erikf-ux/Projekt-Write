@@ -30,6 +30,7 @@ use crate::services::history::RetentionPolicy;
 use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
+use crate::services::media::MediaLibrary;
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome, SavedSession};
 use crate::services::settings::library::{
     AcceptedLocation, HistoryDailyDays, HistoryKeepAllHours, HistoryWeeklyDays, TrashRetentionDays,
@@ -382,6 +383,35 @@ impl LibrarySession {
         let result = operation(structure, documents).await;
         drop(slot);
         result
+    }
+
+    /// Runs `operation` with the media of the open library.
+    pub async fn with_media<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(MediaLibrary, Structure) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let (media, structure) = match &*slot {
+            Slot::Open { library, .. } => (library.media(), library.structure()),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(media, structure).await;
+        drop(slot);
+        result
+    }
+
+    /// The media of the open library, without holding the session: for long
+    /// work (copying a folder for import) and for the media handler, which
+    /// must not wait for other commands. If the library closes meanwhile,
+    /// its database refuses further work.
+    pub async fn media(&self) -> Result<MediaLibrary, CommandError> {
+        match &*self.slot.lock().await {
+            Slot::Open { library, .. } => Ok(library.media()),
+            Slot::Moving => Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        }
     }
 
     /// The id of the open library.

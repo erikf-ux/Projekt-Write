@@ -116,6 +116,23 @@ pub fn run() {
                 }
             }
         })
+        // The media handler (section 17): ids to files of the open library.
+        .register_asynchronous_uri_scheme_protocol(
+            services::media::handler::SCHEME,
+            |ctx, request, responder| {
+                let app = ctx.app_handle().clone();
+                let method = request.method().as_str().to_owned();
+                let path = request.uri().path().to_owned();
+                tauri::async_runtime::spawn(async move {
+                    let media = match app.try_state::<AppState>() {
+                        Some(state) => state.session.media().await.ok(),
+                        None => None,
+                    };
+                    responder
+                        .respond(services::media::handler::respond(media, &method, &path).await);
+                });
+            },
+        )
         .invoke_handler(commands::handler())
         .build(tauri::generate_context!())
         .expect("error while building Project Write");

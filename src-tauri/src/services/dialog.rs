@@ -63,6 +63,18 @@ pub trait FilePicker: Send + Sync {
         dialog: FileDialog,
         request: FilePickRequest,
     ) -> oneshot::Receiver<Option<PathBuf>>;
+
+    /// An open dialog for several files. By default one file of
+    /// [`Self::pick_file`] (the scripted picker of the tests).
+    fn pick_files(&self, request: FilePickRequest) -> oneshot::Receiver<Option<Vec<PathBuf>>> {
+        let single = self.pick_file(FileDialog::Open, request);
+        let (sender, receiver) = oneshot::channel();
+        tauri::async_runtime::spawn(async move {
+            let picked = single.await.ok().flatten().map(|path| vec![path]);
+            let _ = sender.send(picked);
+        });
+        receiver
+    }
 }
 
 /// The operating system's folder and file dialogs, parented to the main
@@ -105,6 +117,37 @@ impl<R: Runtime> FolderPicker for SystemPicker<R> {
 }
 
 impl<R: Runtime> FilePicker for SystemPicker<R> {
+    fn pick_files(&self, request: FilePickRequest) -> oneshot::Receiver<Option<Vec<PathBuf>>> {
+        let (sender, receiver) = oneshot::channel();
+        let window = self.app.get_webview_window("main");
+        let posted = self.app.run_on_main_thread(move || {
+            let mut dialog = rfd::AsyncFileDialog::new().set_title(&request.title);
+            if let Some(dir) = request.start_in.filter(|dir| dir.is_dir()) {
+                dialog = dialog.set_directory(dir);
+            }
+            for filter in &request.filters {
+                dialog = dialog.add_filter(&filter.name, &filter.extensions);
+            }
+            if let Some(window) = &window {
+                dialog = dialog.set_parent(window);
+            }
+            let answer = dialog.pick_files();
+            std::thread::spawn(move || {
+                let picked = tauri::async_runtime::block_on(answer);
+                let _ = sender.send(picked.map(|handles| {
+                    handles
+                        .iter()
+                        .map(|handle| handle.path().to_path_buf())
+                        .collect()
+                }));
+            });
+        });
+        if let Err(error) = posted {
+            log::error!("file dialog could not be shown: {error}");
+        }
+        receiver
+    }
+
     fn pick_file(
         &self,
         kind: FileDialog,

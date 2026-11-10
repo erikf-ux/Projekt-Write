@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-uses"
+description = "Enables the media_uses command without any pre-configured scope."
+commands.allow = ["media_uses"]
+
+[[permission]]
+identifier = "deny-media-uses"
+description = "Denies the media_uses command without any pre-configured scope."
+commands.deny = ["media_uses"]

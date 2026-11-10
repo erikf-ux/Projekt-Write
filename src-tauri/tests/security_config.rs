@@ -21,6 +21,9 @@ fn tauri_config() -> Value {
     read_json(&manifest_dir().join("tauri.conf.json"))
 }
 
+/// The policy of section 20 with the changes their ADRs decided:
+/// `connect-src 'self'` for the font and CMap files of PDF.js (ADR 0019,
+/// decision 9).
 #[test]
 fn csp_is_exactly_the_section_20_policy() {
     let expected = json!({
@@ -29,7 +32,7 @@ fn csp_is_exactly_the_section_20_policy() {
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' pwmedia: http://pwmedia.localhost",
         "font-src": "'self'",
-        "connect-src": "ipc: http://ipc.localhost pwmedia: http://pwmedia.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost pwmedia: http://pwmedia.localhost",
         "worker-src": "'self'",
         "object-src": "'none'",
         "base-uri": "'none'",

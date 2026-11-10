@@ -1198,3 +1198,64 @@ async fn media_take_part_in_memberships_tags_and_undo() {
     assert!(library.media().get(id).await.unwrap().archived_at.is_none());
     library.close().await;
 }
+
+#[tokio::test]
+async fn the_media_handler_serves_only_images_and_pdfs_with_safe_headers() {
+    use project_write_lib::services::media::handler::{CONTENT_SECURITY_POLICY, respond};
+    let dir = common::temp_dir("pw-media-handler-");
+    let svg = write_original(
+        &dir.path().join("in"),
+        "Skript.svg",
+        br#"<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script></svg>"#,
+    );
+    let picture = write_original(&dir.path().join("in"), "Foto.png", &png(500, 300, 16));
+    let office = write_original(&dir.path().join("in"), "Brief.docx", &docx(DOCX_MAIN, &[]));
+    let path = dir.path().join("lib");
+    let (library, _) = Library::create(&path, Generators::system()).await.unwrap();
+    let svg_id = import_one(&library, &svg).await;
+    let png_id = import_one(&library, &picture).await;
+    let office_id = import_one(&library, &office).await;
+    let media = Some(library.media());
+
+    let answer = respond(media.clone(), "GET", &format!("/{svg_id}")).await;
+    assert_eq!(answer.status(), 200);
+    let headers = answer.headers();
+    assert_eq!(headers["content-type"], "image/svg+xml");
+    assert_eq!(headers["x-content-type-options"], "nosniff");
+    assert_eq!(headers["content-security-policy"], CONTENT_SECURITY_POLICY);
+    assert!(CONTENT_SECURITY_POLICY.contains("sandbox"));
+    assert!(CONTENT_SECURITY_POLICY.contains("default-src 'none'"));
+    assert_eq!(answer.body().as_slice(), svg.bytes.as_slice());
+
+    let thumbnail = respond(media.clone(), "GET", &format!("/{png_id}/thumbnail")).await;
+    assert_eq!(thumbnail.status(), 200);
+    assert_eq!(thumbnail.headers()["content-type"], "image/jpeg");
+    let small = image::load_from_memory(thumbnail.body()).unwrap();
+    assert_eq!((small.width(), small.height()), (320, 192));
+
+    let head = respond(media.clone(), "HEAD", &format!("/{png_id}")).await;
+    assert_eq!(head.status(), 200);
+    assert!(head.body().is_empty());
+    for (method, request) in [
+        ("GET", format!("/{office_id}")),
+        ("GET", format!("/{svg_id}/thumbnail")),
+        ("GET", format!("/{}", Uuid::new_v4())),
+        ("GET", "/../library.json".to_owned()),
+        ("GET", format!("/{png_id}/../../database/projectwrite.db")),
+    ] {
+        let answer = respond(media.clone(), method, &request).await;
+        assert_eq!(answer.status(), 404, "{request}");
+        assert_eq!(answer.headers()["x-content-type-options"], "nosniff");
+    }
+    assert_eq!(
+        respond(media.clone(), "POST", &format!("/{png_id}"))
+            .await
+            .status(),
+        405
+    );
+    assert_eq!(
+        respond(None, "GET", &format!("/{png_id}")).await.status(),
+        404
+    );
+    library.close().await;
+}

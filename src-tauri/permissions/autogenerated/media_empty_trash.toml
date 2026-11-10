@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-empty-trash"
+description = "Enables the media_empty_trash command without any pre-configured scope."
+commands.allow = ["media_empty_trash"]
+
+[[permission]]
+identifier = "deny-media-empty-trash"
+description = "Denies the media_empty_trash command without any pre-configured scope."
+commands.deny = ["media_empty_trash"]
