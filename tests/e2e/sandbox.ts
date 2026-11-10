@@ -43,6 +43,19 @@ export const pickedFiles = {
   draft: path.join(ownFiles, 'entwurf.txt'),
 };
 
+/** Originals of the media import (Phase 8), outside the library. */
+export const mediaOriginals = path.join(sandbox, 'Medien');
+
+/** Answers of the media import dialogs (`PW_E2E_PICK_MEDIA`), in this order. */
+export const pickedMedia = {
+  /** A folder with subfolders, refused files, an SVG with script and the CVE test PDF. */
+  folder: path.join(mediaOriginals, 'Reise'),
+  /** One file with the content of a medium already imported. */
+  duplicate: path.join(mediaOriginals, 'Kopie von Ankunft.png'),
+  /** A folder whose import is cancelled. */
+  cancelled: path.join(mediaOriginals, 'Abbruch'),
+};
+
 /** Passed to a second start of the app (not a dialog answer). */
 export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
 

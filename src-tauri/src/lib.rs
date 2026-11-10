@@ -63,13 +63,25 @@ pub fn run() {
             }
             log::info!("Project Write {} starting", env!("CARGO_PKG_VERSION"));
             let picker = folder_picker(app.handle());
-            let state = tauri::async_runtime::block_on(AppState::initialize(
+            #[allow(unused_mut)]
+            let mut state = tauri::async_runtime::block_on(AppState::initialize(
                 dirs,
                 picker,
                 file_picker(app.handle()),
                 link_opener(),
                 Generators::system(),
             ))?;
+            // The media import dialogs answer from their own list in e2e
+            // builds (one path per dialog; ADR 0019).
+            #[cfg(feature = "e2e")]
+            if let Some(list) = std::env::var_os("PW_E2E_PICK_MEDIA") {
+                let answers: Vec<Option<PathBuf>> = std::env::split_paths(&list)
+                    .map(|path| (!path.as_os_str().is_empty()).then_some(path))
+                    .collect();
+                let scripted = Arc::new(services::dialog::ScriptedPicker::new(answers));
+                state.media_files = scripted.clone();
+                state.media_folders = scripted;
+            }
             let menu =
                 services::ui::menu::build(app.handle(), state.ui.locale(), &state.ui.menu_state())?;
             if let Some(window) = app.get_webview_window("main") {

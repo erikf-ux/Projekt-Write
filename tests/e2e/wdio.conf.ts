@@ -6,7 +6,16 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { appDirs, application, openedLinks, pickedFiles, pickedFolders, root, sandbox } from './sandbox';
+import {
+  appDirs,
+  application,
+  openedLinks,
+  pickedFiles,
+  pickedFolders,
+  pickedMedia,
+  root,
+  sandbox,
+} from './sandbox';
 
 if (!fs.existsSync(application)) {
   throw new Error(`App binary not found at ${application}. Run "npm run build:e2e" first.`);
@@ -33,6 +42,7 @@ process.env['WEBVIEW2_USER_DATA_FOLDER'] = path.join(sandbox, 'webview2');
 process.env['PW_E2E_APP_DIRS'] = appDirs;
 process.env['PW_E2E_PICK_FOLDERS'] = [pickedFolders.local, pickedFolders.moveTarget].join(path.delimiter);
 process.env['PW_E2E_PICK_FILES'] = Object.values(pickedFiles).join(path.delimiter);
+process.env['PW_E2E_PICK_MEDIA'] = Object.values(pickedMedia).join(path.delimiter);
 // Web links are recorded there instead of starting a browser.
 process.env['PW_E2E_OPENED_LINKS'] = openedLinks;
 
@@ -56,6 +66,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'external.e2e.ts'),
     path.join(specs, 'documents.e2e.ts'),
     path.join(specs, 'structure.e2e.ts'),
+    path.join(specs, 'media.e2e.ts'),
     path.join(specs, 'session-quit.e2e.ts'),
     path.join(specs, 'session-restored.e2e.ts'),
     path.join(specs, 'crash.e2e.ts'),

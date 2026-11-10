@@ -496,7 +496,7 @@ pub async fn media_import_files(
         file_name: None,
         filters: vec![media_filter(state.ui.locale())],
     };
-    let Ok(Some(paths)) = state.files.pick_files(pick).await else {
+    let Ok(Some(paths)) = state.media_files.pick_files(pick).await else {
         return Ok(None);
     };
     let sources: Vec<ImportSource> = paths
@@ -539,7 +539,7 @@ pub async fn media_import_folder(
     let request = request.into_inner();
     let batch = parse_uuid("batchId", &request.batch_id)?;
     let media = state.session.media().await?;
-    let answer = state.picker.pick_folder(PickRequest {
+    let answer = state.media_folders.pick_folder(PickRequest {
         title: request.title,
         start_in: None,
     });

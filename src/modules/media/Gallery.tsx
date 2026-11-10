@@ -15,7 +15,6 @@ import type { MediaKind } from '@/types/generated/MediaKind';
 import type { MediaSummary } from '@/types/generated/MediaSummary';
 import { useMedia } from './mediaStore';
 import { mediaUrl } from './mediaUrl';
-import { renderPdfThumbnail } from './pdf';
 
 const TILE_WIDTH = 168;
 const TILE_HEIGHT = 168;
@@ -45,6 +44,8 @@ async function drawNext(): Promise<void> {
   }
   drawing = true;
   try {
+    // PDF.js loads only when a thumbnail is missing.
+    const { renderPdfThumbnail } = await import('./pdf');
     const { png, pages } = await renderPdfThumbnail(id);
     await useMedia.getState().storeThumbnail(id, png);
     await useMedia.getState().setPageCount(id, pages);
@@ -278,6 +279,9 @@ export function Gallery({ hidden }: { hidden: boolean }) {
                 }}
                 onClick={() => {
                   setSelected(index);
+                  // The arrows and Enter work on from the clicked tile
+                  // (WebKit does not always focus the list on a click).
+                  scroller.current?.focus({ preventScroll: true });
                 }}
                 onDoubleClick={() => {
                   openMedia(medium.id);

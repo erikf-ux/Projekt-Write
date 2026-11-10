@@ -16,7 +16,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useLocale, useT } from '@/i18n';
 import { formatBytes } from '@/modules/library/format';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
@@ -24,7 +24,9 @@ import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import type { MediaSummary } from '@/types/generated/MediaSummary';
 import { mediaById, useMedia } from './mediaStore';
 import { mediaUrl } from './mediaUrl';
-import { PdfView } from './PdfView';
+
+// PDF.js loads with the first PDF, not with the app (cold start, section 6).
+const PdfView = lazy(() => import('./PdfView').then((module) => ({ default: module.PdfView })));
 
 interface MediaViewProps {
   mediaId: string;
@@ -62,7 +64,9 @@ export function MediaView({ mediaId, page, hidden }: MediaViewProps) {
         <MediaHeader medium={medium} />
         {medium.kind === 'image' ? <ImageBody medium={medium} /> : null}
         {medium.kind === 'pdf' ? (
-          <PdfView mediaId={medium.id} page={page} needsThumbnail={!medium.pageCount} />
+          <Suspense fallback={<p className="text-ui p-6 text-muted">{t('pdf.loading')}</p>}>
+            <PdfView mediaId={medium.id} page={page} needsThumbnail={!medium.pageCount} />
+          </Suspense>
         ) : null}
         {medium.kind === 'attachment' ? <AttachmentBody medium={medium} /> : null}
       </div>
