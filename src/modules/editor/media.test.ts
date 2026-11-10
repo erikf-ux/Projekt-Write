@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { selectedImage } from './ImageDialog';
 import { matchingMedia, pageOf } from './MediaPicker';
 import { cssSize } from './schema/image';
 import { closeAllSessions, openSession, type SessionOptions } from './session';
@@ -74,6 +75,30 @@ describe('media in the editor', () => {
     const missing = markdown.root.querySelector('[data-pw-media-missing]');
     expect(missing?.textContent).toMatch(/Medium fehlt|Medium missing/);
     expect(markdown.text()).toBe(`![Weg](pwmedia://${IMAGE})\n`);
+  });
+
+  it('selects a library image on a click', () => {
+    const markdown = session('md', `Vorher ![Hafen](pwmedia://${IMAGE}) nachher\n`);
+    const figure = markdown.root.querySelector(`[data-pw-media-image="${IMAGE}"]`);
+    figure?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+    const { selection } = markdown.editor.state;
+    expect(selection.from).toBe(8);
+    expect(markdown.editor.state.doc.nodeAt(selection.from)?.type.name).toBe('image');
+    expect(selection.to - selection.from).toBe(1);
+  });
+
+  it('edits the selected image or the one next to the cursor', () => {
+    const markdown = session('md', `Vorher ![Hafen](pwmedia://${IMAGE}) nachher\n`);
+    markdown.editor.commands.setNodeSelection(8);
+    expect(selectedImage(markdown.id)).toBe(8);
+    markdown.editor.commands.setTextSelection(8);
+    expect(selectedImage(markdown.id)).toBe(8);
+    markdown.editor.commands.setTextSelection(9);
+    expect(selectedImage(markdown.id)).toBe(8);
+    markdown.editor.commands.setTextSelection(3);
+    expect(selectedImage(markdown.id)).toBeNull();
+    markdown.editor.commands.setTextSelection({ from: 2, to: 9 });
+    expect(selectedImage(markdown.id)).toBeNull();
   });
 
   it('keeps images with a web address as notes that load nothing', () => {

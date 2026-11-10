@@ -50,10 +50,30 @@ function imageAt(tab: string, position: number): ImageFields | null {
   return { alt: text('alt'), caption: text('title'), size: text('width') || text('height') };
 }
 
-/** The position of the selected image in a tab, or null. */
+/**
+ * The image "Bild bearbeiten" works on: the selected one, or the one right
+ * after (then before) an empty cursor. WebKitGTK turns the selection of a
+ * picture back into a cursor next to it, so the cursor counts as well.
+ */
 export function selectedImage(tab: string): number | null {
   const selection = getSession(tab)?.editor.state.selection;
-  return selection instanceof NodeSelection && selection.node.type.name === 'image' ? selection.from : null;
+  if (!selection) {
+    return null;
+  }
+  if (selection instanceof NodeSelection) {
+    return selection.node.type.name === 'image' ? selection.from : null;
+  }
+  if (!selection.empty) {
+    return null;
+  }
+  const { $from } = selection;
+  if ($from.nodeAfter?.type.name === 'image') {
+    return $from.pos;
+  }
+  if ($from.nodeBefore?.type.name === 'image') {
+    return $from.pos - $from.nodeBefore.nodeSize;
+  }
+  return null;
 }
 
 export function ImageDialog() {
@@ -125,6 +145,7 @@ function ImageForm({ tab, position, initial }: { tab: string; position: number; 
             value={fields.alt}
             maxLength={500}
             autoFocus
+            data-autofocus
             data-testid="image-alt"
             onChange={(event) => {
               setFields({ ...fields, alt: event.target.value });

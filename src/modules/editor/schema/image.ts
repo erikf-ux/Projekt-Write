@@ -12,6 +12,7 @@
  */
 import { Node, type JSONContent } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { NodeSelection } from '@tiptap/pm/state';
 import { translate, useLocale } from '@/i18n';
 import { mediaUrl, parseMediaReference } from '@/modules/media/mediaUrl';
 import { stringAttribute, tokenString } from './attributes';
@@ -202,11 +203,23 @@ export const Image = Node.create({
   // In the editor: library images as pictures, everything else as a note.
   // `renderHTML` above stays for the clipboard.
   addNodeView() {
-    return ({ node, getPos }) => {
+    return ({ node, getPos, editor }) => {
       const dom = document.createElement('span');
       dom.contentEditable = 'false';
       let current = node;
       renderInto(dom, current);
+      // A click selects the image (outline; "Bild bearbeiten" then works
+      // on it), whatever the webview makes of a click on a picture.
+      dom.addEventListener('mousedown', (event) => {
+        const position = typeof getPos === 'function' ? getPos() : undefined;
+        if (event.button !== 0 || position === undefined || !editor.isEditable) {
+          return;
+        }
+        event.preventDefault();
+        const { view } = editor;
+        view.focus();
+        view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, position)));
+      });
       dom.addEventListener('dblclick', (event) => {
         const position = typeof getPos === 'function' ? getPos() : undefined;
         if (position !== undefined && dom.hasAttribute('data-pw-media-image') && editImage) {
@@ -228,6 +241,9 @@ export const Image = Node.create({
         },
         // The picture loading or failing is no change of the document.
         ignoreMutation: () => true,
+        // The click above selects the image; ProseMirror would put a text
+        // selection next to it on mouse up instead.
+        stopEvent: (event) => event.type === 'mousedown',
       };
     };
   },

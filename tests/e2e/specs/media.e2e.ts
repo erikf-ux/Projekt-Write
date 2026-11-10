@@ -8,7 +8,9 @@
  *   CVE-2024-4367 runs nothing.
  *
  * Besides: folder import with subnets, refused files with their reason,
- * duplicates, the gallery, the image and the PDF view.
+ * duplicates, the gallery, the image and the PDF view, and media in the
+ * editor: inserted from the library, a PDF reference opened on its page,
+ * pasted images imported (a duplicate reuses the existing medium).
  *
  * The import dialogs answer from `PW_E2E_PICK_MEDIA` (see sandbox.ts).
  * Runs after structure.e2e.ts in the same library.
@@ -17,7 +19,15 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { $, $$, browser, expect } from '@wdio/globals';
-import { libraryRoot, runFromPalette } from '../editing';
+import {
+  activeDocumentId,
+  appendText,
+  documentFile,
+  libraryRoot,
+  newDocument,
+  renameActive,
+  runFromPalette,
+} from '../editing';
 import { cvePdf, docx, pdf, png, SCRIPT_SVG } from '../fixtures';
 import { mediaOriginals, pickedMedia } from '../sandbox';
 import { pinMainWindow } from '../session';
@@ -78,6 +88,59 @@ async function openTile(kind: string, title: string) {
   await browser.waitUntil(async () => (await tile.getAttribute('aria-selected')) === 'true');
   await browser.keys('Enter');
   await $(`${SHOWN} [data-testid="media-view"][data-kind="${kind}"]`).waitForDisplayed();
+}
+
+/** The id of a medium by its tile in the gallery. */
+async function mediumId(kind: string, title: string): Promise<string> {
+  await runFromPalette('media.gallery');
+  const tile = $(
+    `//*[@data-testid="gallery-list"]//*[@data-media-kind="${kind}"][.//span[normalize-space()="${title}"]]`,
+  );
+  await tile.waitForDisplayed();
+  return (await tile.getAttribute('data-media')) ?? '';
+}
+
+/** Ctrl+click on a link of the visible document (see documents.e2e.ts). */
+async function ctrlClick(href: string) {
+  await browser.execute((address: string) => {
+    const anchor = document.querySelector<HTMLElement>(
+      `[role="tabpanel"]:not([hidden]) [data-testid="editor"] a[href="${address}"]`,
+    );
+    if (!anchor) {
+      throw new Error(`no link to ${address}`);
+    }
+    const box = anchor.getBoundingClientRect();
+    const options = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      button: 0,
+      clientX: box.left + box.width / 2,
+      clientY: box.top + box.height / 2,
+      ctrlKey: true,
+    };
+    anchor.dispatchEvent(new MouseEvent('mousedown', { ...options, buttons: 1 }));
+    anchor.dispatchEvent(new MouseEvent('mouseup', options));
+    anchor.dispatchEvent(new MouseEvent('click', options));
+  }, href);
+}
+
+/** Pastes a file into the visible writing surface, as a screenshot would come. */
+async function pasteFile(name: string, content: Buffer, type: string) {
+  await browser.execute(
+    (fileName: string, base64: string, mime: string) => {
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const data = new DataTransfer();
+      data.items.add(new File([bytes], fileName, { type: mime }));
+      const editor = document.querySelector('[role="tabpanel"]:not([hidden]) [data-testid="editor"]');
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: data });
+      editor?.dispatchEvent(event);
+    },
+    name,
+    content.toString('base64'),
+    type,
+  );
 }
 
 /** Markers the hostile files try to set. */
@@ -278,5 +341,128 @@ describe('Media (Phase 8)', () => {
     expect(mediaFiles()).toEqual(filesBefore);
     expect(await galleryTiles()).toHaveLength(5);
     expect(snapshot(mediaOriginals)).toEqual(originalsBefore);
+  });
+
+  it('inserts an image and a PDF reference, shows them and opens the reference on its page', async () => {
+    const arrival = await mediumId('image', 'Ankunft');
+    const study = await mediumId('pdf', 'Studie');
+    const id = await newDocument();
+    await renameActive('Reisebericht');
+    await appendText('Ankunft ');
+    await runFromPalette('format.image');
+    const picker = $('[data-testid="media-picker"]');
+    await picker.waitForDisplayed();
+    await $('[data-testid="media-picker-search"]').setValue('Ankunft');
+    await $(`[data-testid="media-picker-list"] [data-media="${arrival}"]`).waitForDisplayed();
+    await browser.keys('Enter');
+    await picker.waitForExist({ reverse: true });
+    // Shown through the media handler, in its own size.
+    const picture = $(`${SHOWN} [data-pw-media-image="${arrival}"] img`);
+    await browser.waitUntil(async () => Number(await picture.getProperty('naturalWidth')) === 320, {
+      timeoutMsg: 'the image was not shown in the text',
+    });
+
+    await appendText(' Quelle ');
+    await runFromPalette('format.pdfReference');
+    // A new element: the first dialog is gone, and WebKitGTK reports a
+    // handle to it as hidden instead of looking again.
+    const pdfPicker = $('[data-testid="media-picker"]');
+    await pdfPicker.waitForDisplayed();
+    await $('[data-testid="media-picker-search"]').setValue('Studie');
+    await $(`[data-testid="media-picker-list"] [data-media="${study}"]`).waitForDisplayed();
+    await $('[data-testid="media-picker-page"]').setValue('2');
+    await $('[data-testid="media-picker-insert"]').click();
+    await pdfPicker.waitForExist({ reverse: true });
+    const reference = `pwmedia://${study}#page=2`;
+    await $(`${SHOWN} [data-testid="editor"] a[href="${reference}"]`).waitForExist();
+
+    // Saved as Markdown with the media addresses, never a path.
+    await browser.waitUntil(
+      () => {
+        const file = documentFile(id, 'md');
+        const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+        return text.includes(`![Ankunft](pwmedia://${arrival})`) && text.includes(`](${reference})`);
+      },
+      { timeout: 10_000, timeoutMsg: 'the media were not saved in the document' },
+    );
+
+    // Ctrl+click opens the PDF on the page of the reference.
+    await ctrlClick(reference);
+    await browser.waitUntil(async () => (await activeDocumentId()) === `view:media:${study}`, {
+      timeoutMsg: 'Ctrl+click did not open the PDF',
+    });
+    const view = $(`${SHOWN} [data-testid="pdf-view"]`);
+    await browser.waitUntil(async () => (await view.getAttribute('data-page')) === '2', {
+      timeoutMsg: 'the PDF did not open on page 2',
+    });
+    // "Verwendet in" names the document.
+    await expect($(`${SHOWN} [data-testid="media-uses"]`)).toHaveText(
+      expect.stringContaining('Reisebericht'),
+    );
+  });
+
+  it('imports pasted images and inserts them; a pasted duplicate uses the existing medium', async () => {
+    const arrival = await mediumId('image', 'Ankunft');
+    const id = await newDocument();
+    await appendText('Eingefügt ');
+    const before = mediaFiles();
+    await pasteFile('Bildschirmfoto.png', fs.readFileSync(originals.ankunft), 'image/png');
+    await $(`${SHOWN} [data-pw-media-image="${arrival}"]`).waitForExist({
+      timeoutMsg: 'the pasted duplicate was not inserted as the existing medium',
+    });
+    expect(mediaFiles()).toEqual(before);
+
+    await pasteFile('image.png', png(48, 32, [220, 160, 40]), 'image/png');
+    await browser.waitUntil(() => mediaFiles().length === before.length + 1, {
+      timeoutMsg: 'the pasted image was not imported',
+    });
+    const inserted = await browser.execute(() =>
+      [
+        ...document.querySelectorAll(
+          '[role="tabpanel"]:not([hidden]) [data-testid="editor"] [data-pw-media-image]',
+        ),
+      ].map((element) => element.getAttribute('data-pw-media-image')),
+    );
+    expect(inserted).toHaveLength(2);
+    expect(inserted[0]).toBe(arrival);
+    await browser.waitUntil(
+      () => {
+        const file = documentFile(id, 'md');
+        return (
+          fs.existsSync(file) && (fs.readFileSync(file, 'utf8').match(/pwmedia:\/\//g) ?? []).length === 2
+        );
+      },
+      { timeout: 10_000, timeoutMsg: 'the pasted images were not saved' },
+    );
+    expect(importLeftovers()).toEqual([]);
+
+    // "Bild bearbeiten": caption and display size of the selected image.
+    const pasted = inserted[1] ?? '';
+    await $(`${SHOWN} [data-pw-media-image="${pasted}"]`).click();
+    await runFromPalette('format.imageEdit');
+    const dialog = $('[data-testid="image-dialog"]');
+    await dialog.waitForDisplayed();
+    await $('[data-testid="image-caption"]').setValue('Bunte Streifen');
+    // As a choice in the list arrives (WebDriver's option click does not
+    // reach the change handler in WebKitGTK).
+    await browser.execute(() => {
+      const size = document.querySelector<HTMLSelectElement>('[data-testid="image-size"]');
+      if (size) {
+        size.value = '50%';
+        size.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    await $('[data-testid="image-apply"]').click();
+    await dialog.waitForExist({ reverse: true });
+    const figure = $(`${SHOWN} [data-pw-media-image="${pasted}"]`);
+    await expect(figure.$('.pw-media-caption')).toHaveText('Bunte Streifen');
+    expect(await figure.getAttribute('style')).toContain('width: 50%');
+    await browser.waitUntil(
+      () =>
+        new RegExp(`<img src="pwmedia://${pasted}" alt="[^"]*" title="Bunte Streifen" width="50%">`).test(
+          fs.readFileSync(documentFile(id, 'md'), 'utf8'),
+        ),
+      { timeout: 10_000, timeoutMsg: 'caption and size were not saved in the allowed HTML subset' },
+    );
   });
 });

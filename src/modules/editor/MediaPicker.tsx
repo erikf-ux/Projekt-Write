@@ -186,6 +186,7 @@ function Picker({ tab, mode }: { tab: string; mode: PickerMode }) {
           className="h-8 w-full rounded-pw border border-muted bg-surface px-2 text-fg"
           value={query}
           autoFocus
+          data-autofocus
           data-testid="media-picker-search"
           onChange={(event) => {
             setQuery(event.target.value);
