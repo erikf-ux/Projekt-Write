@@ -25,6 +25,18 @@ type KindFilter = 'all' | MediaKind;
 /** PDFs waiting for a thumbnail, drawn one after the other. */
 const pending: string[] = [];
 let drawing = false;
+/**
+ * PDF.js draws on the main thread: a thumbnail waits until the list has
+ * not scrolled for this long, so scrolling stays smooth.
+ */
+const SCROLL_PAUSE_MS = 300;
+let lastScroll = 0;
+/** PDF tiles in view; one that left the view is queued again when it returns. */
+const pdfsInView = new Set<string>();
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function queueThumbnail(id: string): void {
   if (pending.includes(id)) {
@@ -43,6 +55,13 @@ async function drawNext(): Promise<void> {
     return;
   }
   drawing = true;
+  while (performance.now() - lastScroll < SCROLL_PAUSE_MS) {
+    await pause(SCROLL_PAUSE_MS);
+  }
+  if (!pdfsInView.has(id)) {
+    await drawNext();
+    return;
+  }
   try {
     // PDF.js loads only when a thumbnail is missing.
     const { renderPdfThumbnail } = await import('./pdf');
@@ -121,12 +140,16 @@ export function Gallery({ hidden }: { hidden: boolean }) {
         setView({ width: element.clientWidth, top: element.scrollTop, height: element.clientHeight || 600 });
       });
     };
+    const scrolled = () => {
+      lastScroll = performance.now();
+      update();
+    };
     update();
-    element.addEventListener('scroll', update, { passive: true });
+    element.addEventListener('scroll', scrolled, { passive: true });
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
     observer?.observe(element);
     return () => {
-      element.removeEventListener('scroll', update);
+      element.removeEventListener('scroll', scrolled);
       observer?.disconnect();
     };
   }, [hidden]);
@@ -138,6 +161,17 @@ export function Gallery({ hidden }: { hidden: boolean }) {
   const visible = shown.slice(firstRow * columns, lastRow * columns);
   const current = Math.min(selected, Math.max(0, shown.length - 1));
   const tileId = (index: number) => `pw-gallery-${String(index)}`;
+
+  useEffect(() => {
+    pdfsInView.clear();
+    if (!hidden) {
+      for (const medium of visible) {
+        if (medium.kind === 'pdf') {
+          pdfsInView.add(medium.id);
+        }
+      }
+    }
+  }, [visible, hidden]);
 
   // Keep the selected tile in view (and rendered).
   useEffect(() => {

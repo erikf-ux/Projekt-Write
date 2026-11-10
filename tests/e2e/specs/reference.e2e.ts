@@ -47,8 +47,27 @@ function format(values: number[]): string {
 describe('Explorer with the reference library (Phase 7)', () => {
   before(async () => {
     await pinMainWindow();
-    await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 120_000 });
-    await $('[data-testid="explorer"] [data-subnet]').waitForExist({ timeout: 120_000 });
+    try {
+      await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 30_000 });
+      await $('[data-testid="explorer"] [data-subnet]').waitForExist({ timeout: 30_000 });
+    } catch (error) {
+      console.log(
+        'DEBUG reference',
+        JSON.stringify(
+          await browser.execute(() => ({
+            workbench: document.querySelector('[data-testid="workbench"]') !== null,
+            explorer: document.querySelector('[data-testid="explorer"]')?.outerHTML.slice(0, 1500),
+            text: document.body.innerText.slice(0, 1500),
+            dialogs: [...document.querySelectorAll('[role="dialog"]')].map((d) =>
+              d.textContent?.slice(0, 200),
+            ),
+          })),
+          null,
+          1,
+        ),
+      );
+      throw error;
+    }
   });
 
   it('shows the tree after the library begins to open (target 1 s)', async () => {

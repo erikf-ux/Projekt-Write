@@ -39,6 +39,9 @@ pub const FULL_SUBNETS: usize = 500;
 pub const FULL_TAGS: usize = 1_000;
 /// Media of the full reference library (section 6).
 pub const FULL_MEDIA: usize = 5_000;
+/// Changes whenever the same seed and size give a different library, so a
+/// cached copy from an older generator is built again (E2E cache).
+pub const GENERATOR_VERSION: u32 = 2;
 /// Deepest level of the generated subnet tree.
 const MAX_DEPTH: usize = 4;
 
@@ -590,7 +593,12 @@ pub async fn generate(
     let mut manifest = library.manifest().clone();
     manifest.other.insert(
         "referenceLibrary".to_owned(),
-        serde_json::json!({ "seed": seed, "documents": documents, "media": media_size(documents) }),
+        serde_json::json!({
+            "seed": seed,
+            "documents": documents,
+            "media": media_size(documents),
+            "generator": GENERATOR_VERSION,
+        }),
     );
     manifest
         .write(library.root())
@@ -799,7 +807,8 @@ fn refer_to_media(rng: &mut Rng, text: &mut String, images: &[&Medium], pdfs: &[
 }
 
 /// Subnets and tags for media (Phase 8): about three in four media in one
-/// or two subnets, zero to two tags each, a few favourites.
+/// or two subnets, zero to two tags each; every 500th is a favourite (a
+/// handful, as in real use – "Favoriten" stands open at the top).
 async fn place_media(
     library: &Library,
     seed: u64,
@@ -838,7 +847,7 @@ async fn place_media(
                 }
             }
         }
-        if rng.chance(3) {
+        if index % 500 == 0 {
             service
                 .set_favorite(medium.id, true)
                 .await
