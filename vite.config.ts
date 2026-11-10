@@ -17,7 +17,8 @@ function pdfjsAssets(): Plugin {
   const wanted = (relative: string) =>
     relative.startsWith('standard_fonts/') ||
     relative.startsWith('cmaps/') ||
-    (relative.startsWith('wasm/') && (relative.endsWith('_nowasm_fallback.js') || relative.includes('LICENSE')));
+    (relative.startsWith('wasm/') &&
+      (relative.endsWith('_nowasm_fallback.js') || relative.includes('LICENSE')));
   const types: Record<string, string> = {
     '.js': 'text/javascript',
     '.bcmap': 'application/octet-stream',

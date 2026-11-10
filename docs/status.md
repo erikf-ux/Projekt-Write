@@ -4,13 +4,25 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 7 – Subnetze und Tags** (Abschnitte 13, 16, 18): umgesetzt, lokal und in CI geprüft (Lauf 101 grün); Bericht in `docs/bericht-phase-7.md`. Wartet auf die Freigabe von Phase 8.
+**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt und lokal geprüft; CI-Lauf siehe unten; Bericht in `docs/bericht-phase-8.md`. Wartet auf die Freigabe von Phase 9.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0017; Sicherheitsupdate von SQLite über eine gepatchte Kopie von `sqlx-sqlite`: ADR 0018. Medien (und ihre Zuordnungen) folgen in Phase 8, die Suche mit Filtern in Phase 9.
+Entscheidungen: ADR 0019 (Medien, mit Nachträgen); Neubewertung des Isolation Pattern in ADR 0005 (bleibt aus). Die Suche mit Filtern folgt in Phase 9.
 
 CI: Lauf 101 grün (Abschluss Phase 7; Lauf 100 scheiterte an F-32 und F-33). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26).
+
+## Stand Phase 8
+
+| Schritt | Inhalt                                                                                                                                                                                                                                                 | Stand                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| 1       | ADR 0019, Plan, Datenbankentwurf, Abhängigkeiten (`image`, `zip`, `pdfjs-dist`), CSP                                                                                                                                                                   | erledigt                                              |
+| 2       | Migration 0008 (`media`, `document_media`, `media_tags`, Neuaufbau von `subnet_memberships`), Medien-Dienst in Rust: Typprüfung, Import in zwei Schritten mit Journal, Ordnerimport, Duplikate, Vorschaubilder, Papierkorb, Tests mit harten Abbrüchen | erledigt                                              |
+| 3       | Medien-Handler `pwmedia://`, 20 Medienbefehle, Struktur für Elemente (Dokumente und Medien)                                                                                                                                                            | erledigt                                              |
+| 4       | Oberfläche: „Medien“ im Explorer, Galerie, Medienansicht, PDF-Ansicht mit PDF.js, Importdialog, Ablegen auf das Fenster                                                                                                                                | erledigt                                              |
+| 5       | Editor: Bilder über den Handler mit Unterschrift und Größe, „Bild einfügen …“, „PDF-Verweis einfügen …“, `Strg + Klick` öffnet die Seite, Einfügen und Ablegen von Bilddateien, „Medium fehlt“                                                         | erledigt                                              |
+| 6       | Referenzbibliothek mit 5.000 Medien                                                                                                                                                                                                                    | erledigt; zweimal voll gebaut, gleicher Fingerabdruck |
+| 7       | E2E (Abnahme: bytegleich, Abbruch ohne Rest, SVG und CVE-PDF führen nichts aus; Editor), Galerie-Messung, Doku, Bericht                                                                                                                                | erledigt; CI siehe Bericht                            |
 
 ## Stand Phase 7
 
@@ -142,6 +154,11 @@ CI: Lauf 101 grün (Abschluss Phase 7; Lauf 100 scheiterte an F-32 und F-33). Zw
 | F-31 | E2E: Ein künstliches Drag & Drop im Explorer kam unter WebKitGTK nicht an                                                                                                                                                          | Ein selbst erzeugtes `DataTransfer` reicht eigene Datentypen nicht weiter. Der Explorer merkt sich die gezogene Zeile zusätzlich selbst (das hilft auch bei echten Drags)                                                                                                                                                                                                                                                                                                                                                                                                              |
 | F-32 | CI-Lauf 100: `cargo audit` meldete RUSTSEC-2026-0459 für `libsqlite3-sys` 0.37.0 (SQLite vor 3.54.0 gibt bei einer `-wal`-Datei mit abweichender Seitengröße nicht initialisierten Speicher zurück)                                | Neue Meldung vom 30. Oktober 2026, keine Folge dieser Phase. `sqlx-sqlite` 0.9.0, die neueste Version, lässt die behobene Version 0.39 nicht zu. Eine Kopie von `sqlx-sqlite`, die nur diese Grenze ändert, bindet SQLite 3.54.1 ein (ADR 0018). Rust-Tests, Clippy, E2E-Tests und Fingerabdruck der Referenzbibliothek unverändert; `cargo audit` und `cargo deny` laufen jetzt auch lokal (aus dem Quelltext gebaut)                                                                                                                                                                 |
 | F-33 | CI-Lauf 100 (Windows): Der Scroll-Test der Explorer-Messung fand 251 statt mehr als 500 Zeilen                                                                                                                                     | Fehler im Test: Windows bekam nur 2.000 Dokumente, die Grenze galt für 10.000. Windows misst jetzt mit der vollen Referenzbibliothek (10.000 Dokumente, etwa 100 s zum Erzeugen). Mit 2.000 Dokumenten lagen dort Aufbau bei 199–202 ms, Auf- und Zuklappen bei 32 ms, Filter bei 32 ms und Scrollen bei 15,7 ms je Bild (95 %)                                                                                                                                                                                                                                                        |
+| F-34 | Galerie: Ein Klick auf eine Kachel brachte den Fokus unter WebKitGTK nicht in die Liste; Pfeile und Enter wirkten danach woanders | Der Klick setzt den Fokus selbst auf die Liste. Gefunden vom E2E-Test |
+| F-35 | E2E: Ein Verweis auf einen geschlossenen Dialog meldete unter WebKitGTK „nicht sichtbar“, statt neu zu suchen; ebenso trafen Abfragen die verborgenen Medien-Tabs | Neue Abfrage nach jedem Dialog; Abfragen auf den sichtbaren Tab beschränkt |
+| F-36 | Editor: Ein Klick wählte ein Bild der Bibliothek nicht aus; WebKitGTK macht aus der Auswahl wieder einen Cursor daneben | Das Bild wählt sich beim Klick selbst aus; „Bild bearbeiten …“ nimmt auch das Bild direkt am Cursor (ADR 0019, Nachträge) |
+| F-37 | E2E: Nach der Umstellung des Ablegens erwartete der Phase-3-Test für ein kaputtes PNG einen Hinweis; der offene Importdialog brachte danach alle folgenden Dateien im selben Prozess zum Scheitern | Test erwartet den Importdialog mit dem Grund `type` (zu kurz, um als PNG erkannt zu werden) und schließt ihn |
+| F-38 | Referenzbibliothek: Die ersten Testbilder mit Rauschen je Bildpunkt brauchten 43 MB je 500 Medien | Verläufe statt Rauschen: 3 MB je 500 Medien, alle Bilder weiter verschieden |
 
 ## Offene Aufgaben
 
@@ -151,27 +168,30 @@ CI: Lauf 101 grün (Abschluss Phase 7; Lauf 100 scheiterte an F-32 und F-33). Zw
 - Externe Dateien unter Windows: Rechte (ACL) der ersetzten Datei; die neue Datei erbt die des Ordners. Harte Links werden beim atomaren Ersetzen getrennt (wie bei den meisten Editoren).
 
 - Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
-- Bilder einfügen und importieren, PDF-Verweise (Phase 8); Drucken (Phase 10).
+- Drucken (Phase 10).
+- Echtes Ablegen aus dem Dateimanager in die Schreibfläche und Einfügen eines echten Bildschirmfotos von Hand prüfen; die E2E-Tests erzeugen die Ereignisse synthetisch (ADR 0003).
+- Galerie und PDF-Ansicht auf dem Referenzgerät messen (Release-Build); die E2E-Messung prüft gegen Regressionsgrenzen.
+- Vorschaubilder von PDFs zeichnet die Oberfläche (PDF.js) nacheinander, sobald die Galerie eine PDF-Kachel ohne Vorschaubild zeigt; mit der Referenzbibliothek beim Durchscrollen der Galerie auf dem Referenzgerät beobachten.
+- Galerie- und Medien-Tabs stellt die Sitzung (Stufe 1) nicht wieder her (ADR 0019, Nachträge).
+- Medienbefehle „Medien importieren …“, „Ordner importieren …“ und die Galerie stehen in Befehlspalette und Galerie, nicht im nativen Menü.
 - Eingabe mit Komposition (IME, Tottasten) und `Strg + Umschalt + V` mit echten Programmen von Hand prüfen; der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003).
 
 - Echte Tastaturnavigation (Tab) und echtes Drag & Drop aus dem Dateimanager prüfen: Der eingebettete WebDriver sendet nur synthetische Ereignisse (ADR 0003); dafür eine native Eingabeprüfung oder einen Handtest einplanen.
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
 - Explorer-Messung (F-28) auf dem Referenzgerät wiederholen (Release-Build, Hardware-Rendering); danach die Regressionsgrenzen im E2E-Test durch die Zielwerte ersetzen.
 - Gepatchte Kopie von `sqlx-sqlite` entfernen (`src-tauri/vendor/sqlx-sqlite/`, `[patch.crates-io]`), sobald eine SQLx-Version `libsqlite3-sys` 0.39 oder neuer zulässt (ADR 0018, F-32).
-- Phase 8: `subnet_memberships` mit `media_id` neu aufbauen, `media_tags`, Explorer-Eintrag „Medien“, Zuordnungen und Tags für Medien.
 - Archiv „im Mesh grau“ (Phase 11); Archiv in der Standardsuche ausblenden (Phase 9).
 - Neue Befehle der Phase 7 stehen in Befehlspalette und Kontextmenüs, noch nicht im nativen Menü.
 - Phase 10: Wiederherstellung Stufe 5 (Backup); während des Backups schreibt Autosave nur nach `recovery/` (Abschnitt 21).
 - Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
 - Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
-- Referenzbibliothek ergänzen: Medien und Verbindungen mit ihren Tabellen (Phasen 8, 11; Subnetze und Tags seit Phase 7), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
+- Referenzbibliothek ergänzen: Verbindungen (Phase 11; Subnetze und Tags seit Phase 7, Medien seit Phase 8), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).
 - Echte Sync-Clients (OneDrive, Dropbox) und Netzlaufwerke auf einem Testgerät prüfen; CI hat keine.
 - Unter macOS schreibt der Webview der E2E-Tests Caches in den Benutzerordner der CI-Maschine (ADR 0003).
 - npm-Audit-Funde in Entwicklungswerkzeugen bei jedem Update von WebdriverIO/ESLint neu bewerten (`docs/dependencies.md`).
 - TypeScript 7 und WebdriverIO 10, sobald `typescript-eslint` und `@wdio/tauri-service` sie unterstützen (ADR 0001).
-- PDF.js und WebAssembly-Decoder vs. CSP prüfen (Phase 8, `docs/architecture.md` Abschnitt 10).
-- Isolation Pattern vor Phase 8 und vor Phase 14 neu bewerten (ADR 0005).
+- Isolation Pattern vor Phase 14 neu bewerten (ADR 0005; vor Phase 8 bewertet, bleibt aus).
 
 ### Entscheidungen des Auftraggebers
 
@@ -188,4 +208,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 8 (Medien; Abschnitt 25).
+Nach Freigabe: Phase 9 (Suche; Abschnitt 25).

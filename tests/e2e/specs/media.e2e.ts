@@ -197,7 +197,7 @@ describe('Media (Phase 8)', () => {
     await dialog.waitForDisplayed({ timeout: 30_000 });
     const names: string[] = [];
     for (const item of await $$('[data-testid="media-import-items"] [data-import-item]').getElements()) {
-      names.push(await item.getAttribute('data-import-item'));
+      names.push((await item.getAttribute('data-import-item')) ?? '');
     }
     expect(names.sort()).toEqual([
       'Ankunft.png',
