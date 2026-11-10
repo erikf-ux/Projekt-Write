@@ -984,10 +984,14 @@ async fn a_medium_a_document_uses_stays_in_the_trash() {
     let id_text = id.hyphenated().to_string();
     // The thumbnail is made on demand (and in the background after import).
     let thumbnail = library.media().thumbnail(id).await.unwrap().unwrap();
+    // Both sides canonical: under Windows that is the `\\?\` form.
     assert!(
-        thumbnail
-            .path
-            .starts_with(path.join("thumbnails/images").canonicalize().unwrap())
+        thumbnail.path.canonicalize().unwrap().starts_with(
+            path.join("thumbnails")
+                .join("images")
+                .canonicalize()
+                .unwrap()
+        )
     );
     let markdown = format!("# Text\n\n![Bild](pwmedia://{id_text} \"Unterschrift\")\n");
     let document = library
