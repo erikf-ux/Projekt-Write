@@ -2,7 +2,7 @@
 
 Stand: 10. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig). Entwicklungsumgebung: Cloud-Container, Ubuntu 24.04, 4 vCPU, 15 GB RAM, keine GPU (Xvfb, Software-Rendering), WebKitGTK, Rust 1.99.1, Node.js 22. CI: GitHub Actions `windows-latest` und `ubuntu-24.04`; macOS ist auf Wunsch des Auftraggebers zurückgestellt. Entwickelt und geprüft wurde lokal unter Linux; den CI-Lauf nennt der Abschnitt „CI“.
 
-**Zur Messung „flüssig“** (Abschnitt „Explorer-Messung“): Auf der Container-Maschine vor der Pause verfehlte das Scrollen das Ziel. Auf der jetzigen Maschine und auf dem Linux-Rechner der CI erreichen nach den Optimierungen alle Werte ihr Ziel. Das Ergebnis hängt also deutlich an der Maschine; die Bestätigung auf dem Referenzgerät steht aus.
+**Zur Messung „flüssig“** (Abschnitt „Explorer-Messung“): Auf der Container-Maschine vor der Pause verfehlte das Scrollen das Ziel. Auf der jetzigen Maschine und in CI unter Windows und Linux (Lauf 101, volle Referenzbibliothek) erreichen nach den Optimierungen alle Werte ihr Ziel. Das Ergebnis hängt also deutlich an der Maschine; die Bestätigung auf dem Referenzgerät steht aus.
 
 **Zum Abschluss kam eine Sicherheitsmeldung zu SQLite** (F-32), keine Folge dieser Phase. Behoben mit einer gepatchten Kopie von `sqlx-sqlite`, die SQLite 3.54.1 einbindet (ADR 0018). Das ist eine Entscheidung, die du kennen solltest; siehe „Gefundene Widersprüche und Abweichungen“, Punkt 7.
 
@@ -67,24 +67,26 @@ Was die Tests zeigen, im Einzelnen:
 
 ## Abnahmekriterien Phase 7
 
-| Kriterium                                                         | Stand                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Zyklen werden abgelehnt                                           | **erfüllt** (Rust, Datenbank-Trigger, IPC, E2E).                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Ein Element in zwei Subnetzen bleibt ein Datensatz und eine Datei | **erfüllt für Dokumente** (Rust, IPC, E2E). Medien gibt es erst ab Phase 8; ihre Zuordnungen folgen demselben Muster.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Das Löschen eines Subnetzes löscht kein Element                   | **erfüllt** (Rust, IPC, E2E, mit Struktur-Undo).                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Der Explorer bleibt mit der Referenzbibliothek flüssig            | **erfüllt auf der aktuellen Messmaschine** (drei Läufe), gemessen im echten Programm mit der vollen Referenzbibliothek; Ziele aus ADR 0017, Punkt 17 (der Auftrag nennt keinen Zahlenwert). Baum nach dem Öffnen 649–799 ms (Ziel 1 s), Auf- und Zuklappen 95 % ≤ 49 ms (Ziel 100 ms), Tag-Filter 60–80 ms (Ziel 100 ms), Scrollen 95 % der Bildabstände 22–25 ms (Ziel 33 ms). Auf der vorherigen Container-Maschine verfehlte das Scrollen das Ziel (siehe „Explorer-Messung“); auf dem Referenzgerät nicht gemessen. |
+| Kriterium                                                         | Stand                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Zyklen werden abgelehnt                                           | **erfüllt** (Rust, Datenbank-Trigger, IPC, E2E).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Ein Element in zwei Subnetzen bleibt ein Datensatz und eine Datei | **erfüllt für Dokumente** (Rust, IPC, E2E). Medien gibt es erst ab Phase 8; ihre Zuordnungen folgen demselben Muster.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Das Löschen eines Subnetzes löscht kein Element                   | **erfüllt** (Rust, IPC, E2E, mit Struktur-Undo).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Der Explorer bleibt mit der Referenzbibliothek flüssig            | **erfüllt auf der aktuellen Messmaschine** (drei Läufe) **und in CI unter Windows und Linux** (Lauf 101), gemessen im echten Programm mit der vollen Referenzbibliothek; Ziele aus ADR 0017, Punkt 17 (der Auftrag nennt keinen Zahlenwert). Baum nach dem Öffnen 649–799 ms (Ziel 1 s), Auf- und Zuklappen 95 % ≤ 49 ms (Ziel 100 ms), Tag-Filter 60–80 ms (Ziel 100 ms), Scrollen 95 % der Bildabstände 22–25 ms (Ziel 33 ms). Windows in CI: 817–833 ms, 32 ms, 26–31 ms, 15,7 ms; Linux in CI: 750–767 ms, 34 ms, 54–56 ms, 24 ms. Auf der vorherigen Container-Maschine verfehlte das Scrollen das Ziel (siehe „Explorer-Messung“); auf dem Referenzgerät nicht gemessen. |
 
 ## Explorer-Messung
 
-Gemessen im Debug-Build unter Xvfb mit Software-Rendering (ohne GPU), 4 vCPU, in zwei Container-Maschinen. Die Sitzung lief nach der Pause auf einer neuen Maschine.
+Gemessen im Debug-Build ohne GPU: lokal in zwei Container-Maschinen unter Xvfb mit Software-Rendering, 4 vCPU (die Sitzung lief nach der Pause auf einer neuen Maschine); in CI auf den GitHub-Rechnern `ubuntu-24.04` (Xvfb) und `windows-latest`.
 
-| Wert (Ziel)                               | Vorherige Maschine, vor der Optimierung | Vorherige Maschine, optimiert | Jetzige Maschine, optimiert (3 Läufe) |
-| ----------------------------------------- | --------------------------------------- | ----------------------------- | ------------------------------------- |
-| Baum nach dem Öffnen (≤ 1 s)              | 1.055–1.281 ms                          | 837–1.268 ms                  | 649–799 ms                            |
-| Auf- und Zuklappen, 95 % (≤ 100 ms)       | 56 ms                                   | 55–81 ms                      | 49 ms                                 |
-| Tag-Filter (≤ 100 ms)                     | 103–144 ms                              | 96–116 ms                     | 60–80 ms                              |
-| Scrollen, 95 % der Bildabstände (≤ 33 ms) | 41 ms                                   | 36–47 ms                      | 22–25 ms                              |
-| zum Vergleich: reine DOM-Liste, 95 %      | –                                       | 24–27 ms                      | 19–20 ms                              |
+| Wert (Ziel)                               | Vorherige Maschine, vor der Optimierung | Vorherige Maschine, optimiert | Jetzige Maschine, optimiert (3 Läufe) | CI Linux, Lauf 101 | CI Windows, Lauf 101 |
+| ----------------------------------------- | --------------------------------------- | ----------------------------- | ------------------------------------- | ------------------ | -------------------- |
+| Baum nach dem Öffnen (≤ 1 s)              | 1.055–1.281 ms                          | 837–1.268 ms                  | 649–799 ms                            | 750–767 ms         | 817–833 ms           |
+| Auf- und Zuklappen, 95 % (≤ 100 ms)       | 56 ms                                   | 55–81 ms                      | 49 ms                                 | 34 ms              | 32 ms                |
+| Tag-Filter (≤ 100 ms)                     | 103–144 ms                              | 96–116 ms                     | 60–80 ms                              | 54–56 ms           | 26–31 ms             |
+| Scrollen, 95 % der Bildabstände (≤ 33 ms) | 41 ms                                   | 36–47 ms                      | 22–25 ms                              | 24 ms              | 15,7 ms              |
+| zum Vergleich: reine DOM-Liste, 95 %      | –                                       | 24–27 ms                      | 19–20 ms                              | 19 ms              | 15,7 ms              |
+
+Unter Windows liegen auch die Bildabstände ohne jede Arbeit bei 15,6–15,7 ms: Das ist der Bildtakt (60 Hz). Das Scrollen verliert dort also kein Bild. Nach dem SQLite-Update (F-32) kam ein weiterer lokaler Lauf hinzu: Baum 632–665 ms, Auf- und Zuklappen 36 ms, Filter 50–64 ms, Scrollen 22–24 ms.
 
 Was ich gefunden und geändert habe:
 
@@ -111,7 +113,7 @@ Mein Vorschlag: einmal auf dem Referenzgerät messen (Release-Build, Hardware-Re
 
 ## Offene Fehler
 
-Keine bekannten. F-28 (Explorer-Messung) ist auf der jetzigen Maschine erfüllt; die Messung auf dem Referenzgerät steht aus.
+Keine bekannten. F-28 (Explorer-Messung) ist auf der jetzigen Maschine und in CI unter Windows und Linux erfüllt; die Messung auf dem Referenzgerät steht aus.
 
 ## Behobene Fehler
 
@@ -146,7 +148,15 @@ F-27 bis F-33 in `docs/status.md`:
 
 ## CI
 
-Zwischenstände trugen `[skip ci]`. Den Abschluss prüft ein CI-Lauf unter Windows und Linux; Ergebnis siehe Nachtrag.
+Zwischenstände trugen `[skip ci]`; die Läufe wurden von Hand gestartet.
+
+- **Lauf 100** (Commit `dbd993b`): rot. Der Job „Dependency audit“ meldete RUSTSEC-2026-0459 (F-32), die Explorer-Messung unter Windows scheiterte an der Mindestzahl der Zeilen (F-33). Linux und die Release-Prüfung waren grün; die Explorer-Messung unter Linux lag im Ziel.
+- **Lauf 101** (Commit `eae3587`): **grün**, alle vier Jobs:
+  - Windows und Linux: Prettier, ESLint, Typen, Vitest, rustfmt, Clippy, Rust-Tests, Referenzbibliothek reproduzierbar, erzeugte Typen und Lizenzliste aktuell, E2E 15 von 15 Dateien;
+  - Dependency audit: `cargo audit`, `cargo deny`, `npm audit`;
+  - Release-Build ohne Test-Plugins.
+
+Die Explorer-Messung lief auf beiden Systemen mit der vollen Referenzbibliothek (Werte im Abschnitt „Explorer-Messung“). Windows erzeugte sie in 112 s, Linux in 65 s, beide mit dem Fingerabdruck `cf56e8ae…`. Die Leistungsmessung der Phase 4 unter Windows: 50.000 Wörter öffnen in 168–247 ms, Tippen 95 % 15,8 ms.
 
 ## Nächster Schritt
 
