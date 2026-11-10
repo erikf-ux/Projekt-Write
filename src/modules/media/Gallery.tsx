@@ -6,7 +6,7 @@
  * without a thumbnail gets one drawn from page 1, one at a time.
  */
 import { FileUp, FolderUp, Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { useLocale, useT } from '@/i18n';
 import { MediaIcon } from '@/modules/documents/Explorer';
@@ -108,6 +108,71 @@ function Thumbnail({ medium, version }: { medium: MediaSummary; version: number 
   );
 }
 
+function tileId(index: number): string {
+  return `pw-gallery-${String(index)}`;
+}
+
+interface TileProps {
+  medium: MediaSummary;
+  index: number;
+  columns: number;
+  selected: boolean;
+  version: number;
+  onSelect: (index: number) => void;
+  onOpen: (id: string) => void;
+}
+
+/**
+ * One tile; memoised, so scrolling renders only the tiles that come into
+ * view (like the rows of the Explorer). `contain: strict` keeps style and
+ * layout of a tile to itself.
+ */
+const GalleryTile = memo(function GalleryTile({
+  medium,
+  index,
+  columns,
+  selected,
+  version,
+  onSelect,
+  onOpen,
+}: TileProps) {
+  const t = useT();
+  return (
+    <div
+      id={tileId(index)}
+      role="option"
+      aria-selected={selected}
+      aria-label={`${medium.title}, ${t(`media.kind.${medium.kind}`)}`}
+      data-media={medium.id}
+      data-media-kind={medium.kind}
+      className={`absolute flex flex-col gap-1 rounded-pw p-2 ${
+        selected ? 'bg-surface outline-2 outline-accent' : 'hover:bg-surface'
+      }`}
+      style={{
+        left: (index % columns) * TILE_WIDTH,
+        top: Math.floor(index / columns) * TILE_HEIGHT,
+        width: TILE_WIDTH - 8,
+        height: TILE_HEIGHT - 8,
+        contain: 'strict',
+      }}
+      onClick={() => {
+        onSelect(index);
+      }}
+      onDoubleClick={() => {
+        onOpen(medium.id);
+      }}
+    >
+      <div className="min-h-0 flex-1 overflow-hidden rounded-pw bg-sidebar">
+        <Thumbnail medium={medium} version={version} />
+      </div>
+      <span className="text-ui flex items-center gap-1 truncate">
+        <MediaIcon kind={medium.kind} />
+        <span className="truncate">{medium.title}</span>
+      </span>
+    </div>
+  );
+});
+
 export function Gallery({ hidden }: { hidden: boolean }) {
   const t = useT();
   const locale = useLocale((state) => state.locale);
@@ -160,7 +225,12 @@ export function Gallery({ hidden }: { hidden: boolean }) {
   const lastRow = Math.min(rows, Math.ceil((view.top + view.height) / TILE_HEIGHT) + OVERSCAN_ROWS);
   const visible = shown.slice(firstRow * columns, lastRow * columns);
   const current = Math.min(selected, Math.max(0, shown.length - 1));
-  const tileId = (index: number) => `pw-gallery-${String(index)}`;
+  const select = useCallback((index: number) => {
+    setSelected(index);
+    // The arrows and Enter work on from the clicked tile (WebKit does
+    // not always focus the list on a click).
+    scroller.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     pdfsInView.clear();
@@ -291,44 +361,17 @@ export function Gallery({ hidden }: { hidden: boolean }) {
         <div style={{ height: rows * TILE_HEIGHT }} className="relative">
           {visible.map((medium, offset) => {
             const index = firstRow * columns + offset;
-            const row = Math.floor(index / columns);
-            const column = index % columns;
             return (
-              <div
+              <GalleryTile
                 key={medium.id}
-                id={tileId(index)}
-                role="option"
-                aria-selected={index === current}
-                aria-label={`${medium.title}, ${t(`media.kind.${medium.kind}`)}`}
-                data-media={medium.id}
-                data-media-kind={medium.kind}
-                className={`absolute flex flex-col gap-1 rounded-pw p-2 ${
-                  index === current ? 'bg-surface outline-2 outline-accent' : 'hover:bg-surface'
-                }`}
-                style={{
-                  left: column * TILE_WIDTH,
-                  top: row * TILE_HEIGHT,
-                  width: TILE_WIDTH - 8,
-                  height: TILE_HEIGHT - 8,
-                }}
-                onClick={() => {
-                  setSelected(index);
-                  // The arrows and Enter work on from the clicked tile
-                  // (WebKit does not always focus the list on a click).
-                  scroller.current?.focus({ preventScroll: true });
-                }}
-                onDoubleClick={() => {
-                  openMedia(medium.id);
-                }}
-              >
-                <div className="min-h-0 flex-1 overflow-hidden rounded-pw bg-sidebar">
-                  <Thumbnail medium={medium} version={versions[medium.id] ?? 0} />
-                </div>
-                <span className="text-ui flex items-center gap-1 truncate">
-                  <MediaIcon kind={medium.kind} />
-                  <span className="truncate">{medium.title}</span>
-                </span>
-              </div>
+                medium={medium}
+                index={index}
+                columns={columns}
+                selected={index === current}
+                version={versions[medium.id] ?? 0}
+                onSelect={select}
+                onOpen={openMedia}
+              />
             );
           })}
         </div>

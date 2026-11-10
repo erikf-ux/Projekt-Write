@@ -46,19 +46,19 @@ Die Lizenzliste wächst um 17 Crates (darunter `moxcms` und `pxfm` unter BSD-3-C
 
 ## Welche Tests wurden durchgeführt?
 
-Umfang: **397 Rust-Tests** (261 Unit, 136 Integration; Phase 7: 348), **708 Vitest-Tests** in 39 Dateien (695 in 37), **E2E_GESAMT WebdriverIO-Tests** in 16 Dateien (56 in 15).
+Umfang: **397 Rust-Tests** (261 Unit, 136 Integration; Phase 7: 348), **708 Vitest-Tests** in 39 Dateien (695 in 37), **64 WebdriverIO-Tests** in 16 Dateien (56 in 15).
 
 Lokal (Linux-Container, Xvfb, D-Bus-Sitzung), alle ausgeführt und bestanden:
 
-| Prüfung                                                                                                                                                                                                            | Ergebnis                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Prettier, ESLint (`--max-warnings 0`), TypeScript (App und Node-Teil), Vitest (708)                                                                                                                                | bestanden                                                                                                                                         |
-| rustfmt, Clippy `-D warnings` (Linux, Linux + `e2e`)                                                                                                                                                               | bestanden                                                                                                                                         |
-| Rust-Tests (397), darunter 100 harte Abbrüche beim Speichern, 40 harte Abbrüche beim Import und die Migrationen ab jeder früheren Version (0 bis 7 → 8)                                                            | bestanden                                                                                                                                         |
-| Erzeugte TypeScript-Typen neu geschrieben und unverändert; Lizenzliste neu erzeugt                                                                                                                                 | bestanden                                                                                                                                         |
-| Referenzbibliothek reproduzierbar: zweimal voll gebaut (10.000 Dokumente, 5.000 Medien, noch nur PNG und JPEG); in der endgültigen Fassung mit allen fünf Bildformaten zweimal mit 1.000 Dokumenten und 500 Medien | bestanden, jeweils gleicher Fingerabdruck (voll je Lauf rund 250 s, davon 105 s für die Medien); die volle Größe der endgültigen Fassung prüft CI |
-| E2E (E2E_GESAMT) in 16 Dateien, darunter Medien (7) und Galerie-Messung (1)                                                                                                                                        | E2E_ERGEBNIS                                                                                                                                      |
-| Build ohne `eval(` und `Function`-Konstruktor (Suche im fertigen Frontend)                                                                                                                                         | bestanden; die einzigen Treffer sind ein Methodenname in `re2js` und `FunctionBasedShading` in PDF.js                                             |
+| Prüfung                                                                                                                                                                                                            | Ergebnis                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prettier, ESLint (`--max-warnings 0`), TypeScript (App und Node-Teil), Vitest (708)                                                                                                                                | bestanden                                                                                                                                                                                  |
+| rustfmt, Clippy `-D warnings` (Linux, Linux + `e2e`)                                                                                                                                                               | bestanden                                                                                                                                                                                  |
+| Rust-Tests (397), darunter 100 harte Abbrüche beim Speichern, 40 harte Abbrüche beim Import und die Migrationen ab jeder früheren Version (0 bis 7 → 8)                                                            | bestanden                                                                                                                                                                                  |
+| Erzeugte TypeScript-Typen neu geschrieben und unverändert; Lizenzliste neu erzeugt                                                                                                                                 | bestanden                                                                                                                                                                                  |
+| Referenzbibliothek reproduzierbar: zweimal voll gebaut (10.000 Dokumente, 5.000 Medien, noch nur PNG und JPEG); in der endgültigen Fassung mit allen fünf Bildformaten zweimal mit 1.000 Dokumenten und 500 Medien | bestanden, jeweils gleicher Fingerabdruck (voll je Lauf rund 250 s, davon 105 s für die Medien); die volle Größe der endgültigen Fassung prüft CI                                          |
+| E2E (64) in 16 Dateien, darunter Medien (7) und Galerie-Messung (1)                                                                                                                                                | bestanden: ein vollständiger Lauf (15 von 16 Dateien grün, `reference.e2e.ts` scheiterte an F-39 und F-40), danach die geänderten Dateien erneut mit allen Dateien, von denen sie abhängen |
+| Build ohne `eval(` und `Function`-Konstruktor (Suche im fertigen Frontend)                                                                                                                                         | bestanden; die einzigen Treffer sind ein Methodenname in `re2js` und `FunctionBasedShading` in PDF.js                                                                                      |
 
 `cargo audit` und `cargo deny` laufen in CI (siehe „CI“); lokal waren sie diesmal nicht installiert.
 
@@ -87,7 +87,26 @@ Was die Tests zeigen, im Einzelnen:
 
 ## Galerie-Messung
 
-GALERIE_MESSUNG
+Gemessen in `reference.e2e.ts` im Debug-Build mit der vollen Referenzbibliothek (5.000 Medien), im Container unter Xvfb mit Software-Rendering, 4 vCPU. Der Auftrag nennt für die Galerie keinen Zielwert; Abschnitt 17 verlangt „virtualisiert, mit Vorschaubildern“. Zum Vergleich steht der Explorer mit seinem Ziel von 30 Bildern pro Sekunde (ADR 0017, Punkt 17).
+
+| Wert                                                              | vor den Änderungen | nach den Änderungen |
+| ----------------------------------------------------------------- | ------------------ | ------------------- |
+| Erste Kacheln nach dem Öffnen (mit Befehlspalette)                | 147–168 ms         | 144–170 ms          |
+| Kacheln im DOM (von 5.000), vor und nach dem Scrollen             | 30, 40–45          | 30, 45              |
+| Scrollen, 240 px je Bild, erster Durchgang, 95 % der Bildabstände | 86–93 ms           | 70–88 ms            |
+| dieselbe Strecke noch einmal (Vorschaubilder geladen), 95 %       | –                  | 46–47 ms            |
+| Versuch: dieselbe Strecke ohne Bilder, 95 %                       | –                  | 38 ms               |
+| zum Vergleich: Explorer, 240 px je Bild, 95 %                     | 31 ms              | 26–32 ms            |
+
+Was ich gefunden und geändert habe:
+
+- PDF.js zeichnete die Vorschaubilder der PDFs auf dem Hauptthread **während** des Scrollens, auch für Kacheln, die längst wieder aus dem Bild waren. Jetzt wartet jedes Vorschaubild, bis 300 ms nicht gescrollt wurde, und ein PDF außer Sicht wird übersprungen (es kommt wieder in die Reihe, wenn es wieder erscheint). Gewinn: rund 10–15 ms beim 95-%-Wert.
+- Die Kacheln sind jetzt memoisiert und mit `contain: strict` abgeschlossen wie die Zeilen des Explorers. Messbar war das nicht; es bleibt, weil es nichts kostet.
+- Was übrig bleibt, ist das erste Laden und Dekodieren der Vorschaubilder: Ohne Bilder liegt die Galerie bei 38 ms, mit geladenen Bildern bei 46–47 ms, beim ersten Durchgang bei 70–88 ms. Die Kacheln sind größer als Explorer-Zeilen; ohne GPU kostet schon das Zeichnen mehr.
+
+Der Test prüft die Virtualisierung, den zweiten Durchgang gegen die Grenze des Explorers (50 ms) und den ersten Durchgang gegen eine Regressionsgrenze (150 ms). Die Werte schreibt er jedes Mal mit.
+
+Mein Vorschlag: auf dem Referenzgerät messen (Release-Build, Hardware-Rendering). Liegt der erste Durchgang dort noch deutlich über 33 ms, wären die nächsten Schritte kleinere Vorschaubilder für die Kacheln (heute höchstens 320 px, die Kachel zeigt rund 150 px) und ein Vorladen der nächsten Zeilen. Wenn du für die Galerie ein Ziel festlegen willst, sag es mir.
 
 ## Was konnte nicht getestet werden und warum?
 
@@ -99,15 +118,18 @@ GALERIE_MESSUNG
 
 ## Offene Fehler
 
-Keine bekannten.
+Keine bekannten. Offen ist die Messung der Galerie auf dem Referenzgerät (F-40, „Galerie-Messung“).
 
 ## Behobene Fehler
 
-F-34 bis F-38 in `docs/status.md`:
+F-34 bis F-40 in `docs/status.md`:
 
 - **F-34 und F-36 waren Fehler der App**, gefunden von den E2E-Tests unter WebKitGTK: Ein Klick auf eine Galerie-Kachel brachte den Fokus nicht in die Liste; ein Klick wählte ein Bild im Text nicht aus.
 - **F-35 und F-37 waren Fehler der Tests:** veraltete Elementverweise unter WebKitGTK und eine Erwartung der Phase 3, die nach der Umstellung des Ablegens nicht mehr stimmte (der offene Dialog riss dann alle folgenden Dateien im selben Prozess mit).
-- **F-38** betraf den Generator der Referenzbibliothek (zu große Testbilder).
+- **F-38 und F-39** betrafen den Generator der Referenzbibliothek: zu große Testbilder, und zu viele Favoriten (129 Medien unter „Favoriten“ schoben die Subnetze aus dem ersten Bild des Explorers, die Explorer-Messung lief in die Zeitgrenze).
+- **F-40 war ein Leistungsfehler der App:** PDF-Vorschaubilder entstanden während des Scrollens auf dem Hauptthread (siehe „Galerie-Messung“).
+
+Die Tippverzögerung der Phase 4 lag im vollständigen Lauf bei 95 % ≤ 66 ms (Ziel 50 ms), weil ich währenddessen die Typprüfung auf denselben vier Kernen laufen ließ. Auf der ruhigen Maschine wiederholt: 95 % ≤ 34 ms, Öffnen von 50.000 Wörtern 267–323 ms – wie in Phase 4.
 
 Außerdem fand der vollständige lokale Lauf vor dem CI-Lauf zwei Dinge, die meine Zwischenprüfungen übersehen hatten: eine nicht formatierte `vite.config.ts` und einen Typfehler im E2E-Test (ich hatte nur den App-Teil der Typprüfung laufen lassen). Beides ist behoben; genau dafür gibt es die Regel aus F-26.
 
