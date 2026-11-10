@@ -57,6 +57,7 @@ function update(extra: Partial<StructureUpdate> = {}): StructureUpdate {
     subnets: SUBNETS,
     tags: [],
     documents: [],
+    media: [],
     history: { undo: null, redo: null },
     step: null,
     subjectId: null,

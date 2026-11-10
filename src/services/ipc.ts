@@ -27,6 +27,20 @@ import type { ImportDocumentRequest } from '@/types/generated/ImportDocumentRequ
 import type { ImportResult } from '@/types/generated/ImportResult';
 import type { ImportThemeRequest } from '@/types/generated/ImportThemeRequest';
 import type { LibraryStatus } from '@/types/generated/LibraryStatus';
+import type { ImportCommitRequest } from '@/types/generated/ImportCommitRequest';
+import type { ImportCancelRequest } from '@/types/generated/ImportCancelRequest';
+import type { ImportOutcome } from '@/types/generated/ImportOutcome';
+import type { ImportPreview } from '@/types/generated/ImportPreview';
+import type { ImportProgress } from '@/types/generated/ImportProgress';
+import type { ImportStartRequest } from '@/types/generated/ImportStartRequest';
+import type { MediaFlagRequest } from '@/types/generated/MediaFlagRequest';
+import type { MediaIdRequest } from '@/types/generated/MediaIdRequest';
+import type { MediaSummary } from '@/types/generated/MediaSummary';
+import type { MediaUse } from '@/types/generated/MediaUse';
+import type { PageCountRequest } from '@/types/generated/PageCountRequest';
+import type { PurgeReport } from '@/types/generated/PurgeReport';
+import type { StoreThumbnailRequest } from '@/types/generated/StoreThumbnailRequest';
+import type { UpdateMediaRequest } from '@/types/generated/UpdateMediaRequest';
 import type { LibraryPreferences } from '@/types/generated/LibraryPreferences';
 import type { LocationChoice } from '@/types/generated/LocationChoice';
 import type { MenuStateRequest } from '@/types/generated/MenuStateRequest';
@@ -147,6 +161,25 @@ export interface Commands {
   tag_delete: { request: TagRequest; response: StructureUpdate };
   document_tag: { request: DocumentTagRequest; response: StructureUpdate };
   document_untag: { request: DocumentUntagRequest; response: StructureUpdate };
+  media_list: { request: EmptyRequest; response: MediaSummary[] };
+  media_trash_list: { request: EmptyRequest; response: MediaSummary[] };
+  media_get: { request: MediaIdRequest; response: MediaSummary };
+  media_update: { request: UpdateMediaRequest; response: MediaSummary };
+  media_set_favorite: { request: MediaFlagRequest; response: MediaSummary };
+  media_mark_opened: { request: MediaIdRequest; response: MediaSummary };
+  media_delete: { request: MediaIdRequest; response: MediaSummary };
+  media_restore: { request: MediaIdRequest; response: MediaSummary };
+  media_archive: { request: MediaFlagRequest; response: MediaSummary };
+  media_purge: { request: MediaIdRequest; response: null };
+  media_empty_trash: { request: EmptyRequest; response: PurgeReport };
+  media_uses: { request: MediaIdRequest; response: MediaUse[] };
+  media_set_page_count: { request: PageCountRequest; response: null };
+  media_store_thumbnail: { request: StoreThumbnailRequest; response: null };
+  media_open_external: { request: MediaIdRequest; response: null };
+  media_import_files: { request: ImportStartRequest; response: ImportPreview | null };
+  media_import_folder: { request: ImportStartRequest; response: ImportPreview | null };
+  media_import_commit: { request: ImportCommitRequest; response: ImportOutcome };
+  media_import_cancel: { request: ImportCancelRequest; response: null };
   library_preferences: { request: EmptyRequest; response: LibraryPreferences };
   library_update_preferences: { request: LibraryPreferences; response: LibraryPreferences };
   link_open: { request: OpenLinkRequest; response: null };
@@ -170,6 +203,8 @@ export interface Commands {
 /** Commands that report progress through a channel argument `onProgress`. */
 export interface ProgressCommands {
   library_move: MoveProgress;
+  media_import_files: ImportProgress;
+  media_import_folder: ImportProgress;
 }
 
 export type CommandName = keyof Commands;
@@ -286,6 +321,25 @@ export async function callWithProgress<C extends CommandName & keyof ProgressCom
   channel.onmessage = onProgress;
   try {
     const value = await invoke<Commands[C]['response']>(command, { request, onProgress: channel });
+    return { ok: true, value };
+  } catch (raw) {
+    return { ok: false, error: normalizeError(raw) };
+  }
+}
+
+/**
+ * Hands a dropped or pasted file to Rust as raw bytes (ADR 0019): the
+ * command `media_import_bytes` prepares an import of one. The name travels
+ * URI-encoded in a header. Never throws.
+ */
+export async function importMediaBytes(
+  name: string,
+  bytes: Uint8Array,
+): Promise<CommandResult<ImportPreview>> {
+  try {
+    const value = await invoke<ImportPreview>('media_import_bytes', bytes, {
+      headers: { 'x-pw-file-name': encodeURIComponent(name) },
+    });
     return { ok: true, value };
   } catch (raw) {
     return { ok: false, error: normalizeError(raw) };
