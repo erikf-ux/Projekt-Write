@@ -122,7 +122,7 @@ Keine bekannten. Offen ist die Messung der Galerie auf dem Referenzgerät (F-40,
 
 ## Behobene Fehler
 
-F-34 bis F-43 in `docs/status.md`:
+F-34 bis F-44 in `docs/status.md`:
 
 - **F-34 und F-36 waren Fehler der App**, gefunden von den E2E-Tests unter WebKitGTK: Ein Klick auf eine Galerie-Kachel brachte den Fokus nicht in die Liste; ein Klick wählte ein Bild im Text nicht aus.
 - **F-35 und F-37 waren Fehler der Tests:** veraltete Elementverweise unter WebKitGTK und eine Erwartung der Phase 3, die nach der Umstellung des Ablegens nicht mehr stimmte (der offene Dialog riss dann alle folgenden Dateien im selben Prozess mit).
@@ -130,6 +130,7 @@ F-34 bis F-43 in `docs/status.md`:
 - **F-40 war ein Leistungsfehler der App:** PDF-Vorschaubilder entstanden während des Scrollens auf dem Hauptthread (siehe „Galerie-Messung“).
 - **F-41 und F-42 fand CI-Lauf 102:** eine Lizenzliste, die von der Maschine abhing (eine nur unter Node.js genutzte Abhängigkeit von PDF.js in einer weiteren Variante), und eine nur unter Windows ungenutzte Variable in einem Test. Die Windows-Prüfung mit Clippy hatte ich lokal diesmal ausgelassen, weil das Windows-Ziel wegen Platzmangels gelöscht war.
 - **F-43 fand CI-Lauf 104** unter Windows: Ein Test verglich zwei Pfade in verschiedener Schreibweise (`\\?\`-Form nur auf einer Seite). Ein Fehler des Tests.
+- **F-44 fand CI-Lauf 105** im ersten Windows-E2E-Lauf der Phase: Nach einem Neuladen kamen die Tabs nicht zurück, und der Kürzel-Test ließ dann einen absichtlichen Konflikt stehen, der alle folgenden Dateien mitriss (wie F-27). Seit Phase 8 wartete die Wiederherstellung der Tabs auf das Laden der Medien; das ist gelöst, der Test räumt jetzt in jedem Fall auf.
 
 Die Tippverzögerung der Phase 4 lag im vollständigen Lauf bei 95 % ≤ 66 ms (Ziel 50 ms), weil ich währenddessen die Typprüfung auf denselben vier Kernen laufen ließ. Auf der ruhigen Maschine wiederholt: 95 % ≤ 34 ms, Öffnen von 50.000 Wörtern 267–323 ms – wie in Phase 4.
 

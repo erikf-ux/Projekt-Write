@@ -89,6 +89,9 @@ export async function newDocument(): Promise<string> {
 export async function runFromPalette(command: string): Promise<void> {
   await browser.keys(['Control', 'Shift', 'p']);
   const option = $(`[data-testid="command-palette"] [data-command="${command}"]`);
+  await option.waitForExist({ timeoutMsg: `${command} is not offered` });
+  // The list scrolls; an entry below its end counts as hidden for some drivers.
+  await option.scrollIntoView({ block: 'nearest' });
   await option.waitForDisplayed({ timeoutMsg: `${command} is not offered` });
   await option.click();
   await $('[data-testid="command-palette"]').waitForExist({ reverse: true });

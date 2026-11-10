@@ -112,6 +112,54 @@ async function activeDocumentId(): Promise<string> {
   return (await tab.getAttribute('data-tab')) ?? '';
 }
 
+/** Writes the shortcuts of the settings through Rust, as the settings dialog would. */
+async function setKeybindings(keybindings: Record<string, string[]>): Promise<void> {
+  await browser.execute(async (bindings: Record<string, string[]>) => {
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
+    const state = (await internals.invoke('ui_state', { request: {} })) as {
+      settings: Record<string, unknown>;
+    };
+    await internals.invoke('ui_update_settings', {
+      request: { settings: { ...state.settings, keybindings: bindings } },
+    });
+  }, keybindings);
+}
+
+/** What the start after a reload is waiting for, when the tabs do not come back. */
+async function startDiagnosis(): Promise<unknown> {
+  return browser.execute(async () => {
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
+    const timed = async (command: string) => {
+      const started = performance.now();
+      const answer = await Promise.race([
+        internals.invoke(command, { request: {} }).then(
+          (value) => `ok ${JSON.stringify(value).slice(0, 120)}`,
+          (error: unknown) => `error ${JSON.stringify(error).slice(0, 120)}`,
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => {
+            resolve('no answer within 5 s');
+          }, 5_000),
+        ),
+      ]);
+      return `${answer} (${(performance.now() - started).toFixed(0)} ms)`;
+    };
+    return {
+      tabs: document.querySelectorAll('[data-testid="tabs"] [role="tab"]').length,
+      explorerRows: document.querySelectorAll('[data-testid="explorer"] [role="treeitem"]').length,
+      dialogs: [...document.querySelectorAll('[role="dialog"]')].map((d) => d.getAttribute('data-testid')),
+      mediaList: await timed('media_list'),
+      mediaTrash: await timed('media_trash_list'),
+      structure: await timed('structure_state'),
+      session: await timed('session_restore'),
+    };
+  });
+}
+
 describe('Project Write – Phase 3 workbench', () => {
   before(async () => {
     await pinMainWindow();
@@ -218,44 +266,49 @@ describe('Project Write – Phase 3 workbench', () => {
 
   it('reports conflicts in the settings file and runs nothing on such a chord', async () => {
     // As if settings.json had been edited by hand: two commands on Ctrl+N.
-    await browser.execute(async () => {
-      const internals = (
-        window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }
-      ).__TAURI_INTERNALS__;
-      const state = (await internals.invoke('ui_state', { request: {} })) as {
-        settings: Record<string, unknown>;
-      };
-      await internals.invoke('ui_update_settings', {
-        request: { settings: { ...state.settings, keybindings: { 'palette.show': ['Ctrl+N'] } } },
-      });
-    });
-    // The interface reads the settings at start.
-    await browser.refresh();
-    await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
-    await expect($('[data-testid="status-conflicts"]')).toHaveText(expect.stringContaining('1'));
-    // Stage 1 (Phase 6) opens the tabs of the session again after the reload;
-    // counted before that, a restored tab would look like a new one.
-    await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').waitForExist({
-      timeoutMsg: 'the tabs of the session did not come back',
-    });
-    const tabsBefore = (await tabTitles()).length;
-    await $('[data-testid="explorer"] [role="tree"]').click();
-    await browser.keys(['Control', 'n']);
-    await expect($('[data-testid="notice"]')).toHaveText(expect.stringContaining('mehreren Befehlen'));
-    expect((await tabTitles()).length).toBe(tabsBefore);
-    await expect($('[data-testid="command-palette"]')).not.toBeExisting();
+    await setKeybindings({ 'palette.show': ['Ctrl+N'] });
+    try {
+      // The interface reads the settings at start.
+      await browser.refresh();
+      await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+      await expect($('[data-testid="status-conflicts"]')).toHaveText(expect.stringContaining('1'));
+      // Stage 1 (Phase 6) opens the tabs of the session again after the reload;
+      // counted before that, a restored tab would look like a new one.
+      try {
+        await $('[data-testid="tabs"] [role="tab"][aria-selected="true"]').waitForExist({ timeout: 30_000 });
+      } catch {
+        throw new Error(
+          `the tabs of the session did not come back: ${JSON.stringify(await startDiagnosis())}`,
+        );
+      }
+      const tabsBefore = (await tabTitles()).length;
+      await $('[data-testid="explorer"] [role="tree"]').click();
+      await browser.keys(['Control', 'n']);
+      await expect($('[data-testid="notice"]')).toHaveText(expect.stringContaining('mehreren Befehlen'));
+      expect((await tabTitles()).length).toBe(tabsBefore);
+      await expect($('[data-testid="command-palette"]')).not.toBeExisting();
 
-    await $('[data-testid="status-conflicts"]').click();
-    await expect($('[data-testid="shortcut-conflicts"]')).toHaveText(
-      expect.stringContaining('Befehlspalette'),
-    );
-    await $('[data-shortcut-row="palette.show"]').$('button=Standard').click();
-    await expect($('[data-testid="shortcut-conflicts"]')).not.toBeExisting();
-    // The interface resets at once; Rust writes the file right after.
-    await browser.waitUntil(() => JSON.stringify(readSettings()['keybindings']) === '{}', {
-      timeoutMsg: 'the reset shortcut was not saved',
-    });
-    await closeSettings();
+      await $('[data-testid="status-conflicts"]').click();
+      await expect($('[data-testid="shortcut-conflicts"]')).toHaveText(
+        expect.stringContaining('Befehlspalette'),
+      );
+      await $('[data-shortcut-row="palette.show"]').$('button=Standard').click();
+      await expect($('[data-testid="shortcut-conflicts"]')).not.toBeExisting();
+      // The interface resets at once; Rust writes the file right after.
+      await browser.waitUntil(() => JSON.stringify(readSettings()['keybindings']) === '{}', {
+        timeoutMsg: 'the reset shortcut was not saved',
+      });
+      await closeSettings();
+    } finally {
+      // A failure above must not leave Ctrl+N and the palette blocked for
+      // every file after this one (as in F-27).
+      if (JSON.stringify(readSettings()['keybindings']) !== '{}') {
+        await closeSettings();
+        await setKeybindings({});
+        await browser.refresh();
+        await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+      }
+    }
   });
 
   it('reaches every region with the keyboard and shows the focus', async () => {
