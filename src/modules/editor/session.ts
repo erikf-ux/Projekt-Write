@@ -21,6 +21,8 @@ import { excerpt, findLosses, type Loss } from './markdown/losses';
 import type { ConversionSource } from './convert';
 import { firstDifference, markdownSchema, probeMarkdown, type ProbeIssue } from './markdown/probe';
 import { plainClipboardText, plainDocument, plainExtensions, plainText } from './plain/schema';
+import { isDocumentFile } from '@/modules/documents/importFiles';
+import { mediaReference } from '@/modules/media/mediaUrl';
 import { handleRichPaste } from './paste';
 import { markdownExtensions } from './schema/extensions';
 import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
@@ -64,7 +66,21 @@ export interface SessionOptions {
   onOpenLink?: (href: string) => void;
   /** `[[` was typed in rich text: ask which document to link (ADR 0015). */
   onInternalLinkRequest?: () => void;
+  /**
+   * Files other than text documents were pasted or dropped into rich text:
+   * they are imported into the library and inserted (ADR 0019, decision 10).
+   * `position` is where they were dropped, null for the cursor.
+   */
+  onMediaFiles?: (files: File[], position: number | null) => void;
 }
+
+/**
+ * A medium to insert: an image, or a link to a medium with its text (a PDF
+ * reference with its page, or an attachment).
+ */
+export type InsertedMedium =
+  | { kind: 'image'; id: string; alt: string }
+  | { kind: 'link'; id: string; text: string; page: number | null };
 
 export interface ViewSwitch {
   ok: boolean;
@@ -233,6 +249,46 @@ export class EditorSession {
       })
       .unsetMark('link')
       .run();
+  }
+
+  /**
+   * Inserts media at the cursor or at `position`: images as image nodes,
+   * PDF references and attachments as links. A single link over selected
+   * text links that text. False if rich text is not shown or not editable.
+   * The position comes from before an import and is kept inside the text.
+   */
+  insertMedia(items: readonly InsertedMedium[], position: number | null = null): boolean {
+    const editor = this.rich;
+    if (!editor || !editor.isEditable || (this.isMarkdown && this.view !== 'rich') || items.length === 0) {
+      return false;
+    }
+    const [only] = items;
+    if (items.length === 1 && only?.kind === 'link' && position === null && !editor.state.selection.empty) {
+      return editor
+        .chain()
+        .focus()
+        .setLink({ href: mediaReference(only.id, only.page) })
+        .run();
+    }
+    const content: JSONContent[] = [];
+    items.forEach((item, index) => {
+      if (index > 0) {
+        content.push({ type: 'text', text: ' ' });
+      }
+      content.push(
+        item.kind === 'image'
+          ? { type: 'image', attrs: { src: mediaReference(item.id), alt: item.alt, title: null } }
+          : {
+              type: 'text',
+              text: item.text,
+              marks: [{ type: 'link', attrs: { href: mediaReference(item.id, item.page) } }],
+            },
+      );
+    });
+    const chain = editor.chain().focus();
+    const at = position === null ? null : Math.max(0, Math.min(position, editor.state.doc.content.size));
+    (at === null ? chain.insertContent(content) : chain.insertContentAt(at, content)).unsetMark('link').run();
+    return true;
   }
 
   /** What a conversion starts from: the rich text if it is shown, else the text. */
@@ -508,10 +564,27 @@ export class EditorSession {
                   return false;
                 },
               },
-              handlePaste: (view, event) =>
-                handleRichPaste(view, event, (content) => {
+              handlePaste: (view, event) => {
+                const files = mediaFiles(event.clipboardData);
+                if (files.length > 0 && this.options.onMediaFiles) {
+                  this.options.onMediaFiles(files, null);
+                  return true;
+                }
+                return handleRichPaste(view, event, (content) => {
                   this.rich?.commands.insertContent(content);
-                }),
+                });
+              },
+              // Dropped media files land where they were dropped; text
+              // documents are left to the window (document import).
+              handleDrop: (view, event, _slice, moved) => {
+                const files = moved ? [] : mediaFiles(event.dataTransfer);
+                if (files.length === 0 || !this.options.onMediaFiles || !view.editable) {
+                  return false;
+                }
+                const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? null;
+                this.options.onMediaFiles(files, position);
+                return true;
+              },
             }),
       },
       onUpdate: () => {
@@ -532,6 +605,13 @@ export class EditorSession {
 }
 
 /** The address of the link at a position, if there is one. */
+/** Files of a paste or drop that are no text documents. */
+function mediaFiles(data: DataTransfer | null): File[] {
+  // Not every clipboard (or test double) carries a file list.
+  const files: FileList | undefined = data?.files;
+  return files ? [...files].filter((file) => !isDocumentFile(file.name)) : [];
+}
+
 export function linkAt(document: ProseMirrorNode, position: number): string | null {
   for (const at of [position, position - 1]) {
     if (at < 0 || at >= document.content.size) {

@@ -23,17 +23,31 @@ import { useUi } from '@/modules/settings/uiStore';
 import { call } from '@/services/ipc';
 import { FindBar } from './find/FindBar';
 import { useFind } from './find/findStore';
+import { mediaById, useMedia } from '@/modules/media/mediaStore';
+import { parseMediaReference } from '@/modules/media/mediaUrl';
+import { useImageDialog } from './ImageDialog';
 import { useInternalLinkPicker } from './InternalLinkPicker';
+import { setImageEditor } from './schema/image';
 import { internalLinkTarget } from './schema/extensions';
 import { takePendingSelection } from '@/modules/documents/sessionTabs';
 import { getSession, openSession } from './session';
 import './editor.css';
 
 /**
- * Opens a link: an internal one (`pwrite://<id>`) as a tab of the app, a web
- * link in the system browser (only http, https and mailto; Rust checks).
+ * Opens a link: an internal one (`pwrite://<id>`) as a tab of the app, a
+ * medium (`pwmedia://<id>`, a PDF on its page) in its tab, a web link in
+ * the system browser (only http, https and mailto; Rust checks).
  */
 async function openLink(href: string): Promise<void> {
+  const medium = parseMediaReference(href.trim());
+  if (medium !== null) {
+    if (!mediaById(useMedia.getState(), medium.id)) {
+      useUi.getState().showNotice({ tone: 'error', key: 'editor.mediaGone' });
+      return;
+    }
+    useWorkspace.getState().openMedia(medium.id, medium.page);
+    return;
+  }
   const target = internalLinkTarget(href);
   if (target !== null) {
     const workspace = useWorkspace.getState();
@@ -48,6 +62,27 @@ async function openLink(href: string): Promise<void> {
   if (!result.ok) {
     useUi.getState().showNotice({ tone: 'error', key: 'error.linkOpenFailed', error: result.error });
   }
+}
+
+// A double click on a library image opens "Bild bearbeiten" (`ImageDialog`).
+setImageEditor((position) => {
+  const tab = useWorkspace.getState().active;
+  if (tab && getSession(tab)?.editor.isEditable === true) {
+    useImageDialog.getState().open(tab, position);
+  }
+});
+
+/** Pasted or dropped files: imported into the library, then inserted. */
+async function insertMediaFiles(tab: string, files: File[], position: number | null): Promise<void> {
+  const media = await useMedia.getState().importForEditor(files);
+  getSession(tab)?.insertMedia(
+    media.map((medium) =>
+      medium.kind === 'image'
+        ? { kind: 'image', id: medium.id, alt: medium.description || medium.title }
+        : { kind: 'link', id: medium.id, text: medium.title, page: null },
+    ),
+    position,
+  );
 }
 
 export function panelElementId(id: string): string {
@@ -167,6 +202,9 @@ function DocumentPanel({
       },
       onInternalLinkRequest: () => {
         useInternalLinkPicker.getState().open(id);
+      },
+      onMediaFiles: (files, position) => {
+        void insertMediaFiles(id, files, position);
       },
     });
     setDocumentSource(id, session);

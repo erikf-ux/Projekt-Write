@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(parse_path(&format!("/{}", id.to_uppercase())), None);
         assert_eq!(parse_path(&format!("/{id}/../library.json")), None);
         assert_eq!(parse_path("/../database/projectwrite.db"), None);
-        assert_eq!(parse_path(&format!("{id}")), None);
+        assert_eq!(parse_path(id), None);
         assert_eq!(parse_path("/"), None);
     }
 }

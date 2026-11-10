@@ -157,6 +157,8 @@ describe('command availability (the palette shows only working commands)', () =>
       'format.blockquote': true,
       'format.codeBlock': true,
       'format.link': true,
+      'format.image': true,
+      'format.pdfReference': true,
       'format.horizontalRule': true,
       'format.table': true,
     };

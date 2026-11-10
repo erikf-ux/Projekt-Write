@@ -7,7 +7,9 @@
 import type { Editor } from '@tiptap/core';
 import type { CommandDefinition, CommandId } from '@/modules/commands/types';
 import { activeDocument, useWorkspace } from '@/modules/documents/workspaceStore';
+import { selectedImage, useImageDialog } from '@/modules/editor/ImageDialog';
 import { useLinkDialog } from '@/modules/editor/LinkDialog';
+import { useMediaPicker } from '@/modules/editor/MediaPicker';
 import { getSession } from '@/modules/editor/session';
 import { useLibrary } from '@/modules/library/libraryStore';
 
@@ -104,6 +106,35 @@ export function createFormatCommands(): CommandDefinition[] {
       const href: unknown = editor.getAttributes('link')['href'];
       useLinkDialog.getState().open(typeof href === 'string' ? href : '');
     }),
+    // Media of the library (Phase 8): the picker inserts at the cursor.
+    format('format.image', 'command.format.image', () => {
+      const tab = useWorkspace.getState().active;
+      if (tab) {
+        useMediaPicker.getState().open(tab, 'image');
+      }
+    }),
+    format('format.pdfReference', 'command.format.pdfReference', () => {
+      const tab = useWorkspace.getState().active;
+      if (tab) {
+        useMediaPicker.getState().open(tab, 'pdf');
+      }
+    }),
+    {
+      id: 'format.imageEdit',
+      category: 'edit',
+      titleKey: 'command.format.imageEdit',
+      isAvailable: () => {
+        const tab = useWorkspace.getState().active;
+        return richEditor() !== null && tab !== null && selectedImage(tab) !== null;
+      },
+      run: () => {
+        const tab = useWorkspace.getState().active;
+        const position = tab && richEditor() ? selectedImage(tab) : null;
+        if (tab && position !== null) {
+          useImageDialog.getState().open(tab, position);
+        }
+      },
+    },
     format('format.horizontalRule', 'command.format.horizontalRule', (editor) =>
       editor.chain().focus().setHorizontalRule().run(),
     ),

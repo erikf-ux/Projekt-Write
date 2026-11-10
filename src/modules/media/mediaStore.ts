@@ -8,6 +8,7 @@
  */
 import { create } from 'zustand';
 import { ask } from '@/components/prompt/promptStore';
+import { translate, useLocale } from '@/i18n';
 import { useUi } from '@/modules/settings/uiStore';
 import { setMediaLookup, setMediaReloader, useStructure } from '@/modules/structure/structureStore';
 import { call, callWithProgress, importMediaBytes } from '@/services/ipc';
@@ -67,6 +68,12 @@ interface MediaStore {
   startImport: (source: 'files' | 'folder', dialogTitle: string) => Promise<void>;
   /** Prepares files dropped onto the window or pasted; with no duplicate they are imported at once. */
   importFiles: (files: readonly File[], subnetId?: string | null) => Promise<ImportOutcome | null>;
+  /**
+   * Imports pasted or dropped files for the editor, without a dialog: a
+   * duplicate uses the existing medium, a refused file is named in a
+   * notice. Returns the media to insert, in the order of the files.
+   */
+  importForEditor: (files: readonly File[]) => Promise<MediaSummary[]>;
   commitImport: (choice: ImportChoice) => Promise<ImportOutcome | null>;
   cancelImport: () => Promise<void>;
 }
@@ -99,6 +106,26 @@ function continueDrop(store: () => MediaStore) {
   if (next && next.files.length > 0) {
     void store().importFiles(next.files, next.subnetId);
   }
+}
+
+/** Endings for pasted files without a name of their own, by type. */
+const ENDINGS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'application/pdf': 'pdf',
+};
+
+/** The name a pasted file is imported under (a screenshot has none). */
+export function pastedName(file: File, fallback: string): string {
+  if (/\.[A-Za-z0-9]{1,8}$/.test(file.name)) {
+    return file.name;
+  }
+  const ending = ENDINGS[file.type];
+  const base = file.name.trim() === '' ? fallback : file.name.trim();
+  return ending ? `${base}.${ending}` : base;
 }
 
 /** Bytes of a file for the import (Rust checks type and size). */
@@ -387,6 +414,48 @@ export const useMedia = create<MediaStore>((set, get) => ({
       set({ lastImport: outcome });
     }
     return outcome;
+  },
+
+  importForEditor: async (files) => {
+    const locale = useLocale.getState().locale;
+    const ids: string[] = [];
+    for (const file of files) {
+      const name = pastedName(file, translate(locale, 'editor.pastedImage'));
+      const prepared = await importMediaBytes(name, await bytesOf(file));
+      if (!prepared.ok) {
+        showError(prepared.error);
+        continue;
+      }
+      const preview = prepared.value;
+      if (preview.items.length === 0) {
+        await call('media_import_cancel', { batchId: preview.batchId });
+        const reason = preview.skipped[0]?.reason ?? 'type';
+        useUi.getState().showNotice({
+          tone: 'error',
+          key: 'editor.mediaRefused',
+          params: { name, reason: translate(locale, `media.skip.${reason}`) },
+        });
+        continue;
+      }
+      const committed = await call('media_import_commit', {
+        batchId: preview.batchId,
+        duplicates: 'useExisting',
+      });
+      if (!committed.ok) {
+        showError(committed.error);
+        continue;
+      }
+      ids.push(...committed.value.items.map((item) => item.id));
+    }
+    if (ids.length === 0) {
+      return [];
+    }
+    await Promise.all([get().refresh(), useStructure.getState().load()]);
+    const state = get();
+    return ids.flatMap((id) => {
+      const medium = mediaById(state, id);
+      return medium ? [medium] : [];
+    });
   },
 
   commitImport: async (choice) => {

@@ -67,6 +67,9 @@
   "command.format.paragraph": "Normal text",
   "command.format.strike": "Strikethrough",
   "command.format.table": "Insert table",
+  "command.format.image": "Insert image …",
+  "command.format.pdfReference": "Insert PDF reference …",
+  "command.format.imageEdit": "Edit image …",
   "command.format.taskList": "Task list",
   "command.format.underline": "Underline",
   "command.lineWidth.toggle": "Toggle line width limit",
@@ -745,6 +748,9 @@
   "command.media.insertImage": "Insert image …",
   "command.media.insertPdfReference": "Insert PDF reference …",
   "editor.mediaMissing": "Medium missing",
+  "editor.mediaRefused": "“{name}” was not inserted: {reason}.",
+  "editor.pastedImage": "Pasted image",
+  "editor.mediaGone": "The medium is no longer in the library.",
   "editor.image.size": "Display size",
   "editor.image.sizeOriginal": "Original",
   "editor.image.caption": "Caption",
@@ -760,5 +766,7 @@
   "mediaPicker.insert": "Insert",
   "mediaPicker.importNew": "Import new …",
   "mediaPicker.empty": "No matching media. “Import new …” adds some.",
-  "mediaPicker.list": "Media"
+  "mediaPicker.list": "Media",
+  "mediaPicker.pageInvalid": "Page 1 to {count}",
+  "mediaPicker.pages": "{count} pages"
 }

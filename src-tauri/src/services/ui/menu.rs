@@ -97,6 +97,10 @@ pub enum MenuCommand {
     FormatCodeBlock,
     #[serde(rename = "format.link")]
     FormatLink,
+    #[serde(rename = "format.image")]
+    FormatImage,
+    #[serde(rename = "format.pdfReference")]
+    FormatPdfReference,
     #[serde(rename = "format.horizontalRule")]
     FormatHorizontalRule,
     #[serde(rename = "format.table")]
@@ -104,7 +108,7 @@ pub enum MenuCommand {
 }
 
 impl MenuCommand {
-    pub const ALL: [MenuCommand; 36] = [
+    pub const ALL: [MenuCommand; 38] = [
         MenuCommand::DocumentNew,
         MenuCommand::DocumentSave,
         MenuCommand::DocumentOpenFile,
@@ -139,6 +143,8 @@ impl MenuCommand {
         MenuCommand::FormatBlockquote,
         MenuCommand::FormatCodeBlock,
         MenuCommand::FormatLink,
+        MenuCommand::FormatImage,
+        MenuCommand::FormatPdfReference,
         MenuCommand::FormatHorizontalRule,
         MenuCommand::FormatTable,
     ];
@@ -180,6 +186,8 @@ impl MenuCommand {
             MenuCommand::FormatBlockquote => "format.blockquote",
             MenuCommand::FormatCodeBlock => "format.codeBlock",
             MenuCommand::FormatLink => "format.link",
+            MenuCommand::FormatImage => "format.image",
+            MenuCommand::FormatPdfReference => "format.pdfReference",
             MenuCommand::FormatHorizontalRule => "format.horizontalRule",
             MenuCommand::FormatTable => "format.table",
         }
@@ -313,6 +321,8 @@ const LAYOUT: [(&str, &[Option<MenuCommand>]); 4] = [
             Some(MenuCommand::FormatCodeBlock),
             None,
             Some(MenuCommand::FormatLink),
+            Some(MenuCommand::FormatImage),
+            Some(MenuCommand::FormatPdfReference),
             Some(MenuCommand::FormatHorizontalRule),
             Some(MenuCommand::FormatTable),
         ],

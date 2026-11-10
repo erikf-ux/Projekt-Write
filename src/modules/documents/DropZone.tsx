@@ -121,6 +121,9 @@ export function DropZone({ children }: { children: ReactNode }) {
       if (!carriesFiles(event.dataTransfer) || !event.dataTransfer) {
         return;
       }
+      // Rich text takes dropped media itself and inserts them where they
+      // were dropped (`session.ts`); text documents are imported here.
+      const editorTook = event.defaultPrevented;
       event.preventDefault();
       depth.current = 0;
       setOver(false);
@@ -136,7 +139,7 @@ export function DropZone({ children }: { children: ReactNode }) {
       }
       void run(files.filter((file) => isDocumentFile(file.name)));
       const media = files.filter((file) => !isDocumentFile(file.name));
-      if (media.length > 0) {
+      if (media.length > 0 && !editorTook) {
         void importMedia(media);
       }
     };

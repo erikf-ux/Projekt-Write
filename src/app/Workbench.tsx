@@ -38,7 +38,9 @@ import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor'
 import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
 import { HistoryDialog, VersionNameDialog } from '@/modules/history/HistoryDialog';
 import { offerRecovery, RecoveryDialog } from '@/modules/recovery/RecoveryDialog';
+import { ImageDialog } from '@/modules/editor/ImageDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
+import { MediaPicker } from '@/modules/editor/MediaPicker';
 import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
 import { useStatistics } from '@/modules/editor/statisticsStore';
@@ -375,6 +377,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       )}
       <LinkDialog />
       <InternalLinkPicker />
+      <MediaPicker />
+      <ImageDialog />
       <HistoryDialog />
       <RecoveryDialog />
       <VersionNameDialog />

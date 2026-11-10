@@ -67,6 +67,9 @@
   "command.format.paragraph": "Normaler Text",
   "command.format.strike": "Durchgestrichen",
   "command.format.table": "Tabelle einfügen",
+  "command.format.image": "Bild einfügen …",
+  "command.format.pdfReference": "PDF-Verweis einfügen …",
+  "command.format.imageEdit": "Bild bearbeiten …",
   "command.format.taskList": "Aufgabenliste",
   "command.format.underline": "Unterstrichen",
   "command.lineWidth.toggle": "Zeilenbreite begrenzen ein/aus",
@@ -745,6 +748,9 @@
   "command.media.insertImage": "Bild einfügen …",
   "command.media.insertPdfReference": "PDF-Verweis einfügen …",
   "editor.mediaMissing": "Medium fehlt",
+  "editor.mediaRefused": "„{name}“ wurde nicht eingefügt: {reason}.",
+  "editor.pastedImage": "Eingefügtes Bild",
+  "editor.mediaGone": "Das Medium gibt es in der Bibliothek nicht mehr.",
   "editor.image.size": "Anzeigegröße",
   "editor.image.sizeOriginal": "Original",
   "editor.image.caption": "Bildunterschrift",
@@ -760,5 +766,7 @@
   "mediaPicker.insert": "Einfügen",
   "mediaPicker.importNew": "Neu importieren …",
   "mediaPicker.empty": "Keine passenden Medien. Mit „Neu importieren …“ kommen welche dazu.",
-  "mediaPicker.list": "Medien"
+  "mediaPicker.list": "Medien",
+  "mediaPicker.pageInvalid": "Seite 1 bis {count}",
+  "mediaPicker.pages": "{count} Seiten"
 }

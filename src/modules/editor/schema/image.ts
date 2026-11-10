@@ -1,14 +1,19 @@
 /**
- * Images in Markdown documents (section 10/12). Phase 4 keeps them exactly
- * and shows them as a note with their address; nothing is ever loaded
- * (section 12: "Bilder mit Webadresse werden nie automatisch geladen. Sie
- * erscheinen als Hinweis mit Adresse."). Inserting and importing images
- * comes with the media library (Phase 8).
+ * Images in documents (section 10/12). An image of the library
+ * (`pwmedia://<id>`, Phase 8, ADR 0019 decision 10) is shown through the
+ * media handler, with its caption (the title) below and its display size;
+ * if the medium is gone, "Medium fehlt" takes its place. Every other image
+ * stays a note with its address and is never loaded (section 12: "Bilder
+ * mit Webadresse werden nie automatisch geladen. Sie erscheinen als Hinweis
+ * mit Adresse.").
  *
  * Size is part of the allowed HTML subset: an image with `width` or
  * `height` is written as `<img>`, otherwise as `![alt](src "title")`.
  */
 import { Node, type JSONContent } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { translate, useLocale } from '@/i18n';
+import { mediaUrl, parseMediaReference } from '@/modules/media/mediaUrl';
 import { stringAttribute, tokenString } from './attributes';
 import { linkDestination, linkTitle } from '../markdown/escape';
 
@@ -54,6 +59,82 @@ export function imageHtml(image: ImageAttributes): string {
   if (image.width !== null) parts.push(`width="${escapeHtmlAttribute(image.width)}"`);
   if (image.height !== null) parts.push(`height="${escapeHtmlAttribute(image.height)}"`);
   return `<img ${parts.join(' ')}>`;
+}
+
+/**
+ * A width or height of the allowed subset as CSS: a percentage of the line
+ * (`50%`) or pixels (`320`, `320px`); anything else is not applied.
+ */
+export function cssSize(value: string | null): string | null {
+  const text = value?.trim() ?? '';
+  if (
+    /^\d{1,3}(?:\.\d{1,2})?%$/.test(text) &&
+    Number.parseFloat(text) > 0 &&
+    Number.parseFloat(text) <= 100
+  ) {
+    return text;
+  }
+  const pixels = /^(\d{1,5})(?:px)?$/.exec(text)?.[1];
+  return pixels && Number(pixels) > 0 ? `${pixels}px` : null;
+}
+
+/** Opens the dialog of an image (double click); set by the editor module. */
+let editImage: ((position: number) => void) | null = null;
+
+export function setImageEditor(handler: ((position: number) => void) | null): void {
+  editImage = handler;
+}
+
+function noteContent(dom: HTMLElement, image: ImageAttributes) {
+  dom.className = 'pw-image';
+  dom.setAttribute('data-pw-image', '');
+  dom.title = image.title ?? image.src;
+  dom.textContent = image.alt === '' ? image.src : image.alt;
+}
+
+/** An image of the library: the picture through the handler, the caption below. */
+function mediaContent(dom: HTMLElement, image: ImageAttributes, id: string) {
+  dom.className = 'pw-media-image';
+  dom.setAttribute('data-pw-media-image', id);
+  dom.removeAttribute('title');
+  dom.style.width = cssSize(image.width) ?? '';
+  const picture = document.createElement('img');
+  picture.src = mediaUrl(id);
+  picture.alt = image.alt;
+  picture.draggable = false;
+  const height = image.width === null ? cssSize(image.height) : null;
+  if (height) {
+    picture.style.height = height;
+  }
+  picture.addEventListener('error', () => {
+    const missing = document.createElement('span');
+    missing.className = 'pw-media-missing';
+    missing.setAttribute('data-pw-media-missing', '');
+    missing.textContent = translate(useLocale.getState().locale, 'editor.mediaMissing');
+    picture.replaceWith(missing);
+  });
+  const parts: HTMLElement[] = [picture];
+  if (image.title !== null && image.title !== '') {
+    const caption = document.createElement('span');
+    caption.className = 'pw-media-caption';
+    caption.textContent = image.title;
+    parts.push(caption);
+  }
+  dom.replaceChildren(...parts);
+}
+
+function renderInto(dom: HTMLElement, node: ProseMirrorNode) {
+  const image = attributes({ type: node.type.name, attrs: node.attrs });
+  for (const name of ['class', 'style', 'data-pw-image', 'data-pw-media-image']) {
+    dom.removeAttribute(name);
+  }
+  dom.replaceChildren();
+  const medium = parseMediaReference(image.src);
+  if (medium && medium.page === null) {
+    mediaContent(dom, image, medium.id);
+  } else {
+    noteContent(dom, image);
+  }
 }
 
 export const Image = Node.create({
@@ -116,6 +197,39 @@ export const Image = Node.create({
       },
       label,
     ];
+  },
+
+  // In the editor: library images as pictures, everything else as a note.
+  // `renderHTML` above stays for the clipboard.
+  addNodeView() {
+    return ({ node, getPos }) => {
+      const dom = document.createElement('span');
+      dom.contentEditable = 'false';
+      let current = node;
+      renderInto(dom, current);
+      dom.addEventListener('dblclick', (event) => {
+        const position = typeof getPos === 'function' ? getPos() : undefined;
+        if (position !== undefined && dom.hasAttribute('data-pw-media-image') && editImage) {
+          event.preventDefault();
+          editImage(position);
+        }
+      });
+      return {
+        dom,
+        update: (next) => {
+          if (next.type !== current.type) {
+            return false;
+          }
+          if (next.attrs !== current.attrs) {
+            current = next;
+            renderInto(dom, current);
+          }
+          return true;
+        },
+        // The picture loading or failing is no change of the document.
+        ignoreMutation: () => true,
+      };
+    };
   },
 
   markdownTokenName: 'image',

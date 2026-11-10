@@ -208,6 +208,46 @@
   content: '🖼 ';
 }
 
+/* Images of the library (Phase 8): the picture, the caption below. */
+.pw-rich .pw-media-image {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25em;
+  max-width: 100%;
+  vertical-align: bottom;
+  border-radius: var(--radius-pw);
+}
+
+.pw-rich .pw-media-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-pw);
+}
+
+.pw-rich .pw-media-image[style*='width'] img {
+  width: 100%;
+}
+
+.pw-rich .pw-media-caption {
+  color: var(--pw-color-text-muted);
+  font-size: 0.875em;
+  text-align: center;
+}
+
+.pw-rich .pw-media-missing {
+  border: 1px dashed var(--pw-color-text-muted);
+  border-radius: var(--radius-pw);
+  color: var(--pw-color-text-muted);
+  padding: 0.5em 1em;
+}
+
+/* PDF references (`pwmedia://<id>#page=N`): Ctrl+click opens the page. */
+.pw-rich a[href^='pwmedia:'] {
+  text-decoration-style: dashed;
+}
+
 .pw-rich .ProseMirror-selectednode {
   outline: 2px solid var(--pw-color-accent);
 }

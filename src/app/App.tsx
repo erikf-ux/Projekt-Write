@@ -76,6 +76,8 @@ const MENU_COMMANDS: Record<MenuCommand, true> = {
   'format.blockquote': true,
   'format.codeBlock': true,
   'format.link': true,
+  'format.image': true,
+  'format.pdfReference': true,
   'format.horizontalRule': true,
   'format.table': true,
 };
