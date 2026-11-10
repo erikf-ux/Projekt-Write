@@ -676,6 +676,10 @@ async fn build_structure(
     Ok(())
 }
 
+/// A subnet row as it goes into the fingerprint: id, name, description,
+/// colour, parent, created, updated.
+type SubnetFingerprint = (String, String, String, String, Option<String>, String, String);
+
 /// SHA-256 over everything that defines the library's content: every file
 /// except `library.lock` (process id) and the database files (compared
 /// through their rows instead), plus all rows and the schema version.
@@ -716,7 +720,7 @@ pub async fn fingerprint(path: &Path) -> Result<String, String> {
         hasher.update(format!("setting {row:?}\n"));
     }
     // Phase 7: subnets, memberships, tags.
-    let subnets: Vec<(String, String, String, String, Option<String>, String, String)> =
+    let subnets: Vec<SubnetFingerprint> =
         sqlx::query_as(
             "SELECT id, name, description, color, parent_id, created_at, updated_at FROM subnets ORDER BY id",
         )

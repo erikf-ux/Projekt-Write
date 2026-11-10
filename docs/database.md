@@ -44,14 +44,14 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 | 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent` | 5     |
 | 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                          | 5     |
 | 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                        | 6     |
+| 7       | `0007_subnets_and_tags.sql`     | Tabellen `subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger | 7     |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
 | Phase | Inhalt                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015)                                                                                 |
-| 7     | `subnets`, `subnet_memberships`, `tags`, `document_tags`                                                                                   |
-| 8     | `media`, `media_tags`, `document_media`                                                                                                    |
+| 8     | `media`, `media_tags`, `document_media`; Neuaufbau von `subnet_memberships` mit `media_id`                                                 |
 | 9     | `search_entries`, `search_words`, `search_parts`                                                                                           |
 | 11    | `mesh_nodes` (mit Triggern und Nachtrag für bestehende Elemente), `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions` |
 | 12    | `dictionaries`, `dictionary_words`, `document_dictionaries`, `subnet_dictionaries`, `language_profiles`, `autocorrect_rejections`          |
@@ -68,10 +68,10 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `documents`                    | Dokumente (TXT, MD, `.pwrite`)                   | vorhanden (v2–v4)  |
 | `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | vorhanden (v5)     |
 | `document_history`             | Versionen eines Dokuments                        | vorhanden (v6)     |
-| `subnets`                      | Hierarchische Gruppen                            | geplant (Phase 7)  |
-| `subnet_memberships`           | Zuordnung Element → Subnetz                      | geplant (Phase 7)  |
-| `tags`                         | Stichwörter                                      | geplant (Phase 7)  |
-| `document_tags`                | Tags eines Dokuments                             | geplant (Phase 7)  |
+| `subnets`                      | Hierarchische Gruppen                            | vorhanden (v7)     |
+| `subnet_memberships`           | Zuordnung Element → Subnetz                      | vorhanden (v7)     |
+| `tags`                         | Stichwörter                                      | vorhanden (v7)     |
+| `document_tags`                | Tags eines Dokuments                             | vorhanden (v7)     |
 | `media`                        | Bilder, PDF, Anhänge                             | geplant (Phase 8)  |
 | `media_tags`                   | Tags eines Mediums                               | geplant (Phase 8)  |
 | `document_media`               | Medien, die ein Dokument einbindet oder verweist | geplant (Phase 8)  |
@@ -175,48 +175,50 @@ Regeln in Rust (`services/history.rs`, ADR 0016, Entscheidung 4–7):
 - **Aufbewahrung** (Bibliothekseinstellungen `history.keepAllHours` = 24, `history.dailyDays` = 30, `history.weeklyDays` = 365): alle Versionen der letzten 24 Stunden, danach die neueste je UTC-Tag bis 30 Tage, danach die neueste je ISO-Woche (ab Montag) bis 365 Tage; älteres fällt weg. Benannte Versionen und die neueste Version eines Dokuments bleiben immer. Angewandt nach jeder neuen Version und beim Öffnen der Bibliothek; getestet mit simulierter Zeit (`ManualClock`, `tests/history.rs`).
 - Endgültiges Löschen des Dokuments entfernt seine Versionen (`ON DELETE CASCADE`).
 
-### `subnets` – geplant (Phase 7)
+### `subnets` – vorhanden (Version 7)
 
-| Spalte                      | Typ                   | Regeln                                                        |
-| --------------------------- | --------------------- | ------------------------------------------------------------- |
-| `id`                        | TEXT, Primärschlüssel | UUID                                                          |
-| `name`                      | TEXT                  | 1–200 Zeichen                                                 |
-| `description`               | TEXT                  | kann leer sein                                                |
-| `color`                     | TEXT                  | `#RRGGBB` oder Name eines Cluster-Tokens                      |
-| `parent_id`                 | TEXT NULL             | → `subnets(id)` ON DELETE RESTRICT; `CHECK (parent_id <> id)` |
-| `sort_key`                  | TEXT                  | Reihenfolge unter Geschwistern                                |
-| `created_at`, `updated_at`  | TEXT                  | ISO 8601 UTC                                                  |
-| `archived_at`, `deleted_at` | TEXT NULL             | ISO 8601 UTC                                                  |
+| Spalte                     | Typ                   | Regeln                                                                               |
+| -------------------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| `id`                       | TEXT, Primärschlüssel | UUID (Kleinbuchstaben, `CHECK`)                                                      |
+| `name`                     | TEXT                  | 1–200 Zeichen                                                                        |
+| `name_key`                 | TEXT                  | Unicode-Kleinschreibung des Namens (Rust); eindeutig je übergeordnetem Subnetz       |
+| `description`              | TEXT                  | 0–2000 Zeichen, Zeilenumbrüche erlaubt                                               |
+| `color`                    | TEXT                  | `blue`, `green`, `violet`, `orange`, `grey` (Cluster-Token) oder `#rrggbb` (`CHECK`) |
+| `parent_id`                | TEXT NULL             | → `subnets(id)` ON DELETE RESTRICT; `CHECK (parent_id IS NULL OR parent_id <> id)`   |
+| `created_at`, `updated_at` | TEXT                  | ISO 8601 UTC                                                                         |
 
-Zyklen verhindert ein Trigger (`BEFORE UPDATE OF parent_id`, rekursive Vorfahrenprüfung, `RAISE(ABORT)`), zusätzlich prüft Rust. Löschen eines Subnetzes: Untersubnetze rücken in derselben Transaktion eine Ebene hoch (Abschnitt 16), Elemente werden nie gelöscht.
+`STRICT`. Eindeutiger Index `uq_subnets_sibling_name (ifnull(parent_id, ''), name_key)` (zwei Geschwister heißen nie gleich, auch auf der obersten Ebene), Index `ix_subnets_parent`. Der Trigger `tr_subnets_no_cycle` (`BEFORE UPDATE OF parent_id`) sucht mit einer rekursiven Abfrage unter den Vorfahren des neuen übergeordneten Subnetzes das Subnetz selbst und bricht mit `RAISE(ABORT, 'subnet cycle')` ab; Rust prüft vorher und meldet `SUBNET_CYCLE`.
 
-### `subnet_memberships` – geplant (Phase 7)
+Abweichungen vom Entwurf (ADR 0017, Punkt 2): kein `sort_key` (Geschwister stehen nach Namen), kein `archived_at`/`deleted_at` (Subnetze sind keine Elemente; ein gelöschtes Subnetz bringt das Struktur-Undo zurück), dafür `name_key`. Eine eigene Farbe muss gegen Seitenleiste und Schreibfläche beider mitgelieferter Designs 3:1 erreichen (Rust).
 
-Das geprüfte Muster aus Abschnitt 18, ergänzt um `created_at` (für „die älteste verbleibende rückt nach“):
+Löschen eines Subnetzes (Abschnitt 16), eine Transaktion: Untersubnetze rücken eine Ebene hoch – ein dort vergebener Name bekommt „ (2)“, „ (3)“ … – oder werden mitgelöscht (tiefste zuerst); dann geht das Subnetz, `ON DELETE CASCADE` nimmt seine Zuordnungen mit, Dokumente bleiben; wo die primäre Zuordnung entfiel, rückt die älteste verbleibende nach.
 
-```sql
-CREATE TABLE subnet_memberships (
-  subnet_id   TEXT NOT NULL REFERENCES subnets(id) ON DELETE CASCADE,
-  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
-  media_id    TEXT REFERENCES media(id) ON DELETE CASCADE,
-  is_primary  INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
-  created_at  TEXT NOT NULL,
-  CHECK ((document_id IS NULL) <> (media_id IS NULL))
-) STRICT;
+### `subnet_memberships` – vorhanden (Version 7)
 
-CREATE UNIQUE INDEX uq_member_doc     ON subnet_memberships(subnet_id, document_id) WHERE document_id IS NOT NULL;
-CREATE UNIQUE INDEX uq_member_media   ON subnet_memberships(subnet_id, media_id)    WHERE media_id IS NOT NULL;
-CREATE UNIQUE INDEX uq_primary_doc    ON subnet_memberships(document_id) WHERE is_primary = 1 AND document_id IS NOT NULL;
-CREATE UNIQUE INDEX uq_primary_media  ON subnet_memberships(media_id)    WHERE is_primary = 1 AND media_id IS NOT NULL;
-```
+Das geprüfte Muster aus Abschnitt 18 für Dokumente, ergänzt um `created_at`:
 
-Da `media` erst in Phase 8 entsteht, legt Phase 7 die Tabelle mit `document_id` an; Phase 8 baut sie mit `media_id` neu auf (SQLite kann einer bestehenden Spalte keinen Fremdschlüssel hinzufügen; Neuaufbau per Migration: neue Tabelle, Daten kopieren, alte entfernen, umbenennen – getestet wie jede Migration).
+| Spalte        | Typ     | Regeln                                              |
+| ------------- | ------- | --------------------------------------------------- |
+| `subnet_id`   | TEXT    | → `subnets(id)` ON DELETE CASCADE                   |
+| `document_id` | TEXT    | → `documents(id)` ON DELETE CASCADE                 |
+| `is_primary`  | INTEGER | 0 oder 1                                            |
+| `created_at`  | TEXT    | ISO 8601 UTC; „die älteste verbleibende rückt nach“ |
 
-### `tags`, `document_tags`, `media_tags` – geplant (Phasen 7 und 8)
+`STRICT`. Eindeutige Indizes `uq_member_doc (subnet_id, document_id)` und `uq_primary_doc (document_id) WHERE is_primary = 1`; Index `ix_memberships_document (document_id, created_at)`. Genau eine Zuordnung je Dokument ist primär, die erste von selbst (Rust in jeder Transaktion). Papierkorb und Archiv lassen die Zeilen stehen (ADR 0016); erst endgültiges Löschen entfernt sie.
 
-`tags`: `id` (UUID), `name` (1–100 Zeichen, Anzeige), `name_key` (eindeutig; Unicode-Kleinschreibung in Rust, damit `Äpfel` und `äpfel` dasselbe Tag sind – `COLLATE NOCASE` faltet nur ASCII), `created_at`, `updated_at`.
+Da `media` erst in Phase 8 entsteht, ist `document_id` hier `NOT NULL` und es gibt noch kein `media_id`; Phase 8 baut die Tabelle mit `media_id` und `CHECK ((document_id IS NULL) <> (media_id IS NULL))` neu auf (neue Tabelle, Daten kopieren, alte entfernen, umbenennen – getestet wie jede Migration).
 
-`document_tags (document_id, tag_id)` und `media_tags (media_id, tag_id)`: Primärschlüssel über beide Spalten, Fremdschlüssel mit `ON DELETE CASCADE`, Index auf `tag_id`, `created_at`. Zusammenführen von Tags ist eine Transaktion (Zuordnungen umhängen, Duplikate verwerfen, altes Tag löschen).
+### `tags`, `document_tags` – vorhanden (Version 7); `media_tags` – geplant (Phase 8)
+
+`tags`: `id` (UUID), `name` (1–100 Zeichen, ohne Steuerzeichen und Komma), `name_key` (Unicode-Kleinschreibung in Rust, `UNIQUE` – `Äpfel` und `äpfel` sind dasselbe Tag; `COLLATE NOCASE` faltet nur ASCII), `created_at`, `updated_at`; `STRICT`.
+
+`document_tags (document_id, tag_id, created_at)`: Primärschlüssel über beide IDs, `STRICT, WITHOUT ROWID`, Fremdschlüssel mit `ON DELETE CASCADE`, Index `ix_document_tags_tag (tag_id, document_id)`. Zusammenführen ist eine Transaktion (Zuordnungen umhängen, Doppel verwerfen, altes Tag löschen); Löschen eines Tags lässt die Dokumente stehen. In `.pwrite` schreibt Rust die Namen beim Speichern in die Hülle; beim Import werden die Tags der Hülle zugeordnet.
+
+`media_tags (media_id, tag_id)` entsteht mit den Medien in Phase 8.
+
+### Struktur-Undo (ADR 0017, Punkt 10)
+
+Kein Speicher in der Datenbank: Das Journal hält je Schritt die betroffenen Zeilen von `subnets` und `tags` und Zuordnungen, Tags und Zustand (`deleted_at`, `archived_at`) der betroffenen Dokumente vor und nach dem Schritt, höchstens 100 Schritte, nur im Speicher. Rückgängig prüft, dass der Ist-Stand dem Stand nach dem Schritt gleicht, und schreibt in einer Transaktion den Stand davor: betroffene Subnetze und Tags werden zuerst „abgelöst“ (kein übergeordnetes Subnetz, ein Namensschlüssel mit angehängter ID), dann gelöscht, eingefügt und mit ihren endgültigen Werten geschrieben. So entsteht auf dem Weg weder ein Zyklus noch ein doppelter Name.
 
 ### `media` – geplant (Phase 8)
 

@@ -92,9 +92,13 @@ beforeEach(() => {
           step: { action: 'subnetCreate', subject: 'Neu' },
           history: { undo: null, redo: { action: 'subnetCreate', subject: 'Neu' } },
         });
+      case 'subnet_move':
+        if (request['parentId'] === R) {
+          throw { code: 'SUBNET_CYCLE', messageKey: 'error.subnetCycle' };
+        }
+        return update({ step: { action: 'subnetMove', subject: 'Projekte' } });
       case 'document_move':
       case 'document_assign':
-      case 'subnet_move':
       case 'subnet_delete':
       case 'tag_merge':
         return update({ step: { action: 'documentMove', subject: 'Kapitel' } });
@@ -304,6 +308,14 @@ describe('Explorer with subnets', () => {
     });
     await waitFor(() => {
       expect(calls.find((call) => call.command === 'subnet_move')?.request).toEqual({ id: P, parentId: W });
+    });
+    // Into its own subnet: Rust refuses, and the Explorer says so (F-29).
+    const roman = tree.querySelector(`[data-subnet="${R}"]`) as HTMLElement;
+    fireEvent.drop(roman, {
+      dataTransfer: transfer({ [EXPLORER_DRAG_TYPE]: JSON.stringify({ kind: 'subnet', id: P }) }),
+    });
+    await waitFor(() => {
+      expect(useUi.getState().notice?.error?.code).toBe('SUBNET_CYCLE');
     });
     // Files from outside are not Explorer items.
     const before = calls.length;
