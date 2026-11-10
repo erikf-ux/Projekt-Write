@@ -122,6 +122,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         "document history",
         "546edd56b24d253ac981b4ad7d7e8ff14d730cd452e17171321e1bdbe51f2166f770c0ca6415a7c59e5f5ef86aed6974",
     ),
+    (
+        7,
+        "subnets and tags",
+        "b8eb8bd196ae4b39c4c9c5d7cb3c294587e1e3acc8dfdd3215bb5779c0edb394afd6c2c24fb51c0e83b7cebd7f986536",
+    ),
 ];
 
 async fn fresh(dir: &tempfile::TempDir, name: &str) -> Database {

@@ -11,10 +11,9 @@
  *
  * The values are logged and reported (bericht-phase-7.md). Opening and
  * closing is checked against its target. Opening the library, the filter
- * and scrolling did not reach their targets in every run of the debug build
- * under Xvfb with software rendering (F-28): they are checked against
- * limits that catch a regression, until the targets are confirmed on the
- * reference device.
+ * and scrolling depend on the machine (F-28: met on one container, missed
+ * on another): they are checked against limits that catch a regression,
+ * until the targets are confirmed on the reference device.
  *
  * Runs in a new app process after reference-prepare.e2e.ts.
  */

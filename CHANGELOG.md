@@ -4,6 +4,27 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 7 – Subnetze und Tags
+
+#### Hinzugefügt
+
+- Subnetze als Baum mit Name, Beschreibung und Farbe (fünf Cluster-Farben des Designs oder eine eigene Farbe mit mindestens 3:1 Kontrast in beiden Designs). Zyklen lehnen Rust und ein Datenbank-Trigger ab; Geschwister heißen nie gleich.
+- Mehrfachzuordnung: Ein Dokument kann in mehreren Subnetzen liegen und bleibt ein Datensatz und eine Datei; genau ein Subnetz ist primär. „Verschieben nach …“ wechselt das primäre Subnetz, „Zuordnen zu …“ fügt eines hinzu, „Aus „X“ entfernen“ und „Als primär festlegen“ im Kontextmenü; dazu Drag & Drop im Explorer (mit `Strg` zuordnen).
+- Ein Subnetz löschen löscht kein Dokument: Untersubnetze rücken eine Ebene hoch oder werden mitgelöscht; Dokumente ohne Subnetz stehen unter „Nicht zugeordnet“.
+- Explorer: Favoriten, Zuletzt verwendet, die Subnetze als Baum, Nicht zugeordnet, Archiv, Papierkorb (statt „Alle Dokumente“); weitere Zuordnungen sind markiert; der Weg zum aktiven Dokument klappt auf.
+- Breadcrumbs über der Schreibfläche mit dem Weg des primären Subnetzes, weiteren Subnetzen und den Tags; ein Klick zeigt das Subnetz im Explorer.
+- Tags: vergeben (ein neuer Name legt ein Tag an), entfernen, umbenennen, zusammenführen, löschen; Groß- und Kleinschreibung zählen nicht. `.pwrite` trägt die Tags in der Hülle; ein importiertes `.pwrite` bringt sie mit.
+- Filter im Explorer nach Tags und Titel.
+- Struktur-Undo: Jede Strukturaktion (auch Löschen und Archivieren) lässt sich mit `Strg + Z` im Explorer, in der Befehlspalette oder über „Rückgängig“ im Hinweis zurücknehmen und wiederholen.
+- Kopien behalten Subnetze und Tags.
+- Beispiel-Subnetze „Projekte“, „Wissen“, „Ideen“ als Wahl beim ersten Start.
+- Referenzbibliothek mit 500 Subnetzen, 1.000 Tags und Zuordnungen; E2E-Messung des Explorers damit.
+- Migration 0007 (`subnets`, `subnet_memberships`, `tags`, `document_tags`).
+
+#### Geändert
+
+- „Alle Dokumente“ im Explorer entfällt; der Subnetz-Baum und „Nicht zugeordnet“ zeigen zusammen jedes Dokument.
+
 ### Phase 6 – Wiederherstellung
 
 #### Hinzugefügt

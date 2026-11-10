@@ -678,7 +678,15 @@ async fn build_structure(
 
 /// A subnet row as it goes into the fingerprint: id, name, description,
 /// colour, parent, created, updated.
-type SubnetFingerprint = (String, String, String, String, Option<String>, String, String);
+type SubnetFingerprint = (
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    String,
+);
 
 /// SHA-256 over everything that defines the library's content: every file
 /// except `library.lock` (process id) and the database files (compared
