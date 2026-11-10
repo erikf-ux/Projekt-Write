@@ -71,6 +71,8 @@ function outline(list: Row[]): string[] {
         return `${'  '.repeat(row.level - 1)}[${row.subnet.name}]`;
       case 'document':
         return `${'  '.repeat(row.level - 1)}${row.document.title}${row.secondary ? ' +' : ''}`;
+      case 'media':
+        return `${'  '.repeat(row.level - 1)}<${row.media.title}>${row.secondary ? ' +' : ''}`;
       case 'file':
         return row.file.name;
     }
@@ -91,6 +93,7 @@ describe('Explorer rows', () => {
       '  Quellen',
       'unassigned (1)',
       '  Notiz',
+      'media (0)',
       'archive (0)',
       'trash (0)',
     ]);
@@ -123,6 +126,7 @@ describe('Explorer rows', () => {
       '[Wissen]',
       'unassigned (1)',
       '  Notiz',
+      'media (0)',
       'archive (0)',
       'trash (0)',
     ]);
@@ -138,6 +142,7 @@ describe('Explorer rows', () => {
       '[Wissen]',
       '  Quellen',
       'unassigned (0)',
+      'media (0)',
       'archive (0)',
       'trash (0)',
     ]);
@@ -146,6 +151,7 @@ describe('Explorer rows', () => {
       'recent (0)',
       'unassigned (1)',
       '  Notiz',
+      'media (0)',
       'archive (0)',
       'trash (0)',
     ]);

@@ -33,6 +33,7 @@ import { LOSS_KEYS } from '@/modules/editor/markdown/lossKeys';
 import type { Loss } from '@/modules/editor/markdown/losses';
 import type { ProbeIssue } from '@/modules/editor/markdown/probe';
 import { closeAllSessions, closeSession, getSession, type SaveRequest } from '@/modules/editor/session';
+import { useMedia } from '@/modules/media/mediaStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { setDocumentReloader, useStructure } from '@/modules/structure/structureStore';
 import { call } from '@/services/ipc';
@@ -106,6 +107,20 @@ export interface OpenDocument {
   external: ExternalState | null;
 }
 
+/**
+ * A tab that shows no document: the media gallery or one medium (Phase 8,
+ * ADR 0019). Its id starts with `view:`; it has nothing to save.
+ */
+export type ViewTab = { kind: 'gallery' } | { kind: 'media'; mediaId: string; page: number | null };
+
+/** Id of the gallery tab. */
+export const GALLERY_TAB = 'view:gallery';
+
+/** Id of the tab of a medium. */
+export function mediaTabId(mediaId: string): string {
+  return `view:media:${mediaId}`;
+}
+
 /** Where a tab's text comes from when it is saved: its editor session. */
 export interface DocumentSource {
   saveRequest: () => SaveRequest;
@@ -119,6 +134,12 @@ interface WorkspaceStore {
   tabs: string[];
   active: string | null;
   open: Record<string, OpenDocument>;
+  /** Tabs of the gallery and of media. */
+  views: Record<string, ViewTab>;
+  /** Opens (or shows) the media gallery. */
+  openGallery: () => void;
+  /** Opens (or shows) a medium; a PDF at `page`. */
+  openMedia: (mediaId: string, page?: number | null) => void;
   /** Document whose title is being edited in the Explorer. */
   renaming: string | null;
   lastError: CommandError | null;
@@ -605,11 +626,12 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       const index = state.tabs.indexOf(id);
       const tabs = state.tabs.filter((tab) => tab !== id);
       const open = Object.fromEntries(Object.entries(state.open).filter(([key]) => key !== id));
+      const views = Object.fromEntries(Object.entries(state.views).filter(([key]) => key !== id));
       let active = state.active;
       if (active === id) {
         active = tabs[Math.min(index, tabs.length - 1)] ?? null;
       }
-      return { tabs, open, active, renaming: state.renaming === id ? null : state.renaming };
+      return { tabs, open, views, active, renaming: state.renaming === id ? null : state.renaming };
     });
   };
 
@@ -619,6 +641,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     listError: null,
     tabs: [],
     active: null,
+    views: {},
     open: {},
     renaming: null,
     lastError: null,
@@ -769,9 +792,34 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
       return results.every(Boolean);
     },
 
+    openGallery: () => {
+      const previous = get().active;
+      set((state) => ({
+        tabs: state.tabs.includes(GALLERY_TAB) ? state.tabs : [...state.tabs, GALLERY_TAB],
+        views: { ...state.views, [GALLERY_TAB]: { kind: 'gallery' } },
+        active: GALLERY_TAB,
+      }));
+      if (previous && previous !== GALLERY_TAB) {
+        void get().flush(previous);
+      }
+    },
+
+    openMedia: (mediaId, page = null) => {
+      const id = mediaTabId(mediaId);
+      const previous = get().active;
+      set((state) => ({
+        tabs: state.tabs.includes(id) ? state.tabs : [...state.tabs, id],
+        views: { ...state.views, [id]: { kind: 'media', mediaId, page } },
+        active: id,
+      }));
+      if (previous && previous !== id) {
+        void get().flush(previous);
+      }
+    },
+
     activate: (id) => {
       const previous = get().active;
-      if (previous === id || !get().open[id]) {
+      if (previous === id || (!get().open[id] && !get().views[id])) {
         return;
       }
       set({ active: id });
@@ -781,6 +829,10 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     },
 
     closeTab: async (id) => {
+      if (get().views[id]) {
+        removeTab(id);
+        return true;
+      }
       if (!(await get().flush(id))) {
         return false;
       }
@@ -900,6 +952,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         tabs: kept,
         active: active !== null && kept.includes(active) ? active : (kept[0] ?? null),
         open: Object.fromEntries(kept.flatMap((id) => (open[id] ? [[id, open[id]]] : []))),
+        // Gallery and media belong to the library.
+        views: {},
         renaming: null,
       });
     },
@@ -1384,7 +1438,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
     },
 
     emptyTrash: async () => {
-      const count = get().trash.length;
+      // Documents and media share the trash of the Explorer.
+      const count = get().trash.length + useMedia.getState().trash.length;
       if (count === 0) {
         return false;
       }
@@ -1408,6 +1463,8 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         return false;
       }
       set({ trash: [] });
+      // Media a document still uses stay (section 9).
+      await useMedia.getState().emptyTrash();
       void useStructure.getState().load();
       return true;
     },

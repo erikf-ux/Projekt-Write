@@ -28,7 +28,7 @@ function Picker({ state }: { state: PickerState }) {
   const locale = useLocale((store) => store.locale);
   const subnets = useStructure((store) => store.subnets);
   const placement = useStructure((store) =>
-    state.mode === 'moveSubnet' ? NO_PLACEMENT : (store.byDocument[state.documentId] ?? NO_PLACEMENT),
+    state.mode === 'moveSubnet' ? NO_PLACEMENT : (store.byElement[state.documentId] ?? NO_PLACEMENT),
   );
   const title = useWorkspace((store) =>
     state.mode === 'moveSubnet'

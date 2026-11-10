@@ -23,7 +23,7 @@ export function Breadcrumbs({ documentId, title }: BreadcrumbsProps) {
   const locale = useLocale((store) => store.locale);
   const subnets = useStructure((store) => store.subnets);
   const tags = useStructure((store) => store.tags);
-  const placement = useStructure((store) => store.byDocument[documentId] ?? NO_PLACEMENT);
+  const placement = useStructure((store) => store.byElement[documentId] ?? NO_PLACEMENT);
   const index = useMemo(() => buildIndex(subnets, locale), [subnets, locale]);
   const known = placement.subnetIds.filter((id) => index.byId.has(id));
   const primary = known[0];

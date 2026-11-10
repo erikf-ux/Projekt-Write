@@ -17,6 +17,7 @@
  * becomes its child.
  */
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   FilePlus,
@@ -24,8 +25,10 @@ import {
   Filter,
   HardDrive,
   Hash,
+  Image as ImageIcon,
   Link2,
   Network,
+  Paperclip,
   PenLine,
   Star,
   X,
@@ -51,12 +54,14 @@ import {
   type ContextMenuState,
 } from '@/components/ContextMenu';
 import { useLocale, useT } from '@/i18n';
+import { useMedia } from '@/modules/media/mediaStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
 import { colorValue, pathTo, type SubnetIndex } from '@/modules/structure/tree';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
+import type { MediaKind } from '@/types/generated/MediaKind';
 import {
   explorerBase,
   explorerModel,
@@ -69,7 +74,7 @@ import {
   type Row,
 } from './explorerRows';
 import { useExplorer } from './explorerStore';
-import { useWorkspace } from './workspaceStore';
+import { mediaTabId, useWorkspace } from './workspaceStore';
 
 export { RECENT_LIMIT };
 export const EXPLORER_LIST_ID = 'pw-explorer-list';
@@ -83,7 +88,8 @@ const MAX_TITLE = 300;
 export const EXPLORER_DRAG_TYPE = 'application/x-project-write-item';
 
 type DocumentRow = Extract<Row, { kind: 'document' }>;
-type DraggedItem = { kind: 'document' | 'subnet'; id: string };
+type MediaRow = Extract<Row, { kind: 'media' }>;
+type DraggedItem = { kind: 'document' | 'media' | 'subnet'; id: string };
 
 /** The row being dragged inside the Explorer, until it is dropped or the drag ends. */
 const drag: { item: DraggedItem | null } = { item: null };
@@ -114,6 +120,12 @@ function FormatIcon({ format }: { format: DocumentFormat }) {
     return <PenLine aria-hidden="true" className="size-3.5 shrink-0 text-muted" />;
   }
   return <FileText aria-hidden="true" className="size-3.5 shrink-0 text-muted" />;
+}
+
+/** The kind of a medium: image, PDF or attachment. */
+export function MediaIcon({ kind }: { kind: MediaKind }) {
+  const Icon = kind === 'image' ? ImageIcon : kind === 'pdf' ? BookOpen : Paperclip;
+  return <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted" />;
 }
 
 /** A subnet's colour: a dot with a rim, beside its name (never alone). */
@@ -165,10 +177,15 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const purgeDocument = useWorkspace((state) => state.purgeDocument);
   const emptyTrash = useWorkspace((state) => state.emptyTrash);
   const createDocument = useWorkspace((state) => state.createDocument);
+  const openMedia = useWorkspace((state) => state.openMedia);
+  const openGallery = useWorkspace((state) => state.openGallery);
+  const media = useMedia((state) => state.media);
+  const mediaTrash = useMedia((state) => state.trash);
+  const mediaStore = useMedia.getState;
 
   const subnets = useStructure((state) => state.subnets);
   const structureLoaded = useStructure((state) => state.loaded);
-  const placements = useStructure((state) => state.byDocument);
+  const placements = useStructure((state) => state.byElement);
   const tags = useStructure((state) => state.tags);
   const structure = useStructure.getState;
   const dialogs = useStructureDialogs.getState;
@@ -180,10 +197,17 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   const reveal = useExplorer((state) => state.reveal);
   const explorer = useExplorer.getState;
 
-  const base = useMemo(() => explorerBase(documents, subnets, locale), [documents, subnets, locale]);
+  const base = useMemo(
+    () => explorerBase(documents, subnets, locale, media),
+    [documents, subnets, locale, media],
+  );
   const model = useMemo(
-    () => explorerModel({ documents, trash, recentFiles, subnets, placements, filter, locale }, base),
-    [base, documents, trash, recentFiles, subnets, placements, filter, locale],
+    () =>
+      explorerModel(
+        { documents, trash, media, mediaTrash, recentFiles, subnets, placements, filter, locale },
+        base,
+      ),
+    [base, documents, trash, media, mediaTrash, recentFiles, subnets, placements, filter, locale],
   );
   const rows = useMemo(
     () => explorerRows(model, collapsed, expanded, placements),
@@ -297,6 +321,27 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
   };
 
   const openGroupMenu = (row: Extract<Row, { kind: 'group' }>, position: { x: number; y: number }) => {
+    if (row.group === 'media') {
+      setSelected(row.key);
+      setMenu({
+        ...position,
+        label: groupLabel(row.group),
+        items: [
+          { id: 'gallery', label: t('explorer.media.openGallery'), onSelect: openGallery },
+          {
+            id: 'import',
+            label: t('command.media.import'),
+            onSelect: () => void mediaStore().startImport('files', t('media.import.title')),
+          },
+          {
+            id: 'importFolder',
+            label: t('command.media.importFolder'),
+            onSelect: () => void mediaStore().startImport('folder', t('media.import.titleFolder')),
+          },
+        ],
+      });
+      return;
+    }
     if (row.group !== 'trash' || row.count === 0) {
       return;
     }
@@ -463,10 +508,112 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
     setMenu({ ...position, label: document.title, items });
   };
 
+  /** The menu of a medium: where it is listed decides what it offers. */
+  const openMediaMenu = (row: MediaRow, position: { x: number; y: number }) => {
+    setSelected(row.key);
+    const { media: medium } = row;
+    if (row.group === 'trash') {
+      setMenu({
+        ...position,
+        label: medium.title,
+        items: [
+          {
+            id: 'restore',
+            label: t('explorer.restore'),
+            onSelect: () => void mediaStore().restore(medium.id),
+          },
+          { id: 'purge', label: t('explorer.purge'), onSelect: () => void mediaStore().purge(medium.id) },
+        ],
+      });
+      return;
+    }
+    const favorite = medium.favoritedAt !== null;
+    const items: ContextMenuItem[] = [
+      {
+        id: 'open',
+        label: t('explorer.media.open'),
+        onSelect: () => {
+          openMedia(medium.id);
+        },
+      },
+      {
+        id: 'openExternal',
+        label: t('media.view.openExternal'),
+        onSelect: () => void mediaStore().openExternal(medium.id),
+      },
+      {
+        id: 'favorite',
+        label: favorite ? t('explorer.unfavorite') : t('explorer.favorite'),
+        onSelect: () => void mediaStore().setFavorite(medium.id, !favorite),
+      },
+    ];
+    if (medium.archivedAt === null) {
+      items.push(
+        {
+          id: 'moveTo',
+          label: t('structure.moveTo'),
+          onSelect: () => {
+            dialogs().openPicker({ mode: 'moveDocument', documentId: medium.id });
+          },
+        },
+        {
+          id: 'assignTo',
+          label: t('structure.assignTo'),
+          onSelect: () => {
+            dialogs().openPicker({ mode: 'assignDocument', documentId: medium.id });
+          },
+        },
+      );
+    }
+    if (row.subnetId) {
+      const subnetId = row.subnetId;
+      if (row.secondary) {
+        items.push({
+          id: 'primary',
+          label: t('structure.makePrimary', { subnet: subnetName(subnetId) }),
+          onSelect: () => {
+            report(structure().setPrimary(medium.id, subnetId));
+          },
+        });
+      }
+      items.push({
+        id: 'unassign',
+        label: t('structure.removeFrom', { subnet: subnetName(subnetId) }),
+        onSelect: () => {
+          report(structure().unassign(medium.id, subnetId));
+        },
+      });
+    }
+    items.push(
+      {
+        id: 'tags',
+        label: t('tags.edit'),
+        onSelect: () => {
+          dialogs().openTags(medium.id);
+        },
+      },
+      {
+        id: 'archive',
+        label: medium.archivedAt === null ? t('explorer.archive') : t('explorer.unarchive'),
+        onSelect: () => void mediaStore().archive(medium.id, medium.archivedAt === null),
+      },
+      {
+        id: 'delete',
+        label: t('explorer.delete'),
+        shortcut: t('keys.delete'),
+        onSelect: () => void mediaStore().remove(medium.id),
+      },
+    );
+    setMenu({ ...position, label: medium.title, items });
+  };
+
   const parentKey = (index: number): string | null => {
     const row = rows[index];
     if (!row) {
       return null;
+    }
+    if (row.kind === 'media') {
+      return row.subnetId ? `s:${row.subnetId}` : row.group;
     }
     if (row.kind === 'document' || row.kind === 'file') {
       if (row.kind === 'document' && row.subnetId) {
@@ -500,6 +647,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
       const position = element ? positionBelow(element) : { x: 40, y: 80 };
       if (current?.kind === 'document' || current?.kind === 'file') {
         openMenu(current, position);
+      } else if (current?.kind === 'media') {
+        openMediaMenu(current, position);
       } else if (current?.kind === 'subnet') {
         openSubnetMenu(current, position);
       } else if (current?.kind === 'group') {
@@ -562,6 +711,11 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           openMenu(current, element ? positionBelow(element) : { x: 40, y: 80 });
         } else if (current?.kind === 'document') {
           void openDocument(current.document.id);
+        } else if (current?.kind === 'media' && current.group === 'trash') {
+          const element = window.document.getElementById(rowId(current.key));
+          openMediaMenu(current, element ? positionBelow(element) : { x: 40, y: 80 });
+        } else if (current?.kind === 'media') {
+          openMedia(current.media.id);
         } else if (current?.kind === 'file') {
           void openRecentFile(current.file.id, current.file.name);
         } else if (current?.kind === 'group' && current.count > 0) {
@@ -582,6 +736,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
           void purgeDocument(current.document.id);
         } else if (current?.kind === 'document') {
           void deleteDocument(current.document.id);
+        } else if (current?.kind === 'media' && current.group === 'trash') {
+          void mediaStore().purge(current.media.id);
+        } else if (current?.kind === 'media') {
+          void mediaStore().remove(current.media.id);
         } else if (current?.kind === 'subnet') {
           report(structure().deleteSubnet(current.subnet.id));
         }
@@ -644,7 +802,7 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         return;
       }
       const id = item.id;
-      if (item.kind === 'document') {
+      if (item.kind === 'document' || item.kind === 'media') {
         if (target.subnetId && (event.ctrlKey || event.metaKey)) {
           report(structure().assign(id, target.subnetId));
         } else {
@@ -687,6 +845,10 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         }
       } else if (row.kind === 'file') {
         void openRecentFile(row.file.id, row.file.name);
+      } else if (row.kind === 'media') {
+        if (row.group !== 'trash') {
+          openMedia(row.media.id);
+        }
       } else if (row.group !== 'trash') {
         void openDocument(row.document.id);
       }
@@ -696,6 +858,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         openGroupMenu(row, position);
       } else if (row.kind === 'subnet') {
         openSubnetMenu(row, position);
+      } else if (row.kind === 'media') {
+        openMediaMenu(row, position);
       } else {
         openMenu(row, position);
       }
@@ -713,6 +877,8 @@ export function Explorer({ onNewDocument, newDocumentShortcut, renameShortcut }:
         startDrag(event, { kind: 'subnet', id: row.subnet.id });
       } else if (row.kind === 'document') {
         startDrag(event, { kind: 'document', id: row.document.id });
+      } else if (row.kind === 'media' && row.group !== 'trash') {
+        startDrag(event, { kind: 'media', id: row.media.id });
       }
     },
     dragOver: (event, row) => {
@@ -1001,7 +1167,10 @@ function VisibleRows({
           index={range.first + offset}
           selected={row.key === selected}
           dropTarget={dropTarget === row.key}
-          active={row.kind === 'document' && row.document.id === active}
+          active={
+            (row.kind === 'document' && row.document.id === active) ||
+            (row.kind === 'media' && mediaTabId(row.media.id) === active)
+          }
           renaming={row.kind === 'document' && renaming === row.document.id && row.key === selected}
           topLevel={topLevel}
           roots={roots}
@@ -1180,6 +1349,41 @@ const RowView = memo(function RowView({
       </div>
     );
   }
+  if (row.kind === 'media') {
+    const { media: medium } = row;
+    const inTrash = row.group === 'trash';
+    return (
+      <div
+        {...common}
+        aria-level={row.level}
+        aria-setsize={row.size}
+        aria-posinset={row.position}
+        data-media={medium.id}
+        data-media-kind={medium.kind}
+        data-group-member={row.group}
+        data-subnet-member={row.subnetId ?? undefined}
+        data-secondary={row.secondary ? true : undefined}
+        draggable={!inTrash}
+        title={inTrash && medium.deletedAt ? labels.deletedAt(medium.deletedAt) : medium.originalName}
+        className={`${base} pr-3 ${active ? 'font-semibold' : ''} ${inTrash ? 'text-muted' : ''}`}
+        style={{ ...style, paddingLeft: 6 + (row.level - 1) * 14 + 8 }}
+        onDragStart={dragStart}
+      >
+        <MediaIcon kind={medium.kind} />
+        <span className="truncate">{medium.title}</span>
+        {row.secondary ? (
+          <Link2
+            role="img"
+            aria-label={labels.secondary(labels.subnetName(row.subnetId))}
+            className="size-3 shrink-0 text-muted"
+          />
+        ) : null}
+        {medium.favoritedAt !== null && row.group !== 'favorites' ? (
+          <Star role="img" aria-label={labels.favorite} className="ml-auto size-3 shrink-0 text-muted" />
+        ) : null}
+      </div>
+    );
+  }
   const { document } = row;
   const inTrash = row.group === 'trash';
   return (
@@ -1239,7 +1443,7 @@ function report(result: Promise<CommandError | null>): void {
 
 /** Opens the entries on the way to a document's primary place. */
 function openPlaceOf(id: string, index: SubnetIndex): void {
-  const primary = useStructure.getState().byDocument[id]?.subnetIds.find((subnet) => index.byId.has(subnet));
+  const primary = useStructure.getState().byElement[id]?.subnetIds.find((subnet) => index.byId.has(subnet));
   if (primary) {
     useExplorer.getState().expandPath(pathTo(index, primary).map((subnet) => subnet.id));
   } else {

@@ -43,6 +43,9 @@ import { StatisticsDialog } from '@/modules/editor/StatisticsDialog';
 import { readingMinutes } from '@/modules/editor/statistics';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
+import { MediaImportDialog } from '@/modules/media/MediaImportDialog';
+import { MediaPanels } from '@/modules/media/MediaPanels';
+import { mediaById, useMedia } from '@/modules/media/mediaStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { Breadcrumbs } from '@/modules/structure/Breadcrumbs';
 import { SubnetDialog } from '@/modules/structure/SubnetDialog';
@@ -73,6 +76,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const update = useUi((state) => state.update);
   const openSettings = useUi((state) => state.openSettings);
   const workspace = useWorkspace();
+  const mediaList = useMedia((state) => state.media);
+  const mediaTrash = useMedia((state) => state.trash);
   const current = activeDocument(workspace);
   const statistics = useStatistics((state) => (current ? state.byDocument[current.id] : undefined));
   const statisticsOpen = useStatistics((state) => state.dialogOpen);
@@ -94,10 +99,15 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       setOpenRequestsReady(false);
       await useWorkspace.getState().reset();
       useStructure.getState().reset();
+      useMedia.getState().reset();
       useExplorer.getState().reset();
       // Documents and their subnets and tags (Phase 7) load side by side,
       // before the tabs come back.
-      await Promise.all([useWorkspace.getState().refresh(), useStructure.getState().load()]);
+      await Promise.all([
+        useWorkspace.getState().refresh(),
+        useStructure.getState().load(),
+        useMedia.getState().load(),
+      ]);
       await createSampleSubnets();
       void useWorkspace.getState().refreshTrash();
       // Stage 2: unsaved changes from a crash are offered first.
@@ -163,7 +173,22 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
 
   const sidebarVisible = settings.sidebar.visible && !focusMode;
   const width = previewWidth ?? settings.sidebar.width;
+  const mediaState = { media: mediaList, trash: mediaTrash };
   const tabs = workspace.tabs.flatMap((id) => {
+    const view = workspace.views[id];
+    if (view) {
+      return [
+        {
+          id,
+          title:
+            view.kind === 'gallery'
+              ? t('media.gallery.title')
+              : (mediaById(mediaState, view.mediaId)?.title ?? '…'),
+          marker: undefined,
+          tooltip: undefined,
+        },
+      ];
+    }
     const document = workspace.open[id];
     if (!document) {
       return [];
@@ -269,17 +294,25 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           {!focusMode && current && !current.external ? (
             <Breadcrumbs documentId={current.id} title={current.title} />
           ) : null}
-          <DocumentEditor
-            tabs={workspace.tabs}
-            open={workspace.open}
-            active={workspace.active}
-            tabElementId={tabElementId}
-            limitLineWidth={settings.limitLineWidth}
-            focusMode={focusMode}
-            readOnly={status?.state !== 'open'}
-            onNewDocument={available('document.new') ? run('document.new') : null}
-            newDocumentShortcut={shortcut('document.new')}
-          />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <DocumentEditor
+              tabs={workspace.tabs}
+              open={workspace.open}
+              active={workspace.active}
+              tabElementId={tabElementId}
+              limitLineWidth={settings.limitLineWidth}
+              focusMode={focusMode}
+              readOnly={status?.state !== 'open'}
+              onNewDocument={available('document.new') ? run('document.new') : null}
+              newDocumentShortcut={shortcut('document.new')}
+            />
+            <MediaPanels
+              tabs={workspace.tabs}
+              views={workspace.views}
+              active={workspace.active}
+              tabElementId={tabElementId}
+            />
+          </div>
         </main>
       </div>
       {!focusMode ? (
@@ -349,6 +382,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       <SubnetPicker />
       <TagsDialog />
       <TagManager />
+      <MediaImportDialog />
       {current ? <OutsideChangeDialog document={current} /> : null}
       {statisticsOpen && statistics ? (
         <StatisticsDialog

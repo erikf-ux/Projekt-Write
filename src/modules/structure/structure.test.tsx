@@ -80,6 +80,7 @@ beforeEach(() => {
           subnets: SUBNETS,
           tags: [{ id: 't1', name: 'Entwurf', createdAt: '', updatedAt: '' }],
           documents: [{ id: DOC, subnetIds: [W, R], tagIds: ['t1'] }],
+          media: [],
           history: { undo: null, redo: null },
         };
       case 'subnet_create':
@@ -136,7 +137,7 @@ describe('subnet tree helpers', () => {
 describe('structure store', () => {
   it('takes over what Rust answers and offers to undo every step', async () => {
     await useStructure.getState().load();
-    expect(useStructure.getState().byDocument[DOC]?.subnetIds).toEqual([W, R]);
+    expect(useStructure.getState().byElement[DOC]?.subnetIds).toEqual([W, R]);
     const result = await useStructure.getState().createSubnet({ name: 'Neu' });
     expect(result).toEqual({ id: 'new', error: null });
     const notice = useUi.getState().notice;

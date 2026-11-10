@@ -23,7 +23,7 @@ function Manager() {
   const t = useT();
   const locale = useLocale((store) => store.locale);
   const tags = useStructure((store) => store.tags);
-  const byDocument = useStructure((store) => store.byDocument);
+  const byElement = useStructure((store) => store.byElement);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [merging, setMerging] = useState<string | null>(null);
@@ -34,13 +34,13 @@ function Manager() {
 
   const counts = useMemo(() => {
     const result = new Map<string, number>();
-    for (const placement of Object.values(byDocument)) {
+    for (const placement of Object.values(byElement)) {
       for (const id of placement.tagIds) {
         result.set(id, (result.get(id) ?? 0) + 1);
       }
     }
     return result;
-  }, [byDocument]);
+  }, [byElement]);
   const shown = useMemo(() => {
     const words = query.toLocaleLowerCase(locale).split(/\s+/).filter(Boolean);
     return tags

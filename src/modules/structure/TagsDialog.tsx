@@ -24,7 +24,7 @@ function TagsForm({ documentId }: { documentId: string }) {
   const t = useT();
   const locale = useLocale((store) => store.locale);
   const tags = useStructure((store) => store.tags);
-  const placement = useStructure((store) => store.byDocument[documentId] ?? NO_PLACEMENT);
+  const placement = useStructure((store) => store.byElement[documentId] ?? NO_PLACEMENT);
   const title = useWorkspace(
     (store) => store.documents.find((document) => document.id === documentId)?.title ?? '',
   );

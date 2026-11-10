@@ -14,6 +14,7 @@ import { useUi } from '@/modules/settings/uiStore';
 import { call, type CommandResult } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { CreateSubnetRequest } from '@/types/generated/CreateSubnetRequest';
+import type { ElementKind } from '@/types/generated/ElementKind';
 import type { StructureAction } from '@/types/generated/StructureAction';
 import type { StructureUpdate } from '@/types/generated/StructureUpdate';
 import type { SubnetSummary } from '@/types/generated/SubnetSummary';
@@ -23,7 +24,7 @@ import type { UndoStep } from '@/types/generated/UndoStep';
 import type { UpdateSubnetRequest } from '@/types/generated/UpdateSubnetRequest';
 import { buildIndex, subtree } from './tree';
 
-/** Subnets (primary first) and tags of a document. */
+/** Subnets (primary first) and tags of an element (document or medium). */
 export interface Placement {
   subnetIds: readonly string[];
   tagIds: readonly string[];
@@ -31,7 +32,7 @@ export interface Placement {
 
 export const NO_PLACEMENT: Placement = { subnetIds: [], tagIds: [] };
 
-/** Steps that change trash or archive: the document lists reload after them. */
+/** Steps that change trash or archive: the element lists reload after them. */
 const DOCUMENT_STATE_ACTIONS: readonly StructureAction[] = [
   'documentDelete',
   'documentRestore',
@@ -43,7 +44,11 @@ interface StructureStore {
   loaded: boolean;
   subnets: SubnetSummary[];
   tags: TagSummary[];
-  byDocument: Record<string, Placement>;
+  /**
+   * Placements of documents and media by id (their UUIDs never collide;
+   * ADR 0019, decision 12).
+   */
+  byElement: Record<string, Placement>;
   history: UndoHistory;
   load: () => Promise<void>;
   reset: () => void;
@@ -107,6 +112,32 @@ function showError(error: CommandError) {
 /** Document lists and the trash reload when a step changed them. */
 let reloadDocuments: () => Promise<void> = () => Promise.resolve();
 
+/** Media lists reload after undoing a trash or archive step of a medium. */
+let reloadMedia: () => Promise<void> = () => Promise.resolve();
+
+/** Set by the media module (it owns the media lists). */
+export function setMediaReloader(reload: () => Promise<void>): void {
+  reloadMedia = reload;
+}
+
+/** Whether an id names a medium (set by the media module). */
+let isMedia: (id: string) => boolean = () => false;
+
+/** Set by the media module (it owns the media list). */
+export function setMediaLookup(lookup: (id: string) => boolean): void {
+  isMedia = lookup;
+}
+
+/** The kind of an element, for the structure commands. */
+export function elementKind(id: string): ElementKind {
+  return isMedia(id) ? 'media' : 'document';
+}
+
+/** `{ kind: 'media' }` for a medium, nothing for a document (the default). */
+function kindOf(id: string): { kind?: ElementKind } {
+  return isMedia(id) ? { kind: 'media' } : {};
+}
+
 /** Set by the workspace (it owns the document lists). */
 export function setDocumentReloader(reload: () => Promise<void>): void {
   reloadDocuments = reload;
@@ -143,7 +174,7 @@ export const useStructure = create<StructureStore>((set, get) => {
     }
     get().apply(update);
     if (update.step && DOCUMENT_STATE_ACTIONS.includes(update.step.action)) {
-      await reloadDocuments();
+      await Promise.all([reloadDocuments(), reloadMedia()]);
     }
     showDone(update.step, undo ? 'structure.undone' : 'structure.redone');
     return null;
@@ -153,7 +184,7 @@ export const useStructure = create<StructureStore>((set, get) => {
     loaded: false,
     subnets: [],
     tags: [],
-    byDocument: {},
+    byElement: {},
     history: { undo: null, redo: null },
 
     load: async () => {
@@ -162,40 +193,40 @@ export const useStructure = create<StructureStore>((set, get) => {
         set({ loaded: true });
         return;
       }
-      const byDocument: Record<string, Placement> = {};
-      for (const entry of result.value.documents) {
-        byDocument[entry.id] = { subnetIds: entry.subnetIds, tagIds: entry.tagIds };
+      const byElement: Record<string, Placement> = {};
+      for (const entry of [...result.value.documents, ...result.value.media]) {
+        byElement[entry.id] = { subnetIds: entry.subnetIds, tagIds: entry.tagIds };
       }
       set({
         loaded: true,
         subnets: result.value.subnets,
         tags: result.value.tags,
-        byDocument,
+        byElement,
         history: result.value.history,
       });
     },
 
     reset: () => {
-      set({ loaded: false, subnets: [], tags: [], byDocument: {}, history: { undo: null, redo: null } });
+      set({ loaded: false, subnets: [], tags: [], byElement: {}, history: { undo: null, redo: null } });
     },
 
     apply: (update) => {
       set((state) => {
-        const byDocument = { ...state.byDocument };
-        for (const entry of update.documents) {
+        const byElement = { ...state.byElement };
+        for (const entry of [...update.documents, ...update.media]) {
           // An entry without subnets and tags is the same as none.
-          byDocument[entry.id] = { subnetIds: entry.subnetIds, tagIds: entry.tagIds };
+          byElement[entry.id] = { subnetIds: entry.subnetIds, tagIds: entry.tagIds };
         }
-        return { subnets: update.subnets, tags: update.tags, byDocument, history: update.history };
+        return { subnets: update.subnets, tags: update.tags, byElement, history: update.history };
       });
     },
 
     refreshDocument: async (id) => {
-      const result = await call('structure_document', { id });
+      const result = await call('structure_document', { id, ...kindOf(id) });
       if (result.ok) {
         set((state) => ({
-          byDocument: {
-            ...state.byDocument,
+          byElement: {
+            ...state.byElement,
             [id]: { subnetIds: result.value.subnetIds, tagIds: result.value.tagIds },
           },
         }));
@@ -224,7 +255,7 @@ export const useStructure = create<StructureStore>((set, get) => {
     moveSubnet: (id, parentId) => step(call('subnet_move', { id, parentId })),
 
     deleteSubnet: async (id) => {
-      const { subnets, byDocument } = get();
+      const { subnets, byElement } = get();
       const subnet = subnets.find((entry) => entry.id === id);
       if (!subnet) {
         return null;
@@ -232,8 +263,8 @@ export const useStructure = create<StructureStore>((set, get) => {
       const index = buildIndex(subnets, useLocale.getState().locale);
       const children = index.children.get(id)?.length ?? 0;
       const all = subtree(index, id);
-      const direct = Object.values(byDocument).filter((placement) => placement.subnetIds.includes(id)).length;
-      const below = Object.values(byDocument).filter((placement) =>
+      const direct = Object.values(byElement).filter((placement) => placement.subnetIds.includes(id)).length;
+      const below = Object.values(byElement).filter((placement) =>
         placement.subnetIds.some((subnetId) => all.has(subnetId)),
       ).length;
       const answer = await ask({
@@ -260,10 +291,10 @@ export const useStructure = create<StructureStore>((set, get) => {
       return step(call('subnet_delete', { id, withChildren: answer === 'withChildren' }));
     },
 
-    assign: (documentId, subnetId) => step(call('document_assign', { id: documentId, subnetId })),
-    unassign: (documentId, subnetId) => step(call('document_unassign', { id: documentId, subnetId })),
-    setPrimary: (documentId, subnetId) => step(call('document_set_primary', { id: documentId, subnetId })),
-    moveDocument: (documentId, subnetId) => step(call('document_move', { id: documentId, subnetId })),
+    assign: (id, subnetId) => step(call('document_assign', { id, subnetId, ...kindOf(id) })),
+    unassign: (id, subnetId) => step(call('document_unassign', { id, subnetId, ...kindOf(id) })),
+    setPrimary: (id, subnetId) => step(call('document_set_primary', { id, subnetId, ...kindOf(id) })),
+    moveDocument: (id, subnetId) => step(call('document_move', { id, subnetId, ...kindOf(id) })),
 
     createTag: (name) => step(call('tag_create', { name })),
 
@@ -301,7 +332,7 @@ export const useStructure = create<StructureStore>((set, get) => {
       if (!tag) {
         return null;
       }
-      const count = Object.values(get().byDocument).filter((placement) =>
+      const count = Object.values(get().byElement).filter((placement) =>
         placement.tagIds.includes(id),
       ).length;
       const answer = await ask({
@@ -318,8 +349,8 @@ export const useStructure = create<StructureStore>((set, get) => {
       return answer === 'delete' ? step(call('tag_delete', { id })) : null;
     },
 
-    tagDocument: (documentId, name) => step(call('document_tag', { id: documentId, name }), false),
-    untagDocument: (documentId, tagId) => step(call('document_untag', { id: documentId, tagId }), false),
+    tagDocument: (id, name) => step(call('document_tag', { id, name, ...kindOf(id) }), false),
+    untagDocument: (id, tagId) => step(call('document_untag', { id, tagId, ...kindOf(id) }), false),
 
     undo: () => replay(true),
     redo: () => replay(false),
@@ -331,16 +362,16 @@ export const useStructure = create<StructureStore>((set, get) => {
 
     forget: (id) => {
       set((state) => {
-        if (!(id in state.byDocument)) {
+        if (!(id in state.byElement)) {
           return {};
         }
-        return { byDocument: { ...state.byDocument, [id]: NO_PLACEMENT } };
+        return { byElement: { ...state.byElement, [id]: NO_PLACEMENT } };
       });
     },
   };
 });
 
 /** The subnets and tags of a document. */
-export function placementOf(byDocument: Record<string, Placement>, id: string): Placement {
-  return byDocument[id] ?? NO_PLACEMENT;
+export function placementOf(byElement: Record<string, Placement>, id: string): Placement {
+  return byElement[id] ?? NO_PLACEMENT;
 }

@@ -19,6 +19,7 @@ import { useHistory } from '@/modules/history/HistoryDialog';
 import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
+import { useMedia } from '@/modules/media/mediaStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
@@ -345,6 +346,29 @@ export function createAppCommands(): CommandDefinition[] {
           .getState()
           .redo()
           .then(() => undefined),
+    },
+    {
+      id: 'media.import',
+      category: 'document',
+      titleKey: 'command.media.import',
+      isAvailable: () => libraryOpen() && useMedia.getState().importing === null,
+      run: () => useMedia.getState().startImport('files', text('media.import.title')),
+    },
+    {
+      id: 'media.importFolder',
+      category: 'document',
+      titleKey: 'command.media.importFolder',
+      isAvailable: () => libraryOpen() && useMedia.getState().importing === null,
+      run: () => useMedia.getState().startImport('folder', text('media.import.titleFolder')),
+    },
+    {
+      id: 'media.gallery',
+      category: 'document',
+      titleKey: 'command.media.gallery',
+      isAvailable: libraryOpen,
+      run: () => {
+        workspace().openGallery();
+      },
     },
     {
       id: 'trash.empty',

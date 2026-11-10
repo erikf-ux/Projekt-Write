@@ -66,6 +66,7 @@ describe('Explorer', () => {
       'Favoriten1',
       'Zuletzt verwendet2',
       'Nicht zugeordnet3',
+      'Medien0',
       'Archiv0',
       'Papierkorb0',
     ]);
