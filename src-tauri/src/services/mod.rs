@@ -9,6 +9,7 @@ pub mod import;
 pub mod library;
 pub mod links;
 pub mod locale;
+pub mod media;
 pub mod opening;
 pub mod pwrite;
 pub mod recovery;

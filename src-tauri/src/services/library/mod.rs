@@ -6,13 +6,15 @@
 //! 1. Canonicalise the folder and read `library.json` (format and version).
 //! 2. Refuse links at every fixed path of the structure.
 //! 3. Take the exclusive lock on `library.lock`.
-//! 4. Empty `tmp/`.
+//! 4. Read the import journals in `tmp/` (ADR 0019), then empty `tmp/`.
 //! 5. Classify the location: WAL locally, rollback journal in sync folders
 //!    and on network drives.
 //! 6. Open the database, `PRAGMA quick_check`.
 //! 7. Refuse a newer schema; before pending migrations copy the database to
 //!    `backups/pre-migration/` and check the copy; then migrate.
-//! 8. Compare the document folders with the database (report only).
+//! 8. Remove the files of unfinished imports (their journals name them),
+//!    compare the document and media folders with the database (report
+//!    only).
 
 pub mod layout;
 pub mod lock;
@@ -30,6 +32,7 @@ use crate::database::{Database, DatabaseError, JournalMode, diagnostics};
 use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, PathError, SafeRoot};
 use crate::services::documents::DocumentRepository;
+use crate::services::media::{self, MediaLibrary};
 use crate::services::settings::library::{LibrarySettings, TrashRetentionDays};
 use crate::services::structure::{Journal, Structure};
 
@@ -163,6 +166,8 @@ pub struct Library {
     write_lock: Arc<tokio::sync::Mutex<()>>,
     /// Undo journal of structural actions (ADR 0017), for this opening only.
     journal: Arc<std::sync::Mutex<Journal>>,
+    /// Prepared media imports (ADR 0019), for this opening only.
+    imports: Arc<std::sync::Mutex<media::import::Batches>>,
     // Declared last: released after everything else.
     _lock: LibraryLock,
 }
@@ -232,6 +237,7 @@ impl Library {
             return Err(LibraryError::Moved(moved.clone()));
         }
         let lock = LibraryLock::acquire(&root.resolve(LOCK_FILE)?, generators.now())?;
+        let import_journals = media::read_import_journals(&root);
         let cleared_tmp_entries = maintenance::clear_tmp(&root)?;
 
         let location = location::classify(root.path());
@@ -250,6 +256,26 @@ impl Library {
             })?;
         match Self::prepare_database(&root, &database, &generators).await {
             Ok((schema_version_before, schema_version, migration_backup)) => {
+                if let Err(error) = media::recover_imports(&root, &database, &import_journals).await
+                {
+                    database.close().await;
+                    log::error!("unfinished imports not cleaned up: {error}");
+                    return Err(LibraryError::Io(io::Error::other(error.to_string())));
+                }
+                match media::scan_media(&root, &database).await {
+                    Ok(scan)
+                        if !scan.orphaned_files.is_empty() || !scan.missing_files.is_empty() =>
+                    {
+                        log::warn!(
+                            "library {}: {} media files without database entry, {} media without file",
+                            manifest.id,
+                            scan.orphaned_files.len(),
+                            scan.missing_files.len()
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(error) => log::warn!("media folders not compared: {error}"),
+                }
                 let documents = match maintenance::scan_documents(&root, &database).await {
                     Ok(scan) => scan,
                     Err(error) => {
@@ -344,6 +370,7 @@ impl Library {
             generators,
             write_lock: Arc::new(tokio::sync::Mutex::new(())),
             journal: Arc::new(std::sync::Mutex::new(Journal::default())),
+            imports: Arc::new(std::sync::Mutex::new(media::import::Batches::default())),
             _lock: lock,
         }
     }
@@ -397,6 +424,17 @@ impl Library {
         )
     }
 
+    /// Media: import, thumbnails, files for the media handler, trash.
+    pub fn media(&self) -> MediaLibrary {
+        MediaLibrary::new(
+            self.root.clone(),
+            self.database.clone(),
+            self.generators.clone(),
+            self.write_lock.clone(),
+            self.imports.clone(),
+        )
+    }
+
     /// The library-wide settings.
     pub fn settings(&self) -> LibrarySettings {
         LibrarySettings::new(self.database.clone(), self.generators.clone())
@@ -418,6 +456,15 @@ impl Library {
                 log::info!("{removed} documents removed from the trash after {days} days")
             }
             Err(error) => log::warn!("trash not cleaned up: {error}"),
+        }
+        match self.media().purge_expired(days).await {
+            Ok(report) if report.removed > 0 || report.kept_in_use > 0 => log::info!(
+                "{} media removed from the trash after {days} days, {} kept because documents use them",
+                report.removed,
+                report.kept_in_use
+            ),
+            Ok(_) => {}
+            Err(error) => log::warn!("media trash not cleaned up: {error}"),
         }
         match self.documents().history().apply_retention_all().await {
             Ok(0) => {}

@@ -9,6 +9,8 @@
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqliteConnection, SqlitePool};
 
+use crate::services::documents::References;
+
 /// One row of `documents`, as stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentRow {
@@ -55,15 +57,15 @@ fn from_row(row: &SqliteRow) -> Result<DocumentRow, sqlx::Error> {
     })
 }
 
-/// Inserts a new document and its links.
+/// Inserts a new document with its links and media.
 pub async fn insert(
     pool: &SqlitePool,
     row: &DocumentRow,
-    links: &[String],
+    references: &References,
 ) -> Result<(), sqlx::Error> {
     let mut transaction = pool.begin().await?;
     insert_row(&mut transaction, row).await?;
-    replace_links(&mut transaction, &row.id, links).await?;
+    replace_references(&mut transaction, &row.id, references).await?;
     transaction.commit().await
 }
 
@@ -90,6 +92,17 @@ async fn insert_row(
     .execute(&mut *connection)
     .await?;
     Ok(())
+}
+
+/// Replaces links (`document_links`) and media uses (`document_media`) of
+/// `source` (ADR 0019, decision 11).
+async fn replace_references(
+    connection: &mut SqliteConnection,
+    source: &str,
+    references: &References,
+) -> Result<(), sqlx::Error> {
+    replace_links(connection, source, &references.links).await?;
+    crate::database::media::replace_document_media(connection, source, &references.media).await
 }
 
 /// Replaces the outgoing links of `source`.
@@ -200,7 +213,7 @@ pub async fn update_content(
     size_bytes: i64,
     content_sha256: &str,
     updated_at: &str,
-    links: &[String],
+    references: &References,
 ) -> Result<u64, sqlx::Error> {
     let mut transaction = pool.begin().await?;
     let changed = sqlx::query(
@@ -214,7 +227,7 @@ pub async fn update_content(
     .await?
     .rows_affected();
     if changed > 0 {
-        replace_links(&mut transaction, id, links).await?;
+        replace_references(&mut transaction, id, references).await?;
     }
     transaction.commit().await?;
     Ok(changed)
@@ -229,7 +242,7 @@ pub async fn update_format(
     size_bytes: i64,
     content_sha256: &str,
     updated_at: &str,
-    links: &[String],
+    references: &References,
 ) -> Result<u64, sqlx::Error> {
     let mut transaction = pool.begin().await?;
     let changed = sqlx::query(
@@ -245,7 +258,7 @@ pub async fn update_format(
     .await?
     .rows_affected();
     if changed > 0 {
-        replace_links(&mut transaction, id, links).await?;
+        replace_references(&mut transaction, id, references).await?;
     }
     transaction.commit().await?;
     Ok(changed)

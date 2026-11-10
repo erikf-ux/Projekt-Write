@@ -37,6 +37,11 @@ rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
 sha2 = "0.10.9"
 flate2 = "1.1.10"
+# Media (Phase 8, ADR 0019): decoding with limits and thumbnails; only the
+# four raster formats of section 17, without threads.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+# Office check: reads [Content_Types].xml and the part names.
+zip = { version = "9.5.0", default-features = false, features = ["deflate-flate2"] }
 time = "0.3.55"
 tokio = { version = "1", features = ["sync", "rt"] }
 

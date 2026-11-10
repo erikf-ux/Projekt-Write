@@ -68,6 +68,27 @@ impl LibrarySetting for TrashRetentionDays {
     }
 }
 
+/// Largest image accepted, in megapixels (section 17: "Grenzwerte schützen
+/// vor Bildbomben, Startwert 100 Megapixel"; ADR 0019, decision 4).
+pub struct MediaMaxMegapixels;
+
+impl LibrarySetting for MediaMaxMegapixels {
+    const KEY: &'static str = "media.maxMegapixels";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        100
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=1000).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 1000 megapixels")
+        }
+    }
+}
+
 /// History: every version of the last hours stays (section 13: 24 hours).
 pub struct HistoryKeepAllHours;
 

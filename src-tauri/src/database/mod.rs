@@ -12,6 +12,7 @@ pub mod diagnostics;
 pub mod documents;
 pub mod fts;
 pub mod history;
+pub mod media;
 pub mod settings;
 pub mod structure;
 

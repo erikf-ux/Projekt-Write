@@ -1499,6 +1499,101 @@ fn with_primary(mut memberships: Vec<MembershipRow>) -> Vec<MembershipRow> {
     memberships
 }
 
+/// A folder name as a subnet name: control characters become spaces, at
+/// most [`MAX_SUBNET_NAME_CHARS`] characters, never empty.
+pub fn subnet_name_from_folder(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let trimmed: String = cleaned.trim().chars().take(MAX_SUBNET_NAME_CHARS).collect();
+    let trimmed = trimmed.trim_end().to_owned();
+    if trimmed.is_empty() {
+        "Ordner".to_owned()
+    } else {
+        trimmed
+    }
+}
+
+/// Finds or creates one subnet per name, each below the one before, starting
+/// below `parent` (the top level if `None`); returns the last. A subnet with
+/// the name on its level is reused. Colours follow [`Structure::create_subnet`].
+/// Runs in the caller's transaction and outside the undo journal: a folder
+/// import is no structural step (ADR 0019, decision 6).
+pub(crate) async fn ensure_subnet_path(
+    connection: &mut SqliteConnection,
+    generators: &Generators,
+    parent: Option<String>,
+    names: &[String],
+) -> Result<Option<String>, StructureError> {
+    let mut current = parent;
+    if let Some(id) = &current {
+        ensure_subnet(connection, id).await?;
+    }
+    for name in names {
+        let name = subnet_name_from_folder(name);
+        let key = name_key(&name);
+        if let Some(existing) = rows::sibling_named(connection, current.as_deref(), &key).await? {
+            current = Some(existing);
+            continue;
+        }
+        let color = match &current {
+            Some(parent) => {
+                rows::get_subnet(connection, parent)
+                    .await?
+                    .ok_or(StructureError::SubnetNotFound)?
+                    .color
+            }
+            None => {
+                let roots = rows::count_roots(connection).await?;
+                let index = usize::try_from(roots).unwrap_or(0) % CLUSTER_COLORS.len();
+                CLUSTER_COLORS[index].to_owned()
+            }
+        };
+        let id = id_text(generators.new_id());
+        let now = generators.now().to_iso();
+        rows::insert_subnet(
+            connection,
+            &SubnetRow {
+                id: id.clone(),
+                name,
+                name_key: key,
+                description: String::new(),
+                color,
+                parent_id: current.clone(),
+                created_at: now.clone(),
+                updated_at: now,
+            },
+        )
+        .await?;
+        current = Some(id);
+    }
+    Ok(current)
+}
+
+/// Gives an element a membership in `subnet` outside the journal (folder
+/// import): primary if it is the first, nothing if it exists.
+pub(crate) async fn add_membership(
+    connection: &mut SqliteConnection,
+    element: &Element,
+    subnet: &str,
+    now: &str,
+) -> Result<(), StructureError> {
+    let mut memberships = rows::memberships_of(connection, element).await?;
+    if memberships.iter().any(|m| m.subnet_id == subnet) {
+        return Ok(());
+    }
+    let first = memberships.is_empty();
+    memberships.push(MembershipRow {
+        subnet_id: subnet.to_owned(),
+        element: element.clone(),
+        is_primary: first,
+        created_at: now.to_owned(),
+    });
+    rows::replace_memberships(connection, element, &memberships).await?;
+    Ok(())
+}
+
 async fn ensure_subnet(connection: &mut SqliteConnection, id: &str) -> Result<(), StructureError> {
     rows::get_subnet(connection, id)
         .await?

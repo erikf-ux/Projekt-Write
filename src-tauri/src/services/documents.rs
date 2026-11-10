@@ -358,8 +358,8 @@ impl DocumentRepository {
             favorited_at: None,
             last_opened_at: None,
         };
-        let links = links_in(format, content);
-        if let Err(error) = rows::insert(self.database.writer(), &row, &links).await {
+        let references = references_in(format, content);
+        if let Err(error) = rows::insert(self.database.writer(), &row, &references).await {
             // Without a row the new file would be an orphan.
             let _ = std::fs::remove_file(&path);
             return Err(error.into());
@@ -420,7 +420,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
-            &links_in(meta.format, &content),
+            &references_in(meta.format, &content),
         )
         .await?;
         let meta = self.get(id).await?.ok_or(DocumentError::NotFound)?;
@@ -453,7 +453,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
-            &links_in(meta.format, content),
+            &references_in(meta.format, content),
         )
         .await?;
         // Stage 4: one version per 10 minutes of editing. A failure here
@@ -543,12 +543,46 @@ impl DocumentRepository {
             &id.hyphenated().to_string(),
         )
         .await?;
-        if file.content == content && file.title == meta.title && file.tags == tags {
+        // The media the content uses go into the envelope (section 10, ADR
+        // 0019, decision 10). Entries of media this library does not have
+        // stay as they were (a file from another library).
+        let mut used = std::collections::BTreeSet::new();
+        collect_media(&content, &mut used);
+        let mut media = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for (media_id, _) in used {
+            if !seen.insert(media_id.clone()) {
+                continue;
+            }
+            let previous = file.media.iter().find(|entry| entry.id == media_id);
+            match crate::database::media::get(self.database.reader(), &media_id).await? {
+                Some(row) => media.push(pwrite::MediaEntry {
+                    id: row.id,
+                    sha256: row.sha256,
+                    original_name: row.original_name,
+                    mime_type: row.mime_type,
+                    unknown: previous
+                        .map(|entry| entry.unknown.clone())
+                        .unwrap_or_default(),
+                }),
+                None => {
+                    if let Some(previous) = previous {
+                        media.push(previous.clone());
+                    }
+                }
+            }
+        }
+        if file.content == content
+            && file.title == meta.title
+            && file.tags == tags
+            && file.media == media
+        {
             return Ok(SaveOutcome::Unchanged(meta));
         }
         file.content = content;
         file.title.clone_from(&meta.title);
         file.tags = tags;
+        file.media = media;
         file.updated_at = self.generators.now().to_iso();
         self.save(id, &pwrite::to_bytes(&file)).await
     }
@@ -614,7 +648,7 @@ impl DocumentRepository {
         let old_path = self.prepare_path(meta.format, &meta.format.relative_path(meta.id))?;
         let size = i64::try_from(data.len()).map_err(|_| DocumentError::TooLarge)?;
         let sha = sha256_hex(&data);
-        let links = links_in(format, &data);
+        let references = references_in(format, &data);
         let target = new_path.clone();
         blocking(move || atomic::write_atomic(&target, &data)).await?;
         let updated = rows::update_format(
@@ -624,7 +658,7 @@ impl DocumentRepository {
             size,
             &sha,
             &now,
-            &links,
+            &references,
         )
         .await;
         match updated {
@@ -1004,6 +1038,104 @@ impl DocumentRepository {
 
 /// Prefix of internal links (ADR 0015, decision 14).
 pub const INTERNAL_LINK_PREFIX: &str = "pwrite://";
+/// Prefix of media in documents (ADR 0019, decision 8).
+pub const MEDIA_PREFIX: &str = "pwmedia://";
+
+/// What a content refers to: documents it links to and media it uses (with
+/// the page of a PDF reference, 0 for the whole medium). Written with the
+/// content in one transaction.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct References {
+    pub links: Vec<String>,
+    pub media: Vec<(String, u32)>,
+}
+
+/// Links and media of a content.
+pub fn references_in(format: DocumentFormat, content: &[u8]) -> References {
+    References {
+        links: links_in(format, content),
+        media: media_in(format, content),
+    }
+}
+
+/// The media a content uses (`pwmedia://<id>`, optionally `#page=<n>`),
+/// sorted and without repeats. Markdown is searched as text, `.pwrite`
+/// through image sources and link marks.
+pub fn media_in(format: DocumentFormat, content: &[u8]) -> Vec<(String, u32)> {
+    let mut uses = std::collections::BTreeSet::new();
+    match format {
+        DocumentFormat::Txt => {}
+        DocumentFormat::Md => {
+            let text = String::from_utf8_lossy(content);
+            for (index, _) in text.match_indices(MEDIA_PREFIX) {
+                if let Some(found) = media_target(&text[index..]) {
+                    uses.insert(found);
+                }
+            }
+        }
+        DocumentFormat::Pwrite => {
+            if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
+                collect_media(&file.content, &mut uses);
+            }
+        }
+    }
+    uses.into_iter().collect()
+}
+
+/// `pwmedia://<id>` at the start of `text`, with the page of a following
+/// `#page=<n>` (1 to 100,000; anything else counts as the whole medium).
+fn media_target(text: &str) -> Option<(String, u32)> {
+    let rest = text.strip_prefix(MEDIA_PREFIX)?;
+    let candidate = rest.get(..36)?;
+    let id = Uuid::try_parse(candidate).ok()?;
+    if id.hyphenated().to_string() != candidate {
+        return None;
+    }
+    let page = rest[36..]
+        .strip_prefix("#page=")
+        .map(|digits| {
+            digits
+                .chars()
+                .take_while(char::is_ascii_digit)
+                .take(6)
+                .collect::<String>()
+        })
+        .and_then(|digits| digits.parse::<u32>().ok())
+        .filter(|page| (1..=crate::services::media::MAX_PAGES).contains(page))
+        .unwrap_or(0);
+    Some((candidate.to_owned(), page))
+}
+
+fn collect_media(node: &serde_json::Value, uses: &mut std::collections::BTreeSet<(String, u32)>) {
+    let attribute = |value: &serde_json::Value, name: &str| {
+        value
+            .get("attrs")
+            .and_then(|attrs| attrs.get(name))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    if node.get("type").and_then(serde_json::Value::as_str) == Some("image")
+        && let Some(src) = attribute(node, "src")
+        && let Some((id, _)) = media_target(&src)
+    {
+        uses.insert((id, 0));
+    }
+    if let Some(marks) = node.get("marks").and_then(serde_json::Value::as_array) {
+        for mark in marks {
+            if mark.get("type").and_then(serde_json::Value::as_str) == Some("link")
+                && let Some(href) = attribute(mark, "href")
+                && let Some(found) = media_target(&href)
+            {
+                uses.insert(found);
+            }
+        }
+    }
+    if let Some(children) = node.get("content").and_then(serde_json::Value::as_array) {
+        for child in children {
+            collect_media(child, uses);
+        }
+    }
+}
 
 /// The documents a content links to (`pwrite://<id>`), sorted and without
 /// repeats. Plain text has no links; Markdown is searched as text, `.pwrite`
