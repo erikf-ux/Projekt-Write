@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 7 – Subnetze und Tags**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 8 – Medien**. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -13,19 +13,19 @@ Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Wi
 
 ## Befehle
 
-| Zweck                                          | Befehl                                                                                                                                                   |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Abhängigkeiten installieren                    | `npm ci`                                                                                                                                                 |
-| App im Entwicklungsmodus                       | `npm run tauri dev`                                                                                                                                      |
-| Alle Frontend-Prüfungen                        | `npm run check` (Prettier, ESLint, TypeScript, Vitest)                                                                                                   |
-| Rust-Tests (erzeugt auch die TypeScript-Typen) | `cargo test --manifest-path src-tauri/Cargo.toml`                                                                                                        |
-| Debug-Build für E2E                            | `npm run build:e2e`                                                                                                                                      |
-| E2E-Tests                                      | `npm run test:e2e` (Linux ohne Bildschirm: `dbus-run-session -- xvfb-run -a npm run test:e2e`)                                                           |
-| Echten Ordnerdialog prüfen (manuell)           | `npx wdio run tests/e2e/manual/wdio.manual.conf.ts` (unter Linux mit `xvfb-run`; speichert ein Bildschirmfoto)                                           |
-| Referenzbibliothek erzeugen                    | `node scripts/reference-library.mjs` (Standard: 10.000 Dokumente in `src-tauri/target/reference-library`; `--seed`, `--documents`, `--force`, `--check`) |
-| Lizenzliste aktualisieren                      | `node scripts/third-party-licenses.mjs`                                                                                                                  |
-| Release-Binary                                 | `npx tauri build --no-bundle`                                                                                                                            |
-| App-Icons neu erzeugen                         | `node scripts/app-icons.mjs` (Quelle `src-tauri/icons/app-icon.png`, 256 × 256 px)                                                                       |
+| Zweck                                          | Befehl                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Abhängigkeiten installieren                    | `npm ci`                                                                                                                                                                  |
+| App im Entwicklungsmodus                       | `npm run tauri dev`                                                                                                                                                       |
+| Alle Frontend-Prüfungen                        | `npm run check` (Prettier, ESLint, TypeScript, Vitest)                                                                                                                    |
+| Rust-Tests (erzeugt auch die TypeScript-Typen) | `cargo test --manifest-path src-tauri/Cargo.toml`                                                                                                                         |
+| Debug-Build für E2E                            | `npm run build:e2e`                                                                                                                                                       |
+| E2E-Tests                                      | `npm run test:e2e` (Linux ohne Bildschirm: `dbus-run-session -- xvfb-run -a npm run test:e2e`)                                                                            |
+| Echten Ordnerdialog prüfen (manuell)           | `npx wdio run tests/e2e/manual/wdio.manual.conf.ts` (unter Linux mit `xvfb-run`; speichert ein Bildschirmfoto)                                                            |
+| Referenzbibliothek erzeugen                    | `node scripts/reference-library.mjs` (Standard: 10.000 Dokumente und 5.000 Medien in `src-tauri/target/reference-library`; `--seed`, `--documents`, `--force`, `--check`) |
+| Lizenzliste aktualisieren                      | `node scripts/third-party-licenses.mjs`                                                                                                                                   |
+| Release-Binary                                 | `npx tauri build --no-bundle`                                                                                                                                             |
+| App-Icons neu erzeugen                         | `node scripts/app-icons.mjs` (Quelle `src-tauri/icons/app-icon.png`, 256 × 256 px)                                                                                        |
 
 ## Dokumentation
 
@@ -42,13 +42,15 @@ Project Write speichert Dokumente in einer **Bibliothek**: einem Ordner mit Date
 
 ## Bedienung
 
-Beim ersten Start wählen Sie den Ort der Bibliothek und die Sprache; danach öffnet sich ein leeres Dokument. Dokumente der Bibliothek speichern von selbst (1 s nach der letzten Eingabe, beim Tab-Wechsel und beim Schließen); die Statusleiste zeigt „Gespeichert“. Text- und Markdown-Dateien, die Sie auf das Fenster ziehen, werden in die Bibliothek importiert; das Original bleibt unverändert.
+Beim ersten Start wählen Sie den Ort der Bibliothek und die Sprache; danach öffnet sich ein leeres Dokument. Dokumente der Bibliothek speichern von selbst (1 s nach der letzten Eingabe, beim Tab-Wechsel und beim Schließen); die Statusleiste zeigt „Gespeichert“. Text- und Markdown-Dateien, die Sie auf das Fenster ziehen, werden als Dokumente in die Bibliothek importiert, alle anderen Dateien als Medien; das Original bleibt unverändert.
 
-Markdown-Dokumente bearbeiten Sie als Rich Text; Markdown-Kürzel wie `# ` oder `**fett**` wirken beim Tippen, `Strg + /` zeigt den Markdown-Quelltext. Gespeichert wird immer Markdown. Was Markdown nicht verlustfrei halten kann, meldet der Editor vor dem Speichern; ein Dokument, das er nicht verlustfrei darstellen kann, öffnet in der Quelltextansicht und nennt den Grund. Die Statusleiste zeigt die Wörter und die Lesezeit, ein Klick darauf die ganze Statistik. Bilder erscheinen als Hinweis mit Adresse und werden nie geladen. Weblinks öffnen Sie mit `Strg + Klick` im Systembrowser.
+Markdown-Dokumente bearbeiten Sie als Rich Text; Markdown-Kürzel wie `# ` oder `**fett**` wirken beim Tippen, `Strg + /` zeigt den Markdown-Quelltext. Gespeichert wird immer Markdown. Was Markdown nicht verlustfrei halten kann, meldet der Editor vor dem Speichern; ein Dokument, das er nicht verlustfrei darstellen kann, öffnet in der Quelltextansicht und nennt den Grund. Die Statusleiste zeigt die Wörter und die Lesezeit, ein Klick darauf die ganze Statistik. Bilder aus der Bibliothek erscheinen im Text mit Unterschrift und Anzeigegröße; Bilder mit Webadresse bleiben ein Hinweis mit Adresse und werden nie geladen. Weblinks öffnen Sie mit `Strg + Klick` im Systembrowser.
 
 Neben Text (`.txt`) und Markdown (`.md`) gibt es Rich-Text-Dokumente im Format `.pwrite`; Dokumente lassen sich kopieren, als Favorit markieren und zwischen den Formaten umwandeln (die App nennt vorher, was verloren ginge). `[[` verlinkt ein anderes Dokument der Bibliothek; die Seitenleiste „Verbindungen“ zeigt, welche Dokumente auf das aktuelle verweisen.
 
 Ordnung ist freiwillig: **Subnetze** gliedern die Bibliothek als Baum (Explorer › „Neues Subnetz“, Kontextmenü „Neues Untersubnetz …“), jedes mit Name, Beschreibung und Farbe. Ein Dokument kann in mehreren Subnetzen liegen und bleibt doch ein Dokument; eines davon ist primär, die Breadcrumbs über der Schreibfläche zeigen seinen Weg. „Verschieben nach …“ wechselt das primäre Subnetz, „Zuordnen zu …“ fügt eines hinzu; schneller geht es per Drag & Drop im Explorer (mit `Strg` zuordnen statt verschieben). Ein Subnetz löschen löscht nie ein Dokument. **Tags** vergeben Sie über „Tags …“ (Kontextmenü, Breadcrumbs oder Befehlspalette), verwalten sie unter „Tags verwalten …“ und filtern den Explorer damit (Filter-Symbol). Jede solche Änderung lässt sich mit `Strg + Z` im Explorer oder „Rückgängig“ im Hinweis zurücknehmen; das Rückgängig des Editors bleibt davon getrennt.
+
+**Medien** – Bilder (PNG, JPEG, GIF, WebP, SVG), PDFs und Office-Dateien als Anhang – importieren Sie über die Galerie (Befehlspalette › „Medien-Galerie öffnen“ oder „Medien importieren …“) einzeln oder als ganzen Ordner, auf Wunsch mit Subnetzen aus der Ordnerstruktur. Der Dialog nennt, was übernommen wird und was nicht (mit Grund), und fragt bei gleichem Inhalt, ob das vorhandene Medium genügt. Die Originale bleiben unverändert; ein abgebrochener Import hinterlässt nichts. PDFs lesen Sie in der App (Seiten, Zoom, Text markieren); Anhänge öffnen als schreibgeschützte Kopie im Standardprogramm. Im Text fügen Sie Medien mit „Bild einfügen …“ und „PDF-Verweis einfügen …“ (Menü „Format“) ein oder einfach durch Einfügen und Ablegen einer Bilddatei; ein Doppelklick auf ein Bild ändert Unterschrift und Größe, `Strg + Klick` auf einen PDF-Verweis öffnet das PDF auf der Seite. Medien lassen sich wie Dokumente Subnetzen zuordnen, taggen, archivieren und löschen; die Medienansicht zeigt, welche Dokumente ein Medium verwenden.
 
 Nichts geht verloren, ohne dass Sie es wollen (vier Stufen): Beim nächsten Start sind die Tabs der letzten Sitzung wieder offen, mit Ansicht und Auswahl. Nach einem Absturz bietet die App an, was seit dem letzten Speichern getippt wurde (es fehlen höchstens die letzten ein bis zwei Sekunden). Gelöschte Dokumente liegen im Papierkorb des Explorers, bis Sie ihn leeren oder 30 Tage um sind; „Wiederherstellen“ bringt sie mit allen Verbindungen zurück. Ältere Stände eines Dokuments zeigt „Versionen …“ in der Befehlspalette, neben dem aktuellen Stand; „Version speichern …“ legt einen benannten Stand an, der bleibt. Vor jeder Wiederherstellung sichert die App den aktuellen Stand als Version. Dokumente, die Sie gerade nicht brauchen, legen Sie ins Archiv. Wie lange Papierkorb und Versionen aufbewahrt werden, stellen Sie unter Einstellungen › Bibliothek ein.
 

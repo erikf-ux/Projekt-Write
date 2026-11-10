@@ -1,6 +1,7 @@
 //! Acceptance test of Phase 2 (section 25): "Die Referenzbibliothek entsteht
 //! reproduzierbar." A small library (the full size runs in CI through
-//! `node scripts/reference-library.mjs --check`).
+//! `node scripts/reference-library.mjs --check`). Phases 7 and 8 add the
+//! structure and the media.
 
 mod common;
 
@@ -45,6 +46,16 @@ async fn the_same_seed_builds_the_same_library() {
         generate::structure_size(generate::FULL_DOCUMENTS),
         (500, 1_000)
     );
+    // Phase 8: media of all three kinds, imported, used and placed.
+    assert_eq!(generate::media_size(generate::FULL_DOCUMENTS), 5_000);
+    assert_eq!(summary.media, generate::media_size(DOCUMENTS));
+    assert_eq!(
+        summary.images + summary.pdfs + summary.attachments,
+        summary.media
+    );
+    assert!(summary.images > 0 && summary.pdfs > 0 && summary.attachments > 0);
+    assert!(summary.media_uses > 0);
+    assert!(summary.media_memberships >= summary.media - summary.media_unassigned);
 
     // It is an ordinary, intact library.
     let (library, report) = Library::open(&first, OpenOptions::default(), Generators::system())
@@ -57,6 +68,34 @@ async fn the_same_seed_builds_the_same_library() {
             .await
             .unwrap()
     );
+    let scan = project_write_lib::services::media::scan_media(library.root(), library.database())
+        .await
+        .unwrap();
+    assert!(scan.orphaned_files.is_empty(), "{:?}", scan.orphaned_files);
+    assert!(scan.missing_files.is_empty(), "{:?}", scan.missing_files);
+    let media = library.media().list().await.unwrap();
+    assert_eq!(media.len(), summary.media);
+    assert!(
+        media
+            .iter()
+            .filter(|medium| medium.kind == project_write_lib::services::media::MediaKind::Pdf)
+            .all(|pdf| pdf
+                .page_count
+                .is_some_and(|pages| (1..=40).contains(&pages)))
+    );
+    // Pictures in all five formats (ADR 0019, decision 16).
+    let formats: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT extension FROM media WHERE kind = 'image' ORDER BY extension",
+    )
+    .fetch_all(library.database().reader())
+    .await
+    .unwrap();
+    assert_eq!(formats, ["gif", "jpg", "png", "svg", "webp"]);
+    let uses: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM document_media")
+        .fetch_one(library.database().reader())
+        .await
+        .unwrap();
+    assert_eq!(uses, summary.media_uses as i64);
     let documents = library.documents();
     assert_eq!(documents.count().await.unwrap(), DOCUMENTS as u64);
     let structure = library.structure();

@@ -19,17 +19,19 @@ import { pinMainWindow, waitUntilAppEnded } from '../session';
 
 /** The full reference library (section 6). */
 const REFERENCE_DOCUMENTS = 10_000;
+const REFERENCE_MEDIA = 5_000;
 const library = path.join(referenceCache, `reference-library-${String(REFERENCE_DOCUMENTS)}`);
 
-/** Whether `library` holds a reference library of this size and seed. */
+/** Whether `library` holds a reference library of this size and seed (with media since Phase 8). */
 function usable(): boolean {
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(library, 'library.json'), 'utf8')) as {
-      referenceLibrary?: { seed?: number; documents?: number };
+      referenceLibrary?: { seed?: number; documents?: number; media?: number };
     };
     return (
       manifest.referenceLibrary?.seed === 2026 &&
       manifest.referenceLibrary.documents === REFERENCE_DOCUMENTS &&
+      manifest.referenceLibrary.media === REFERENCE_MEDIA &&
       fs.existsSync(path.join(library, 'database', 'projectwrite.db'))
     );
   } catch {

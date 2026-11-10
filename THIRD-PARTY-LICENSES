@@ -9,21 +9,24 @@ licence it declares. Full licence texts are bundled with the installers
 program; they ship as separate data packages with their own licence text
 (master prompt, section 7). Phase 1 ships no dictionaries.
 
-Rust crates (normal dependencies, all target platforms): 420
+Rust crates (normal dependencies, all target platforms): 437
 Licence summary:
-   192  MIT OR Apache-2.0
-   107  MIT
-    38  Apache-2.0 OR MIT
+   197  MIT OR Apache-2.0
+   110  MIT
+    40  Apache-2.0 OR MIT
     18  Unicode-3.0
     15  Zlib OR Apache-2.0 OR MIT
-    10  MIT/Apache-2.0
+    11  MIT/Apache-2.0
+     6  Unlicense OR MIT
      5  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
      5  MPL-2.0
-     5  Unlicense OR MIT
      4  Apache-2.0/MIT
+     3  MIT OR Apache-2.0 OR Zlib
      2  Apache-2.0
      2  BSD-3-Clause
+     2  BSD-3-Clause OR Apache-2.0
      2  BSD-3-Clause OR MIT OR Apache-2.0
+     2  CC0-1.0 OR MIT-0 OR Apache-2.0
      2  MIT OR Apache-2.0 OR LGPL-2.1-or-later
      2  MIT OR Zlib OR Apache-2.0
      2  Unlicense/MIT
@@ -33,13 +36,12 @@ Licence summary:
      1  Apache-2.0 AND MIT
      1  BSD-3-Clause AND MIT
      1  BSD-3-Clause/MIT
-     1  CC0-1.0 OR MIT-0 OR Apache-2.0
-     1  MIT OR Apache-2.0 OR Zlib
      1  Zlib
 
-npm packages (production dependencies): 65
+npm packages (production dependencies): 68
 Licence summary:
-    63  MIT
+    65  MIT
+     1  Apache-2.0
      1  Apache-2.0 OR MIT
      1  ISC
 
@@ -81,6 +83,7 @@ brotli-decompressor 6.2.0           BSD-3-Clause/MIT
 bumpalo 3.20.3                      MIT OR Apache-2.0
 bytemuck 1.25.2                     Zlib OR Apache-2.0 OR MIT
 byteorder 1.5.0                     Unlicense OR MIT
+byteorder-lite 0.1.0                Unlicense OR MIT
 bytes 1.12.1                        MIT
 cairo-rs 0.18.5                     MIT
 cairo-sys-rs 0.18.2                 MIT
@@ -90,8 +93,10 @@ cargo-platform 0.1.9                MIT OR Apache-2.0
 cesu8 1.1.0                         Apache-2.0/MIT
 cfb 0.14.0                          MIT
 cfg-if 1.0.5                        MIT OR Apache-2.0
+color_quant 1.1.0                   MIT
 combine 4.6.9                       MIT
 concurrent-queue 2.5.0              Apache-2.0 OR MIT
+constant_time_eq 0.6.1              CC0-1.0 OR MIT-0 OR Apache-2.0
 cookie 0.18.2                       MIT OR Apache-2.0
 core-foundation 0.10.1              MIT OR Apache-2.0
 core-foundation-sys 0.8.7           MIT OR Apache-2.0
@@ -170,6 +175,7 @@ gdkx11-sys 0.18.2                   MIT
 generic-array 0.14.9                MIT
 getrandom 0.3.4                     MIT OR Apache-2.0
 getrandom 0.4.3                     MIT OR Apache-2.0
+gif 0.14.2                          MIT OR Apache-2.0
 gio 0.18.4                          MIT
 gio-sys 0.18.1                      MIT
 glib 0.18.5                         MIT
@@ -206,6 +212,8 @@ icu_provider 2.4.0                  Unicode-3.0
 ident_case 1.0.1                    MIT/Apache-2.0
 idna 1.1.0                          MIT OR Apache-2.0
 idna_adapter 1.2.2                  Apache-2.0 OR MIT
+image 0.25.10                       MIT OR Apache-2.0
+image-webp 0.2.4                    MIT OR Apache-2.0
 indexmap 1.9.3                      Apache-2.0 OR MIT
 indexmap 2.14.2                     Apache-2.0 OR MIT
 infer 0.22.0                        MIT
@@ -236,11 +244,13 @@ mime 0.3.17                         MIT OR Apache-2.0
 miniz_oxide 0.8.9                   MIT OR Zlib OR Apache-2.0
 miniz_oxide 0.9.1                   MIT OR Zlib OR Apache-2.0
 mio 1.2.4                           MIT
+moxcms 0.8.1                        BSD-3-Clause OR Apache-2.0
 muda 0.20.0                         Apache-2.0 OR MIT
 ndk 0.9.0                           MIT OR Apache-2.0
 ndk-context 0.1.1                   MIT OR Apache-2.0
 ndk-sys 0.6.0+11769913              MIT OR Apache-2.0
 new_debug_unreachable 1.0.6         MIT
+nix 0.31.3                          MIT
 num_enum 0.7.6                      BSD-3-Clause OR MIT OR Apache-2.0
 num_enum_derive 0.7.6               BSD-3-Clause OR MIT OR Apache-2.0
 num-conv 0.2.2                      MIT OR Apache-2.0
@@ -288,6 +298,8 @@ proc-macro-crate 3.5.0              MIT OR Apache-2.0
 proc-macro-error 1.0.4              MIT OR Apache-2.0
 proc-macro-error-attr 1.0.4         MIT OR Apache-2.0
 proc-macro2 1.0.107                 MIT OR Apache-2.0
+pxfm 0.1.30                         BSD-3-Clause OR Apache-2.0
+quick-error 2.0.1                   MIT/Apache-2.0
 quick-xml 0.42.0                    MIT
 quote 1.0.47                        MIT OR Apache-2.0
 r-efi 5.3.0                         MIT OR Apache-2.0 OR LGPL-2.1-or-later
@@ -389,6 +401,7 @@ tracing-core 0.1.36                 MIT
 try-lock 0.2.5                      MIT
 ts-rs 12.0.1                        MIT
 ts-rs-macros 12.0.1                 MIT
+typed-path 0.13.0                   MIT OR Apache-2.0
 typeid 1.0.3                        MIT OR Apache-2.0
 typenum 1.20.1                      MIT OR Apache-2.0
 uds_windows 1.2.1                   MIT
@@ -417,6 +430,7 @@ webkit2gtk-sys 2.0.2                MIT
 webview2-com 0.39.1                 MIT
 webview2-com-macros 0.8.1           MIT
 webview2-com-sys 0.39.1             MIT
+weezl 0.1.12                        MIT OR Apache-2.0
 winapi 0.3.9                        MIT/Apache-2.0
 winapi-i686-pc-windows-gnu 0.4.0    MIT/Apache-2.0
 winapi-util 0.1.11                  Unlicense OR MIT
@@ -459,10 +473,15 @@ zbus_names 4.3.5                    MIT
 zcheapstr 1.2.0                     MIT
 zerofrom 0.1.8                      Unicode-3.0
 zerofrom-derive 0.1.8               Unicode-3.0
+zeroize 1.9.1                       Apache-2.0 OR MIT
+zeroize_derive 1.5.0                Apache-2.0 OR MIT
 zerotrie 0.2.5                      Unicode-3.0
 zerovec 0.11.9                      Unicode-3.0
 zerovec-derive 0.11.7               Unicode-3.0
+zip 9.5.0                           MIT
 zmij 1.0.23                         MIT
+zune-core 0.5.3                     MIT OR Apache-2.0 OR Zlib
+zune-jpeg 0.5.15                    MIT OR Apache-2.0 OR Zlib
 zvariant 5.15.1                     MIT
 zvariant_derive 5.15.1              MIT
 zvariant_utils 4.2.0                MIT
@@ -473,6 +492,8 @@ npm packages
 @floating-ui/core 1.8.0                    MIT
 @floating-ui/dom 1.8.0                     MIT
 @floating-ui/utils 0.2.12                  MIT
+@napi-rs/canvas 1.1.0                      MIT
+@napi-rs/canvas-linux-x64-gnu 1.1.0        MIT
 @tauri-apps/api 2.12.4                     Apache-2.0 OR MIT
 @tiptap/core 3.32.2                        MIT
 @tiptap/extension-blockquote 3.32.2        MIT
@@ -514,6 +535,7 @@ linkifyjs 4.4.0                            MIT
 lucide-react 1.66.0                        ISC
 marked 17.0.6                              MIT
 orderedmap 2.1.1                           MIT
+pdfjs-dist 6.5.438                         Apache-2.0
 prosemirror-changeset 2.4.6                MIT
 prosemirror-commands 1.7.2                 MIT
 prosemirror-dropcursor 1.8.4               MIT

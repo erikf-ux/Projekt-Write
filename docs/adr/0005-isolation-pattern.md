@@ -55,3 +55,13 @@ Option 1 ist technisch belegt (Variante B). Sie bleibt dem Auftraggeber offen, s
 - Vor Phase 8 (PDF.js und weitere große Frontend-Abhängigkeiten).
 - Vor Phase 14 (Auslieferung).
 - Sobald Tauri das Isolations-Schema in `frame-src` ergänzt oder ein festes Schema erlaubt.
+
+## Neubewertung vor Phase 8 (10. November 2026)
+
+Fällig vor Phase 8, festgehalten erst während der Phase (Versäumnis, im Bericht der Phase 8 genannt). Die Entscheidung bleibt: **nicht aktivieren.**
+
+- **Technisch unverändert.** Tauri 2.12.5 und `tauri-codegen` 2.7.4 wie in Phase 1: Das Isolations-Schema ist je Build zufällig und steht nur in `default-src`. Mit `frame-src 'none'` bliebe jede IPC-Nachricht hängen (Variante A).
+- **Neues Risiko:** PDF.js liest fremde PDFs im Frontend. Eine Lücke dort (wie CVE-2024-4367) gäbe einem Angreifer Skript im Kontext der Oberfläche. Das Isolation Pattern hülfe dagegen nicht: Der Hook sähe die Aufrufe eines solchen Skripts als gültige, erlaubte Befehle an – genau wie bei einer kompromittierten Abhängigkeit (oben).
+- **Was stattdessen schützt** (ADR 0019): Die CSP verbietet `unsafe-eval`, der Build enthält weder `eval(` noch `new Function` (der Angriffsweg von CVE-2024-4367); PDF-eigene Skripte und `pdf.sandbox` werden nie geladen; der Worker kommt aus dem eigenen Build; `connect-src` erlaubt nur die eigenen Dateien, Netz gibt es nicht. Rust bleibt die Vertrauensgrenze: Jeder Medienbefehl prüft seine Eingaben, der Medien-Handler liefert nur Bilder und PDFs mit Sandbox-CSP und `nosniff`. Der E2E-Test öffnet eine Test-PDF nach dem Muster von CVE-2024-4367 und eine SVG mit Skript; beide führen nichts aus.
+
+Nächste Neubewertung: vor Phase 14 (Auslieferung) oder sobald Tauri das Isolations-Schema in `frame-src` ergänzt.

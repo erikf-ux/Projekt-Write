@@ -15,9 +15,15 @@
  * on another): they are checked against limits that catch a regression,
  * until the targets are confirmed on the reference device.
  *
+ * Phase 8 adds the gallery with the 5,000 media of the reference library
+ * (section 17: "Galerie, virtualisiert, mit Vorschaubildern"): it shows its
+ * first tiles, keeps only the visible rows in the DOM and scrolls; the
+ * values are logged for the report.
+ *
  * Runs in a new app process after reference-prepare.e2e.ts.
  */
 import { $, browser, expect } from '@wdio/globals';
+import { runFromPalette } from '../editing';
 import { pinMainWindow } from '../session';
 
 /** Targets (ADR 0017, decision 17). */
@@ -211,6 +217,51 @@ describe('Explorer with the reference library (Phase 7)', () => {
       `Explorer: scrolling through ${String(result.rows)} rows at 80 px a frame ${format(result.deltas)}; at 240 px ${format(result.fling)}; without work ${format(result.idle)}; a plain list without React at 240 px ${format(result.floor)}`,
     );
     expect(result.rows).toBeGreaterThan(500);
+    expect(percentile(result.deltas, 0.95)).toBeLessThanOrEqual(FRAME_LIMIT_MS);
+  });
+});
+
+describe('Gallery with the reference library (Phase 8)', () => {
+  it('shows 5,000 media virtualised and scrolls through them', async () => {
+    const started = await browser.execute(() => performance.now());
+    await runFromPalette('media.gallery');
+    await $('[data-testid="gallery-list"] [data-media]').waitForDisplayed({ timeout: 30_000 });
+    const shown = await browser.execute(() => performance.now());
+    const result = await browser.execute(async () => {
+      const list = document.querySelector<HTMLElement>('[data-testid="gallery-list"]');
+      if (!list) {
+        throw new Error('no gallery');
+      }
+      const frame = () =>
+        new Promise<number>((resolve) => {
+          requestAnimationFrame(() => {
+            resolve(performance.now());
+          });
+        });
+      const tilesBefore = list.querySelectorAll('[data-media]').length;
+      const deltas: number[] = [];
+      let before = await frame();
+      for (let step = 0; step < 120; step += 1) {
+        list.scrollTop += 240;
+        const now = await frame();
+        deltas.push(now - before);
+        before = now;
+      }
+      return {
+        tilesBefore,
+        tilesAfter: list.querySelectorAll('[data-media]').length,
+        height: list.scrollHeight,
+        deltas,
+      };
+    });
+    console.log(
+      `Gallery of the reference library: first tiles after ${(shown - started).toFixed(0)} ms (palette included); ${String(result.tilesBefore)} tiles in the DOM, ${String(result.tilesAfter)} after scrolling; scrolling at 240 px a frame ${format(result.deltas)}`,
+    );
+    // Virtualised: a screenful of tiles, not 5,000.
+    expect(result.tilesBefore).toBeGreaterThan(0);
+    expect(result.tilesBefore).toBeLessThan(400);
+    expect(result.tilesAfter).toBeLessThan(400);
+    expect(result.height).toBeGreaterThan(20_000);
     expect(percentile(result.deltas, 0.95)).toBeLessThanOrEqual(FRAME_LIMIT_MS);
   });
 });

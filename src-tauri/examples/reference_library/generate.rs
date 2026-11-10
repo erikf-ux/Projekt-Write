@@ -8,12 +8,16 @@
 //! Phase 2 built the documents; Phase 7 adds 500 subnets in up to four
 //! levels, 1,000 tags, memberships (about 85 % of the documents in one to
 //! three subnets) and zero to four tags per document, through the structure
-//! service (ADR 0017). Media and confirmed connections join with Phases 8
-//! and 11.
+//! service (ADR 0017). Phase 8 adds 5,000 media through the real import
+//! (prepare and commit, ADR 0019): pictures in all five formats, PDFs with
+//! 1 to 40 pages and DOCX attachments; about one Markdown document in eight shows
+//! an image or refers to a PDF page, and about three in four media sit in
+//! subnets, some with tags. Confirmed connections join with Phase 11.
 //!
 //! Shared by `examples/reference_library/main.rs` and
 //! `tests/reference_library.rs`.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -21,6 +25,8 @@ use std::sync::Mutex;
 use project_write_lib::clock::{Clock, Generators, IdSource, Timestamp};
 use project_write_lib::services::documents::{DocumentFormat, sha256_hex};
 use project_write_lib::services::library::Library;
+use project_write_lib::services::media::{Decision, SubnetPlacement};
+use project_write_lib::services::structure::ElementKind;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -31,8 +37,31 @@ pub const LONG_DOCUMENT_WORDS: usize = 50_000;
 /// Subnets and tags of the full reference library (section 6).
 pub const FULL_SUBNETS: usize = 500;
 pub const FULL_TAGS: usize = 1_000;
+/// Media of the full reference library (section 6).
+pub const FULL_MEDIA: usize = 5_000;
 /// Deepest level of the generated subnet tree.
 const MAX_DEPTH: usize = 4;
+
+#[path = "media_files.rs"]
+mod media_files;
+
+const MEDIA_WORDS: &[&str] = &[
+    "Foto",
+    "Skizze",
+    "Karte",
+    "Scan",
+    "Plakat",
+    "Grundriss",
+    "Porträt",
+    "Landschaft",
+    "Notizzettel",
+    "Tafel",
+    "Studie",
+    "Bericht",
+    "Protokoll",
+    "Urkunde",
+    "Brief",
+];
 
 const SUBNET_WORDS: &[&str] = &[
     "Projekt",
@@ -85,6 +114,11 @@ const TAG_WORDS: &[&str] = &[
 pub fn structure_size(documents: usize) -> (usize, usize) {
     let scaled = |full: usize| (documents * full / FULL_DOCUMENTS).max(5);
     (scaled(FULL_SUBNETS), scaled(FULL_TAGS))
+}
+
+/// Media for a library of `documents` (the full size has 5,000).
+pub fn media_size(documents: usize) -> usize {
+    (documents * FULL_MEDIA / FULL_DOCUMENTS).max(5)
 }
 
 /// Small deterministic pseudo-random generator (SplitMix64).
@@ -530,6 +564,16 @@ pub struct Summary {
     pub memberships: usize,
     pub document_tags: usize,
     pub unassigned: usize,
+    pub media: usize,
+    pub images: usize,
+    pub pdfs: usize,
+    pub attachments: usize,
+    pub media_bytes: u64,
+    /// Rows of `document_media`: images shown and PDF pages referred to.
+    pub media_uses: usize,
+    pub media_memberships: usize,
+    pub media_tags: usize,
+    pub media_unassigned: usize,
 }
 
 /// Creates the reference library in `path` (missing or empty folder).
@@ -546,7 +590,7 @@ pub async fn generate(
     let mut manifest = library.manifest().clone();
     manifest.other.insert(
         "referenceLibrary".to_owned(),
-        serde_json::json!({ "seed": seed, "documents": documents }),
+        serde_json::json!({ "seed": seed, "documents": documents, "media": media_size(documents) }),
     );
     manifest
         .write(library.root())
@@ -564,14 +608,33 @@ pub async fn generate(
         memberships: 0,
         document_tags: 0,
         unassigned: 0,
+        media: 0,
+        images: 0,
+        pdfs: 0,
+        attachments: 0,
+        media_bytes: 0,
+        media_uses: 0,
+        media_memberships: 0,
+        media_tags: 0,
+        media_unassigned: 0,
     };
+    // Media first: documents refer to them, and a reference needs its row.
+    let media = build_media(&library, seed, media_size(documents), &mut summary).await?;
+    let images: Vec<&Medium> = media
+        .iter()
+        .filter(|m| m.kind == MediaKind::Image)
+        .collect();
+    let pdfs: Vec<&Medium> = media.iter().filter(|m| m.kind == MediaKind::Pdf).collect();
+    let mut references = Rng::new(seed ^ 0x3EF5);
     let mut created = Vec::with_capacity(documents);
     for index in 0..documents {
         let title = title(&mut rng, index);
         let words = target_words(&mut rng, index);
         let (format, content) = if rng.chance(55) {
             summary.markdown += 1;
-            (DocumentFormat::Md, markdown(&mut rng, &title, words))
+            let mut text = markdown(&mut rng, &title, words);
+            summary.media_uses += refer_to_media(&mut references, &mut text, &images, &pdfs);
+            (DocumentFormat::Md, text)
         } else {
             summary.text += 1;
             (DocumentFormat::Txt, plain_text(&mut rng, words))
@@ -585,18 +648,214 @@ pub async fn generate(
         summary.documents += 1;
         progress(index + 1);
     }
-    build_structure(&library, seed, &created, &mut summary).await?;
+    let (subnets, tags) = build_structure(&library, seed, &created, &mut summary).await?;
+    place_media(&library, seed, &media, &subnets, &tags, &mut summary).await?;
     library.close().await;
     Ok(summary)
 }
 
-/// Subnets, tags, memberships and document tags (Phase 7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MediaKind {
+    Image,
+    Pdf,
+    Attachment,
+}
+
+/// A medium of the library as documents refer to it.
+struct Medium {
+    id: Uuid,
+    kind: MediaKind,
+    title: String,
+    pages: usize,
+}
+
+/// Imports the media one by one through prepare and commit, as a file
+/// pasted into the window would come (ADR 0019, decisions 5 and 6).
+async fn build_media(
+    library: &Library,
+    seed: u64,
+    count: usize,
+    summary: &mut Summary,
+) -> Result<Vec<Medium>, String> {
+    let service = library.media();
+    let mut rng = Rng::new(seed ^ 0x3ED1A);
+    let mut created = Vec::with_capacity(count);
+    let started = std::time::Instant::now();
+    for index in 0..count {
+        if index > 0 && index % 1000 == 0 {
+            eprintln!("  {index} / {count} media");
+        }
+        let word = rng.pick(MEDIA_WORDS);
+        let title = format!("{word} {:04}", index + 1);
+        let roll = rng.range(0, 100);
+        let (name, bytes, kind, pages) = if roll < 72 {
+            // Pictures up to 640 × 480: the larger ones get a thumbnail.
+            let width = rng.range(48, 641) as u32;
+            let height = rng.range(48, 481) as u32;
+            let (ending, bytes) = match roll {
+                0..30 => ("png", media_files::png(&mut rng, width, height)),
+                30..52 => ("jpg", media_files::jpeg(&mut rng, width, height)),
+                52..58 => ("gif", media_files::gif(&mut rng, width, height)),
+                58..65 => ("webp", media_files::webp(&mut rng, width, height)),
+                _ => ("svg", media_files::svg(&mut rng, width, height, &title)),
+            };
+            (format!("{title}.{ending}"), bytes, MediaKind::Image, 0)
+        } else if roll < 92 {
+            let pages = rng.range(1, 41);
+            let lines: Vec<String> = (0..8).map(|_| sentence(&mut rng)).collect();
+            let bytes = media_files::pdf(&title, pages, &lines);
+            (format!("{title}.pdf"), bytes, MediaKind::Pdf, pages)
+        } else {
+            let lines: Vec<String> = (0..rng.range(3, 30)).map(|_| sentence(&mut rng)).collect();
+            (
+                format!("{title}.docx"),
+                media_files::docx(&lines),
+                MediaKind::Attachment,
+                0,
+            )
+        };
+        let preview = service
+            .prepare_bytes(&name, &bytes)
+            .await
+            .map_err(|e| format!("medium {index} ({name}): {e}"))?;
+        if preview.items.len() != 1 {
+            return Err(format!(
+                "medium {index} ({name}) was refused: {:?}",
+                preview.skipped
+            ));
+        }
+        let batch = Uuid::try_parse(&preview.batch_id).map_err(|e| e.to_string())?;
+        let outcome = service
+            .commit_import(
+                batch,
+                &BTreeMap::new(),
+                Decision::Import,
+                &SubnetPlacement::default(),
+            )
+            .await
+            .map_err(|e| format!("medium {index} ({name}): {e}"))?;
+        let id = outcome
+            .items
+            .first()
+            .and_then(|item| Uuid::try_parse(&item.id).ok())
+            .ok_or_else(|| format!("medium {index} ({name}): no id"))?;
+        if kind == MediaKind::Pdf {
+            // The PDF view reports the page count after the first look.
+            service
+                .set_page_count(id, pages as u32)
+                .await
+                .map_err(|e| format!("pages of medium {index}: {e}"))?;
+        }
+        match kind {
+            MediaKind::Image => summary.images += 1,
+            MediaKind::Pdf => summary.pdfs += 1,
+            MediaKind::Attachment => summary.attachments += 1,
+        }
+        summary.media += 1;
+        summary.media_bytes += bytes.len() as u64;
+        created.push(Medium {
+            id,
+            kind,
+            title,
+            pages,
+        });
+    }
+    eprintln!(
+        "  {count} / {count} media ({:.1} s)",
+        started.elapsed().as_secs_f64()
+    );
+    Ok(created)
+}
+
+/// About one Markdown document in eight shows an image, about one in ten
+/// refers to a PDF page. Returns the new `document_media` rows.
+fn refer_to_media(rng: &mut Rng, text: &mut String, images: &[&Medium], pdfs: &[&Medium]) -> usize {
+    let mut uses = BTreeSet::new();
+    if !images.is_empty() && rng.chance(12) {
+        let image = images[rng.range(0, images.len())];
+        let caption = if rng.chance(50) {
+            format!(" \"{}\"", image.title)
+        } else {
+            String::new()
+        };
+        text.push_str(&format!(
+            "\n![Abbildung: {}](pwmedia://{}{caption})\n",
+            image.title,
+            image.id.hyphenated()
+        ));
+        uses.insert((image.id, 0));
+    }
+    if !pdfs.is_empty() && rng.chance(10) {
+        let pdf = pdfs[rng.range(0, pdfs.len())];
+        let page = rng.range(1, pdf.pages + 1);
+        text.push_str(&format!(
+            "\nSiehe [{}, Seite {page}](pwmedia://{}#page={page}).\n",
+            pdf.title,
+            pdf.id.hyphenated()
+        ));
+        uses.insert((pdf.id, page));
+    }
+    uses.len()
+}
+
+/// Subnets and tags for media (Phase 8): about three in four media in one
+/// or two subnets, zero to two tags each, a few favourites.
+async fn place_media(
+    library: &Library,
+    seed: u64,
+    media: &[Medium],
+    subnets: &[Uuid],
+    tags: &[String],
+    summary: &mut Summary,
+) -> Result<(), String> {
+    let structure = library.structure();
+    let service = library.media();
+    let mut rng = Rng::new(seed ^ 0x9A1E);
+    for (index, medium) in media.iter().enumerate() {
+        if subnets.is_empty() || rng.chance(25) {
+            summary.media_unassigned += 1;
+        } else {
+            for _ in 0..rng.range(1, 3) {
+                let subnet = subnets[rng.range(0, subnets.len())];
+                let outcome = structure
+                    .assign_element(ElementKind::Media, medium.id, subnet)
+                    .await
+                    .map_err(|e| format!("membership of medium {index}: {e}"))?;
+                if outcome.step.is_some() {
+                    summary.media_memberships += 1;
+                }
+            }
+        }
+        if !tags.is_empty() {
+            for _ in 0..rng.range(0, 3) {
+                let name = &tags[rng.range(0, tags.len())];
+                let outcome = structure
+                    .tag_element(ElementKind::Media, medium.id, name)
+                    .await
+                    .map_err(|e| format!("tag of medium {index}: {e}"))?;
+                if outcome.step.is_some() {
+                    summary.media_tags += 1;
+                }
+            }
+        }
+        if rng.chance(3) {
+            service
+                .set_favorite(medium.id, true)
+                .await
+                .map_err(|e| format!("favourite medium {index}: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// Subnets, tags, memberships and document tags (Phase 7). Returns the
+/// subnets and the tag names for the media.
 async fn build_structure(
     library: &Library,
     seed: u64,
     documents: &[Uuid],
     summary: &mut Summary,
-) -> Result<(), String> {
+) -> Result<(Vec<Uuid>, Vec<String>), String> {
     let structure = library.structure();
     let mut rng = Rng::new(seed ^ 0x5B7E);
     let (subnet_count, tag_count) = structure_size(documents.len());
@@ -673,7 +932,7 @@ async fn build_structure(
             }
         }
     }
-    Ok(())
+    Ok((subnets.into_iter().map(|(id, _)| id).collect(), tags))
 }
 
 /// A subnet row as it goes into the fingerprint: id, name, description,
@@ -686,6 +945,26 @@ type SubnetFingerprint = (
     Option<String>,
     String,
     String,
+);
+
+/// A membership row: subnet, document or medium, primary, created.
+type MembershipFingerprint = (String, Option<String>, Option<String>, i64, String);
+
+/// A media row as it goes into the fingerprint, in two parts (tuples of
+/// more than twelve have no `Debug`): id, kind, type, extension, title,
+/// description, original name; id, size, SHA-256, width, height, pages,
+/// created, updated, favourite.
+type MediaFingerprint = (String, String, String, String, String, String, String);
+type MediaFileFingerprint = (
+    String,
+    i64,
+    String,
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    String,
+    String,
+    Option<String>,
 );
 
 /// SHA-256 over everything that defines the library's content: every file
@@ -738,8 +1017,10 @@ pub async fn fingerprint(path: &Path) -> Result<String, String> {
     for row in &subnets {
         hasher.update(format!("subnet {row:?}\n"));
     }
-    let memberships: Vec<(String, String, i64, String)> = sqlx::query_as(
-        "SELECT subnet_id, document_id, is_primary, created_at FROM subnet_memberships ORDER BY document_id, subnet_id",
+    // Phase 8: a membership belongs to a document or a medium.
+    let memberships: Vec<MembershipFingerprint> = sqlx::query_as(
+        "SELECT subnet_id, document_id, media_id, is_primary, created_at FROM subnet_memberships \
+         ORDER BY document_id, media_id, subnet_id",
     )
     .fetch_all(database.reader())
     .await
@@ -763,6 +1044,44 @@ pub async fn fingerprint(path: &Path) -> Result<String, String> {
     .map_err(|e| e.to_string())?;
     for row in &document_tags {
         hasher.update(format!("document tag {row:?}\n"));
+    }
+    // Phase 8: media, their uses in documents and their tags.
+    let media: Vec<MediaFingerprint> = sqlx::query_as(
+        "SELECT id, kind, mime_type, extension, title, description, original_name FROM media ORDER BY id",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &media {
+        hasher.update(format!("medium {row:?}\n"));
+    }
+    let media_files: Vec<MediaFileFingerprint> = sqlx::query_as(
+        "SELECT id, size_bytes, sha256, width, height, page_count, created_at, updated_at, favorited_at \
+         FROM media ORDER BY id",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &media_files {
+        hasher.update(format!("medium file {row:?}\n"));
+    }
+    let uses: Vec<(String, String, i64)> = sqlx::query_as(
+        "SELECT document_id, media_id, page FROM document_media ORDER BY document_id, media_id, page",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &uses {
+        hasher.update(format!("medium use {row:?}\n"));
+    }
+    let media_tags: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT media_id, tag_id, created_at FROM media_tags ORDER BY media_id, tag_id",
+    )
+    .fetch_all(database.reader())
+    .await
+    .map_err(|e| e.to_string())?;
+    for row in &media_tags {
+        hasher.update(format!("medium tag {row:?}\n"));
     }
     database.close().await;
     Ok(sha256_hex(&hasher.finalize()))

@@ -111,6 +111,17 @@ Regeln stehen in den Abschnitten 9 (Speicherstruktur, Import in die Bibliothek),
     - **SVG mit Skript:** `<script>`, `onload` und ein eingebettetes `<foreignObject>` mit Skript. Im echten Programm in Galerie, Vorschau und Dokument geprüft: Es ändert nichts. Die Kopfzeilen prüft ein Rust-Test.
     - **CVE-2024-4367:** eine Test-PDF mit einer Type1-Schrift, deren `FontMatrix` Code einschleust. Im echten Programm geöffnet: Sie führt nichts aus, die Seite wird gezeigt.
 
+## Nachträge aus der Umsetzung
+
+- **Ablegen auf das Fenster:** Textdokumente (`.txt`, `.md`, `.markdown`, `.pwrite`) gehen wie bisher in den Dokumentimport, jede andere Datei in den Medienimport. Ohne Rückfrage nötig wird sie sofort übernommen; bei einer Ablehnung oder einem Duplikat öffnet der Importdialog, und die Dateien dahinter warten, bis er geschlossen ist. Liegt die Ablage in einer Schreibfläche, nimmt der Editor die Medien selbst.
+- **Einfügen und Ablegen in der Schreibfläche:** ohne Dialog. Ein Duplikat verwendet das vorhandene Medium (Abschnitt 9 sieht sonst die Rückfrage vor; beim Einfügen eines Bildes ist „vorhandenes verwenden“ die Antwort, die den Text nicht verändert). Eine abgelehnte Datei nennt ein Hinweis mit Grund. Eingefügte Dateien ohne Namen bekommen „Eingefügtes Bild“ und die Endung ihres Typs. Bilder werden als Bild, PDFs und Anhänge als Link mit ihrem Titel eingefügt.
+- **„Bild bearbeiten …“** (Doppelklick auf ein Bild der Bibliothek oder Befehl) ändert Alternativtext, Unterschrift und Anzeigegröße (Original, 25, 50, 75, 100 %). Eine neue Größe ist eine Breite; die Höhe entfällt dann. Als Alternativtext nimmt das Einfügen die Beschreibung des Mediums, sonst seinen Titel. Weil WebKitGTK die Auswahl eines Bildes wieder in einen Cursor daneben verwandelt, gilt auch das Bild direkt hinter (sonst vor) einem leeren Cursor als ausgewählt.
+- **Menü:** „Bild einfügen …“ und „PDF-Verweis einfügen …“ stehen im Menü „Format“ hinter „Link …“; ein PDF-Verweis über markiertem Text verlinkt diesen Text.
+- **Ansichts-Tabs:** Galerie und Medien öffnen als eigene Tabs neben den Dokumenten. Die Sitzung (Stufe 1) stellt sie nicht wieder her; sie hält weiter nur Dokumente.
+- **Explorer:** Medien stehen in ihren Subnetzen und unter „Medien“ (alle). „Nicht zugeordnet“ zeigt weiter nur Dokumente; ein Medium ohne Subnetz findet sich unter „Medien“.
+- **Referenzbibliothek:** Die 5.000 Medien entstehen einzeln über Vorbereiten und Abschließen, wie eine eingefügte Datei (72 % Bilder in allen fünf Formaten, 20 % PDFs mit 1 bis 40 Seiten, 8 % DOCX); die Seitenzahl der PDFs setzt der Generator, wie es sonst die PDF-Anzeige beim ersten Öffnen tut. Vorschaubilder von PDFs entstehen erst in der Oberfläche. Etwa jedes achte Markdown-Dokument zeigt ein Bild, jedes zehnte verweist auf eine PDF-Seite; etwa drei von vier Medien liegen in Subnetzen. Medien, Verwendungen, Zuordnungen und Medien-Tags gehen in den Fingerabdruck ein; der Eintrag `referenceLibrary` in `library.json` nennt die Zahl der Medien, damit ein älterer Zwischenspeicher ohne Medien nicht weiterverwendet wird.
+- **Debug-Builds:** `image` und seine Codecs werden wie `sha2` und SQLite auch in Debug-Builds optimiert übersetzt (`[profile.dev.package.*]`); Verhalten unverändert, Vorschaubilder in Tests und der Referenzbibliothek entstehen so in einem Bruchteil der Zeit.
+
 ## Abhängigkeiten
 
 - `image` 0.25.10 (MIT OR Apache-2.0), nur PNG, JPEG, GIF und WebP, ohne `rayon`: Dekodieren mit Grenzwerten, Verkleinern, Kodieren der Vorschaubilder. Reines Rust; `png` liegt schon im Baum.

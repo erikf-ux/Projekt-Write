@@ -76,6 +76,32 @@ opt-level = 3
 [profile.dev.package.libsqlite3-sys]
 opt-level = 3
 
+# The same for decoding, scaling and encoding pictures (thumbnails in tests,
+# E2E and the reference library with its 5,000 media).
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.png]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.fdeflate]
+opt-level = 3
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.image-webp]
+opt-level = 3
+
+[profile.dev.package.gif]
+opt-level = 3
+
+[profile.dev.package.color_quant]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true

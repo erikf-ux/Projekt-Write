@@ -164,6 +164,19 @@ fn main() -> ExitCode {
                 summary.document_tags,
                 summary.unassigned
             );
+            println!(
+                "media:       {} ({} images, {} PDFs, {} attachments), {} bytes, {} uses in documents",
+                summary.media,
+                summary.images,
+                summary.pdfs,
+                summary.attachments,
+                summary.media_bytes,
+                summary.media_uses
+            );
+            println!(
+                "media place: {} memberships, {} tags, {} media not assigned",
+                summary.media_memberships, summary.media_tags, summary.media_unassigned
+            );
             println!("time:        {:.1} s", started.elapsed().as_secs_f64());
             println!("fingerprint: {fingerprint}");
             ExitCode::SUCCESS

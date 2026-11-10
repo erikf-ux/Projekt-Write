@@ -4,6 +4,26 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 8 – Medien
+
+#### Hinzugefügt
+
+- Medien in der Bibliothek: Bilder (PNG, JPEG, GIF, WebP, SVG), PDF und Office-Dateien als Anhang (DOCX, XLSX, PPTX). Der Typ wird am Inhalt erkannt (Positivliste); eine falsche Endung, Makro-Dateien und alles andere werden mit Grund abgelehnt.
+- Import einzelner Dateien und ganzer Ordner (rekursiv, ohne symbolische Links und versteckte Einträge), auf Wunsch mit Subnetzen aus der Ordnerstruktur. Der Dialog zeigt Fortschritt, die übernommenen und die übersprungenen Dateien mit Grund und fragt bei Duplikaten (gleiche SHA-256-Prüfsumme): vorhandenes verwenden, trotzdem importieren oder auslassen, je Datei oder für alle.
+- Originale bleiben bytegleich; die Bibliothek erhält Kopien. Ein abgebrochener Import – auch ein Absturz mitten im Abschließen – hinterlässt weder Dateien noch Datenbankzeilen (Journal, Wiederaufnahme beim nächsten Öffnen).
+- Galerie (virtualisiert, mit Vorschaubildern, Filter nach Art und Titel, Tastatur), Medienansicht mit Details, Beschreibung und „Verwendet in“; Bilder eingepasst oder in Originalgröße; Anhänge öffnen als schreibgeschützte Kopie mit dem Standardprogramm.
+- PDF-Ansicht mit PDF.js 6.5: Seiten, Zoom, Textebene zum Markieren und Kopieren, interne Links springen zur Seite, Weblinks erst nach Rückfrage. PDF-eigene Skripte laufen nie.
+- Medien-Handler `pwmedia://`: Das Frontend sieht keine Pfade; jede Antwort trägt eine Sandbox-CSP und `nosniff`. Ein SVG ist nur Bildquelle, nie Teil der Seite.
+- Explorer: „Medien“ und Medien in ihren Subnetzen; Zuordnungen, primäres Subnetz, Verschieben, Tags, Favoriten, Archiv, Papierkorb und Struktur-Undo gelten auch für Medien. Ein Medium, das ein Dokument verwendet, lässt sich nicht endgültig löschen.
+- Editor: „Bild einfügen …“ und „PDF-Verweis einfügen …“ (Auswahl aus der Bibliothek oder neu importieren), Bilder mit Unterschrift und Anzeigegröße („Bild bearbeiten …“), PDF-Verweise auf eine Seite öffnen mit `Strg + Klick`, „Medium fehlt“ für fehlende Medien. Eingefügte und abgelegte Bilddateien werden importiert und eingefügt; ein Duplikat verwendet das vorhandene Medium.
+- Ablegen auf das Fenster: Textdokumente wie bisher als Dokument, alle anderen Dateien in den Medienimport.
+- Referenzbibliothek mit 5.000 Medien (alle Bildformate, PDFs, Anhänge), Verwendungen in Dokumenten, Zuordnungen und Tags; E2E-Messung der Galerie damit.
+- Migration 0008 (`media`, `document_media`, `media_tags`; `subnet_memberships` mit `media_id`).
+
+#### Geändert
+
+- `connect-src` der CSP erlaubt `'self'`: PDF.js lädt Schriftdaten und CMaps aus dem eigenen Build.
+
 ### Phase 7 – Subnetze und Tags
 
 #### Hinzugefügt

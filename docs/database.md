@@ -69,12 +69,12 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `document_links`               | Interne Links zwischen Dokumenten (Rückverweise) | vorhanden (v5)     |
 | `document_history`             | Versionen eines Dokuments                        | vorhanden (v6)     |
 | `subnets`                      | Hierarchische Gruppen                            | vorhanden (v7)     |
-| `subnet_memberships`           | Zuordnung Element → Subnetz                      | vorhanden (v7)     |
+| `subnet_memberships`           | Zuordnung Element → Subnetz                      | vorhanden (v7, v8) |
 | `tags`                         | Stichwörter                                      | vorhanden (v7)     |
 | `document_tags`                | Tags eines Dokuments                             | vorhanden (v7)     |
-| `media`                        | Bilder, PDF, Anhänge                             | geplant (Phase 8)  |
-| `media_tags`                   | Tags eines Mediums                               | geplant (Phase 8)  |
-| `document_media`               | Medien, die ein Dokument einbindet oder verweist | geplant (Phase 8)  |
+| `media`                        | Bilder, PDF, Anhänge                             | vorhanden (v8)     |
+| `media_tags`                   | Tags eines Mediums                               | vorhanden (v8)     |
+| `document_media`               | Medien, die ein Dokument einbindet oder verweist | vorhanden (v8)     |
 | `search_entries`               | Zuordnung FTS-Zeile → Element                    | geplant (Phase 9)  |
 | `search_words`, `search_parts` | FTS5-Index (Abschnitt 19)                        | geplant (Phase 9)  |
 | `mesh_nodes`                   | Knoten des Mesh (ein Eintrag je Element/Subnetz) | geplant (Phase 11) |
@@ -206,43 +206,47 @@ Das geprüfte Muster aus Abschnitt 18 für Dokumente, ergänzt um `created_at`:
 
 `STRICT`. Eindeutige Indizes `uq_member_doc (subnet_id, document_id)` und `uq_primary_doc (document_id) WHERE is_primary = 1`; Index `ix_memberships_document (document_id, created_at)`. Genau eine Zuordnung je Dokument ist primär, die erste von selbst (Rust in jeder Transaktion). Papierkorb und Archiv lassen die Zeilen stehen (ADR 0016); erst endgültiges Löschen entfernt sie.
 
-Da `media` erst in Phase 8 entsteht, ist `document_id` hier `NOT NULL` und es gibt noch kein `media_id`; Phase 8 baut die Tabelle mit `media_id` und `CHECK ((document_id IS NULL) <> (media_id IS NULL))` neu auf (neue Tabelle, Daten kopieren, alte entfernen, umbenennen – getestet wie jede Migration).
+In Version 7 war `document_id` `NOT NULL`, ein `media_id` gab es noch nicht. Migration 0008 baut die Tabelle nach dem geprüften Muster aus Abschnitt 18 neu auf (neue Tabelle, Daten kopieren, alte entfernen, umbenennen; `created_at` bleibt): `document_id` und `media_id` sind beide `NULL`-fähig, `CHECK ((document_id IS NULL) <> (media_id IS NULL))` verlangt genau eines. Dazu je Elementart die eindeutigen Indizes `uq_member_doc`/`uq_member_media (subnet_id, …)` und `uq_primary_doc`/`uq_primary_media (… ) WHERE is_primary = 1` sowie `ix_memberships_document`/`ix_memberships_media`. Getestet wie jede Migration (Fixture der Version 7 mit Zuordnungen).
 
-### `tags`, `document_tags` – vorhanden (Version 7); `media_tags` – geplant (Phase 8)
+### `tags`, `document_tags` – vorhanden (Version 7); `media_tags` – vorhanden (Version 8)
 
 `tags`: `id` (UUID), `name` (1–100 Zeichen, ohne Steuerzeichen und Komma), `name_key` (Unicode-Kleinschreibung in Rust, `UNIQUE` – `Äpfel` und `äpfel` sind dasselbe Tag; `COLLATE NOCASE` faltet nur ASCII), `created_at`, `updated_at`; `STRICT`.
 
 `document_tags (document_id, tag_id, created_at)`: Primärschlüssel über beide IDs, `STRICT, WITHOUT ROWID`, Fremdschlüssel mit `ON DELETE CASCADE`, Index `ix_document_tags_tag (tag_id, document_id)`. Zusammenführen ist eine Transaktion (Zuordnungen umhängen, Doppel verwerfen, altes Tag löschen); Löschen eines Tags lässt die Dokumente stehen. In `.pwrite` schreibt Rust die Namen beim Speichern in die Hülle; beim Import werden die Tags der Hülle zugeordnet.
 
-`media_tags (media_id, tag_id)` entsteht mit den Medien in Phase 8.
+`media_tags (media_id, tag_id, created_at)` wie `document_tags`: Primärschlüssel über beide IDs, `STRICT, WITHOUT ROWID`, Fremdschlüssel mit `ON DELETE CASCADE`, Index `ix_media_tags_tag (tag_id, media_id)`. Zusammenführen und Löschen von Tags behandeln Dokumente und Medien gleich.
 
 ### Struktur-Undo (ADR 0017, Punkt 10)
 
 Kein Speicher in der Datenbank: Das Journal hält je Schritt die betroffenen Zeilen von `subnets` und `tags` und Zuordnungen, Tags und Zustand (`deleted_at`, `archived_at`) der betroffenen Dokumente vor und nach dem Schritt, höchstens 100 Schritte, nur im Speicher. Rückgängig prüft, dass der Ist-Stand dem Stand nach dem Schritt gleicht, und schreibt in einer Transaktion den Stand davor: betroffene Subnetze und Tags werden zuerst „abgelöst“ (kein übergeordnetes Subnetz, ein Namensschlüssel mit angehängter ID), dann gelöscht, eingefügt und mit ihren endgültigen Werten geschrieben. So entsteht auf dem Weg weder ein Zyklus noch ein doppelter Name.
 
-### `media` – geplant (Phase 8)
+### `media` – vorhanden (Version 8)
 
-| Spalte                                      | Typ                   | Regeln                                                         |
-| ------------------------------------------- | --------------------- | -------------------------------------------------------------- |
-| `id`                                        | TEXT, Primärschlüssel | UUID                                                           |
-| `kind`                                      | TEXT                  | `image`, `pdf`, `attachment`                                   |
-| `mime_type`                                 | TEXT                  | aus dem Inhalt erkannt (Positivliste, Abschnitt 20)            |
-| `extension`                                 | TEXT                  | aus der Positivliste                                           |
-| `original_name`                             | TEXT                  | Dateiname beim Import                                          |
-| `import_folder`                             | TEXT NULL             | Importordner (Metadatum)                                       |
-| `size_bytes`                                | INTEGER               | ≥ 0                                                            |
-| `sha256`                                    | TEXT                  | Prüfsumme; Index, **nicht** eindeutig („trotzdem importieren“) |
-| `width`, `height`                           | INTEGER NULL          | Bilder                                                         |
-| `page_count`                                | INTEGER NULL          | PDF                                                            |
-| `caption`                                   | TEXT NULL             | Bildunterschrift                                               |
-| `created_at`, `updated_at`                  | TEXT                  | ISO 8601 UTC                                                   |
-| `favorited_at`, `archived_at`, `deleted_at` | TEXT NULL             | ISO 8601 UTC                                                   |
+| Spalte                           | Typ                   | Regeln                                                                           |
+| -------------------------------- | --------------------- | -------------------------------------------------------------------------------- |
+| `id`                             | TEXT, Primärschlüssel | UUID                                                                             |
+| `kind`                           | TEXT                  | `image`, `pdf`, `attachment`                                                     |
+| `mime_type`                      | TEXT                  | aus dem Inhalt erkannt, `CHECK` mit der Positivliste (Abschnitt 20)              |
+| `extension`                      | TEXT                  | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `pdf`, `docx`, `xlsx`, `pptx`        |
+| `title`                          | TEXT                  | Anzeigename, 1–300 Zeichen, umbenennbar (aus dem Dateinamen ohne Endung)         |
+| `description`                    | TEXT                  | 0–2000 Zeichen; Alternativtext beim Einfügen eines Bildes                        |
+| `original_name`                  | TEXT                  | Dateiname beim Import, 1–255 Zeichen                                             |
+| `import_folder`                  | TEXT NULL             | Importordner (Metadatum)                                                         |
+| `size_bytes`                     | INTEGER               | ≥ 0                                                                              |
+| `sha256`                         | TEXT                  | Prüfsumme; Index `ix_media_sha256`, **nicht** eindeutig („Trotzdem importieren“) |
+| `width`, `height`                | INTEGER NULL          | Bilder (aus dem Dateikopf)                                                       |
+| `page_count`                     | INTEGER NULL          | PDF; setzt die PDF-Anzeige beim ersten Öffnen                                    |
+| `created_at`, `updated_at`       | TEXT                  | ISO 8601 UTC                                                                     |
+| `favorited_at`, `last_opened_at` | TEXT NULL             | Favoriten, „Zuletzt verwendet“ (Index `ix_media_recent`)                         |
+| `archived_at`, `deleted_at`      | TEXT NULL             | Archiv, Papierkorb (ADR 0016)                                                    |
 
-Datei: `media/images/<id>.<ext>`, `media/pdf/<id>.pdf`, `media/attachments/<id>.<ext>`; Vorschaubilder in `thumbnails/` (abgeleitet, nicht in der Datenbank).
+Abweichungen vom Entwurf (ADR 0019, Punkt 2): `title` und `description` statt `caption` – eine Bildunterschrift gehört zur einzelnen Verwendung im Dokument, nicht zum Medium; dazu `last_opened_at`.
 
-### `document_media` – geplant (Phase 8)
+Datei: `media/images/<id>.<ext>`, `media/pdf/<id>.pdf`, `media/attachments/<id>.<ext>`; Vorschaubilder in `thumbnails/images/<id>.png|jpg` (Rust, beim Import) und `thumbnails/pdf/<id>.png` (Seite 1 aus PDF.js, von Rust geprüft) – abgeleitet, nicht in der Datenbank. Import-Journale `tmp/import-<id>.json` (ADR 0019, Punkt 5) arbeitet das Öffnen der Bibliothek vor dem Leeren von `tmp/` ab; Dateien ohne Zeile und Zeilen ohne Datei meldet es im Protokoll.
 
-`document_id` → `documents` (CASCADE), `media_id` → `media` (CASCADE), `page` INTEGER NOT NULL DEFAULT 0 (0 = ganzes Medium, sonst PDF-Seite). Primärschlüssel `(document_id, media_id, page)`, Index auf `media_id`. Beim Speichern aus dem Inhalt abgeleitet.
+### `document_media` – vorhanden (Version 8)
+
+`document_id` → `documents` (CASCADE), `media_id` → `media` (CASCADE), `page` INTEGER NOT NULL DEFAULT 0 (0 = ganzes Medium, sonst PDF-Seite). Primärschlüssel `(document_id, media_id, page)`, `STRICT, WITHOUT ROWID`, Index `ix_document_media_media (media_id, document_id)`. Entsteht beim Speichern aus dem Inhalt, in derselben Transaktion wie `document_links`: in Markdown jedes `pwmedia://<id>` (Bild oder Link, `#page=N` für eine PDF-Seite), in `.pwrite` die Bildknoten und Linkmarken. „Endgültig löschen“ eines Mediums ist nur möglich, solange keine Zeile darauf zeigt.
 
 ### `search_entries`, `search_words`, `search_parts` – geplant (Phase 9)
 

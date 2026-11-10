@@ -16,8 +16,10 @@
  *   Folders of earlier runs (for example restored from a CI cache) are never
  *   touched.
  *
- * Phase 2 holds documents only (10,000 by default, one with 50,000 words).
- * Media, subnets, tags and connections follow with their tables.
+ * 10,000 documents by default (one with 50,000 words), with Phase 7 500
+ * subnets and 1,000 tags, with Phase 8 5,000 media (pictures, PDFs, DOCX)
+ * imported through the real import; smaller sizes keep the proportions.
+ * Confirmed connections follow with Phase 11.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
