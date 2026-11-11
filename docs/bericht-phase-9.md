@@ -124,7 +124,7 @@ F-46 bis F-50 in `docs/status.md`:
 Zwischenstände trugen `[skip ci]` in der Betreffzeile.
 
 - **Lauf 108** (Commit `8368d30`): Audit, Release-Prüfung und Windows vollständig grün (E2E 17 von 17 Dateien). Linux: alle Prüfungen grün bis auf einen E2E-Test, den Kürzel-Konflikttest aus Phase 3 (F-50, ein Fehler des Tests). Die Werte beider Systeme stehen unten.
-- **Lauf 109** (Korrektur von F-50): LAUF_109
+- **Lauf 109** (Korrektur von F-50): **grün**, alle vier Jobs (Commit `74e0727`): Windows und Linux mit Prettier, ESLint, Typen, Vitest, rustfmt, Clippy, Rust-Tests, reproduzierbarer Referenzbibliothek, aktuellen Typen und Lizenzliste und E2E 17 von 17 Dateien; Audit; Release-Build ohne Test-Plugins.
 
 Werte aus Lauf 108 (volle Referenzbibliothek):
 

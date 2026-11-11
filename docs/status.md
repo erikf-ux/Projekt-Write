@@ -4,13 +4,15 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 9 – Suche** (Abschnitt 19): umgesetzt und lokal geprüft (E2E 17 von 17 Dateien); CI-Lauf siehe Bericht `docs/bericht-phase-9.md`. Begonnen auf „Bearbeite schon mal einen Teil von Phase 9“, fortgesetzt auf „Fahre fort“. Wartet auf die Freigabe von Phase 10.
+**Phase 9 – Suche** (Abschnitt 19): abgeschlossen, lokal und in CI geprüft (Lauf 109 grün); Bericht in `docs/bericht-phase-9.md`.
+
+**Phase 10 – Export und Backup** (Abschnitt 21): freigegeben („Starte“), in Arbeit; ADR 0021.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46).
 
-CI: Lauf 107 grün (Abschluss Phase 8). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 9
 
