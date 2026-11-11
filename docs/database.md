@@ -1,6 +1,6 @@
 # Datenbank – Project Write
 
-Stand: Phase 2 (3. November 2026). Diese Datei enthält das **vollständige geplante Schema** (Abschnitt 18) und kennzeichnet, was bereits per Migration existiert. Tabellen entstehen in der Phase, die sie braucht; Spalten, die eine spätere Phase braucht, kommen mit einer eigenen Migration hinzu.
+Stand: Phase 9 (11. November 2026). Diese Datei enthält das **vollständige geplante Schema** (Abschnitt 18) und kennzeichnet, was bereits per Migration existiert. Tabellen entstehen in der Phase, die sie braucht; Spalten, die eine spätere Phase braucht, kommen mit einer eigenen Migration hinzu.
 
 ## 1. Konventionen (Abschnitt 18)
 
@@ -36,23 +36,23 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 - **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), kopiert die App sie mit `VACUUM INTO` nach `backups/pre-migration/projectwrite-schema-<alt>-<Zeit>.db`, prüft die Kopie mit `PRAGMA integrity_check` und migriert erst dann. Scheitert die Sicherung, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten Kopien bleiben, ältere entfernt die App (nur eigene Dateien nach diesem Namensmuster). Ab Phase 10 ersetzt ein vollständiges `.pwbackup` diese Kopie (Abschnitt 21).
 - **Tests ab jeder früheren Version:** `tests/migrations.rs` legt für jede Version 0 … n−1 eine Datenbank an, füllt die Tabellen dieser Version mit Testdaten, migriert auf die aktuelle Version und prüft: Schema identisch zu einer frisch migrierten Datenbank, Daten erhalten, `integrity_check` = ok, `foreign_key_check` leer. Jede neue Migration bringt eine Testzeile für ihre Tabellen mit.
 
-| Version | Datei                           | Inhalt                                                                            | Phase |
-| ------- | ------------------------------- | --------------------------------------------------------------------------------- | ----- |
-| 1       | `0001_application_settings.sql` | Tabelle `application_settings`                                                    | 1     |
-| 2       | `0002_documents.sql`            | Tabelle `documents`                                                               | 2     |
-| 3       | `0003_document_import.sql`      | `documents.original_name`                                                         | 3     |
-| 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent` | 5     |
-| 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                          | 5     |
-| 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                        | 6     |
-| 7       | `0007_subnets_and_tags.sql`     | Tabellen `subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger | 7     |
+| Version | Datei                           | Inhalt                                                                                                        | Phase |
+| ------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----- |
+| 1       | `0001_application_settings.sql` | Tabelle `application_settings`                                                                                | 1     |
+| 2       | `0002_documents.sql`            | Tabelle `documents`                                                                                           | 2     |
+| 3       | `0003_document_import.sql`      | `documents.original_name`                                                                                     | 3     |
+| 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent`                             | 5     |
+| 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                                                      | 5     |
+| 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                                                    | 6     |
+| 7       | `0007_subnets_and_tags.sql`     | Tabellen `subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger                             | 7     |
+| 8       | `0008_media.sql`                | Tabellen `media`, `media_tags`, `document_media`; Neuaufbau von `subnet_memberships` mit `media_id`           | 8     |
+| 9       | `0009_search.sql`               | Tabelle `search_entries`, FTS5-Tabellen `search_words` und `search_parts`, drei Ansichten, Trigger (ADR 0020) | 9     |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
 | Phase | Inhalt                                                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015)                                                                                 |
-| 8     | `media`, `media_tags`, `document_media`; Neuaufbau von `subnet_memberships` mit `media_id`                                                 |
-| 9     | `search_entries`, `search_words`, `search_parts`                                                                                           |
 | 11    | `mesh_nodes` (mit Triggern und Nachtrag für bestehende Elemente), `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions` |
 | 12    | `dictionaries`, `dictionary_words`, `document_dictionaries`, `subnet_dictionaries`, `language_profiles`, `autocorrect_rejections`          |
 
@@ -75,8 +75,8 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `media`                        | Bilder, PDF, Anhänge                             | vorhanden (v8)     |
 | `media_tags`                   | Tags eines Mediums                               | vorhanden (v8)     |
 | `document_media`               | Medien, die ein Dokument einbindet oder verweist | vorhanden (v8)     |
-| `search_entries`               | Zuordnung FTS-Zeile → Element                    | geplant (Phase 9)  |
-| `search_words`, `search_parts` | FTS5-Index (Abschnitt 19)                        | geplant (Phase 9)  |
+| `search_entries`               | Zuordnung FTS-Zeile → Element                    | vorhanden (v9)     |
+| `search_words`, `search_parts` | FTS5-Index (Abschnitt 19)                        | vorhanden (v9)     |
 | `mesh_nodes`                   | Knoten des Mesh (ein Eintrag je Element/Subnetz) | geplant (Phase 11) |
 | `mesh_connections`             | Bestätigte Verbindungen                          | geplant (Phase 11) |
 | `mesh_suggestions`             | Vorschläge mit Wert, Begründung und Status       | geplant (Phase 11) |
@@ -248,9 +248,19 @@ Datei: `media/images/<id>.<ext>`, `media/pdf/<id>.pdf`, `media/attachments/<id>.
 
 `document_id` → `documents` (CASCADE), `media_id` → `media` (CASCADE), `page` INTEGER NOT NULL DEFAULT 0 (0 = ganzes Medium, sonst PDF-Seite). Primärschlüssel `(document_id, media_id, page)`, `STRICT, WITHOUT ROWID`, Index `ix_document_media_media (media_id, document_id)`. Entsteht beim Speichern aus dem Inhalt, in derselben Transaktion wie `document_links`: in Markdown jedes `pwmedia://<id>` (Bild oder Link, `#page=N` für eine PDF-Seite), in `.pwrite` die Bildknoten und Linkmarken. „Endgültig löschen“ eines Mediums ist nur möglich, solange keine Zeile darauf zeigt.
 
-### `search_entries`, `search_words`, `search_parts` – geplant (Phase 9)
+### `search_entries`, `search_words`, `search_parts` – vorhanden (Version 9)
 
-`search_entries (rowid INTEGER PRIMARY KEY, element_kind TEXT, element_id TEXT UNIQUE)` verbindet die FTS-Zeilen mit Elementen. Die beiden FTS5-Tabellen entstehen exakt mit den Definitionen aus Abschnitt 19 (in Phase 1 bereits als Probe geprüft, `src-tauri/src/database/fts.rs`). Der Index wird in derselben Transaktion wie die Daten aktualisiert; „Suchindex neu aufbauen“ leert und füllt ihn neu.
+| Spalte           | Typ                      | Regeln                                                |
+| ---------------- | ------------------------ | ----------------------------------------------------- |
+| `id`             | INTEGER, Primärschlüssel | `rowid` der Zeile in beiden FTS5-Tabellen             |
+| `document_id`    | TEXT NULL, eindeutig     | → `documents(id)` ON DELETE CASCADE                   |
+| `media_id`       | TEXT NULL, eindeutig     | → `media(id)` ON DELETE CASCADE                       |
+| `subnet_id`      | TEXT NULL, eindeutig     | → `subnets(id)` ON DELETE CASCADE                     |
+| `indexed_sha256` | TEXT NULL                | Prüfsumme des indexierten Inhalts; nur bei Dokumenten |
+
+`STRICT`; genau eine der drei Element-Spalten ist gesetzt (`CHECK`). Die FTS5-Tabellen stehen wörtlich wie in Abschnitt 19 (`search_words`: `title, body, tags, subnets, meta`, `unicode61 remove_diacritics 2`, `prefix = '2 3'`; `search_parts`: `title, body`, `trigram remove_diacritics 1`) – ein Test vergleicht sie mit den Definitionen der Probe aus Phase 1 (`src-tauri/src/database/fts.rs`).
+
+Die Ansichten `search_document_fields`, `search_media_fields` und `search_subnet_fields` beschreiben, was der Index je Element hält (ADR 0020, Punkt 2). Trigger halten es in der Transaktion jeder Änderung aktuell: Anlegen und Ändern von Dokumenten, Medien und Subnetzen, Tags und Zuordnungen; das Löschen eines Eintrags (auch über `ON DELETE CASCADE`) entfernt beide FTS-Zeilen. Den Text eines Dokuments schreibt Rust in der Transaktion, die den Inhalt festhält, und setzt `indexed_sha256`; weicht sie von `documents.content_sha256` ab, trägt das Öffnen der Bibliothek den Text aus der Datei nach. Archiv und Papierkorb ändern den Index nicht; die Suche liest den Zustand aus `documents` und `media`. „Suchindex neu aufbauen“ leert alle drei Tabellen und füllt sie aus den Tabellen und Dateien neu.
 
 ### `mesh_nodes` – geplant (Phase 11)
 
