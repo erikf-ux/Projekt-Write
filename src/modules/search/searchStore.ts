@@ -16,7 +16,7 @@ import type { SearchRequest } from '@/types/generated/SearchRequest';
 /** Pause after the last keystroke before searching. */
 export const SEARCH_DELAY_MS = 60;
 /** Hits asked for. */
-export const SEARCH_LIMIT = 100;
+export const SEARCH_LIMIT = 50;
 /** Set when the hits of a search are shown (measured by the E2E test). */
 export const SEARCH_SHOWN_MARK = 'pw:search-shown';
 

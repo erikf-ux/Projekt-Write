@@ -7,6 +7,8 @@
 //! * Words query (`search_words`): every word must match, as a word or the
 //!   beginning of one. A word that ends in a sign (`C++`) must match as a
 //!   whole word: its beginning alone (`c`) would match nearly everything.
+//!   So must a single character (`e`): as a beginning it matches almost
+//!   every text, and the prefix index of section 19 starts at two.
 //! * A word with a sign in it (`C++`, `E-Mail`) loses the sign in the words
 //!   index (`C++` becomes `c`). With three or more characters it must also
 //!   occur as typed in title or body (`exact`, looked up in the trigram
@@ -92,8 +94,9 @@ pub fn spellings(term: &str) -> Vec<String> {
 }
 
 fn word_group(term: &str) -> String {
-    // A word that ends in a sign matches as a whole word only.
-    let prefix = term.chars().last().is_some_and(char::is_alphanumeric);
+    // A word that ends in a sign, and a single character, match as whole
+    // words only.
+    let prefix = term.chars().count() > 1 && term.chars().last().is_some_and(char::is_alphanumeric);
     let alternatives: Vec<String> = spellings(term)
         .iter()
         .map(|spelling| {
@@ -201,6 +204,7 @@ mod tests {
     fn short_words_only_search_words() {
         let built = expressions("ab");
         assert_eq!(built.words.as_deref(), Some(r#"("ab"*)"#));
+        assert_eq!(expressions("e").words.as_deref(), Some(r#"("e")"#));
         assert_eq!(built.parts, None);
         assert_eq!(built.short_words, None);
 

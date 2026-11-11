@@ -34,7 +34,7 @@ function hit(id: string, title: string, extra: Partial<SearchHit> = {}): SearchH
 
 describe('search requests', () => {
   it('sends only the filters that are set', () => {
-    expect(searchRequest('Müller', NO_FILTERS)).toEqual({ query: 'Müller', limit: 100 });
+    expect(searchRequest('Müller', NO_FILTERS)).toEqual({ query: 'Müller', limit: 50 });
     const request = searchRequest('haus', {
       kinds: ['document', 'pdf'],
       tagIds: ['t1'],
@@ -47,7 +47,7 @@ describe('search requests', () => {
     });
     expect(request).toEqual({
       query: 'haus',
-      limit: 100,
+      limit: 50,
       kinds: ['document', 'pdf'],
       tagIds: ['t1'],
       subnetId: 's1',
@@ -197,12 +197,12 @@ describe('search store and panel', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10);
     });
-    expect(requests.at(-1)).toEqual({ query: 'Garten', limit: 100, includeArchived: true });
+    expect(requests.at(-1)).toEqual({ query: 'Garten', limit: 50, includeArchived: true });
     fireEvent.click(screen.getByTestId('search-filter-clear'));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10);
     });
-    expect(requests.at(-1)).toEqual({ query: 'Garten', limit: 100 });
+    expect(requests.at(-1)).toEqual({ query: 'Garten', limit: 50 });
   });
 
   it('shows the error of a failed search', async () => {
