@@ -24,6 +24,7 @@ use crate::database::{Database, DatabaseError, JournalMode};
 use crate::error::{CommandError, ErrorCode};
 use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, display_path};
+use crate::services::backup::{self, BackupProgress, BackupSummary};
 use crate::services::dialog::{FolderPicker, PickRequest};
 use crate::services::documents::DocumentRepository;
 use crate::services::history::RetentionPolicy;
@@ -231,6 +232,10 @@ pub struct LibrarySession {
     slot: tokio::sync::Mutex<Slot>,
     tokens: Mutex<VecDeque<Chosen>>,
     move_cancel: Mutex<Option<Arc<AtomicBool>>>,
+    /// A backup in progress (ADR 0021).
+    backup: Arc<Mutex<backup::control::Activity>>,
+    /// The daily automatic backup at start (off in end-to-end runs that ask).
+    automatic_backups: AtomicBool,
 }
 
 impl LibrarySession {
@@ -253,6 +258,8 @@ impl LibrarySession {
             slot: tokio::sync::Mutex::new(Slot::Closed { error: None }),
             tokens: Mutex::new(VecDeque::new()),
             move_cancel: Mutex::new(None),
+            backup: Arc::new(Mutex::new(backup::control::Activity::default())),
+            automatic_backups: AtomicBool::new(automatic_backups_wanted()),
         }
     }
 
@@ -283,6 +290,7 @@ impl LibrarySession {
         *slot = match result {
             Ok((library, report)) => {
                 library.housekeeping().await;
+                self.start_automatic_backup(&library);
                 Slot::Open {
                     notes: OpenNotes::from_report(&report),
                     library: Box::new(library),
@@ -832,6 +840,406 @@ fn preferences_error(error: crate::services::settings::library::SettingsError) -
             CommandError::new(ErrorCode::Database)
         }
     }
+}
+
+/// Backups as the settings show them (ADR 0021, decision 7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BackupOverview {
+    /// The target as text, for display.
+    pub target: String,
+    /// `backups/` of the library.
+    pub default_target: bool,
+    /// The target lies on the drive of the library (section 21: warn).
+    pub same_drive: bool,
+    pub automatic: bool,
+    pub keep: u32,
+    pub running: bool,
+    /// When the newest backup of this library in the target was written.
+    pub last_backup_at: Option<String>,
+}
+
+/// Marks a backup as running for as long as it lives.
+struct Running {
+    activity: Arc<Mutex<backup::control::Activity>>,
+}
+
+impl Running {
+    fn start(
+        activity: &Arc<Mutex<backup::control::Activity>>,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Self, CommandError> {
+        let mut current = lock(activity);
+        if current.running {
+            return Err(CommandError::new(ErrorCode::BackupRunning));
+        }
+        current.running = true;
+        current.cancel = Some(cancel);
+        Ok(Self {
+            activity: activity.clone(),
+        })
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        let mut current = lock(&self.activity);
+        current.running = false;
+        current.cancel = None;
+    }
+}
+
+pub(crate) fn backup_error(error: backup::BackupError) -> CommandError {
+    match error {
+        backup::BackupError::Refused(reason) => {
+            log::warn!("backup refused: {reason}");
+            CommandError::new(ErrorCode::BackupRefused).with_detail("reason", reason)
+        }
+        backup::BackupError::Newer(what) => {
+            CommandError::new(ErrorCode::BackupNewer).with_detail("reason", what)
+        }
+        backup::BackupError::TargetNotEmpty => CommandError::new(ErrorCode::FolderNotEmpty),
+        backup::BackupError::TargetInsideLibrary => {
+            CommandError::new(ErrorCode::BackupTargetInsideLibrary)
+        }
+        backup::BackupError::Cancelled => CommandError::new(ErrorCode::BackupCancelled),
+        backup::BackupError::Database(error) => {
+            log::error!("backup database error: {error}");
+            CommandError::new(ErrorCode::LibraryBackupFailed)
+        }
+        backup::BackupError::Path(error) => {
+            log::error!("backup path error: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        }
+        backup::BackupError::Io(error) => {
+            log::error!("backup file error: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        }
+    }
+}
+
+impl LibrarySession {
+    /// End-to-end runs measure the app; a backup in the middle would disturb
+    /// them.
+    pub fn disable_automatic_backups(&self) {
+        self.automatic_backups.store(false, Ordering::Relaxed);
+    }
+
+    /// The backup target of `library`: the chosen folder if it still exists,
+    /// else its `backups/`.
+    fn backup_target_of(&self, library: &Library) -> Result<(PathBuf, bool), CommandError> {
+        let id = library.manifest().id.hyphenated().to_string();
+        let chosen = lock(&self.settings).get().backup_targets.get(&id).cloned();
+        if let Some(path) = chosen.map(PathBuf::from).filter(|path| path.is_dir()) {
+            return Ok((path, false));
+        }
+        library
+            .root()
+            .create_dir_all(crate::services::library::layout::BACKUPS_DIR)
+            .map_err(|error| {
+                log::error!("backups folder not created: {error}");
+                CommandError::new(ErrorCode::FileSystem)
+            })?;
+        let path = library
+            .root()
+            .resolve(crate::services::library::layout::BACKUPS_DIR)
+            .map_err(|_| CommandError::new(ErrorCode::FileSystem))?;
+        Ok((path, true))
+    }
+
+    /// What the settings show about backups.
+    pub async fn backup_overview(&self) -> Result<BackupOverview, CommandError> {
+        let slot = self.slot.lock().await;
+        let library = match &*slot {
+            Slot::Open { library, .. } => library,
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let (target, default_target) = self.backup_target_of(library)?;
+        let settings = library.settings();
+        let automatic = settings
+            .get::<crate::services::settings::library::BackupAutomatic>()
+            .await
+            .unwrap_or(true);
+        let keep = settings
+            .get::<crate::services::settings::library::BackupKeep>()
+            .await
+            .unwrap_or(7);
+        let last_backup_at = backup::control::newest_backup(&target, library.manifest().id)
+            .and_then(|time| {
+                let millis = time.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis();
+                crate::clock::Timestamp::from_unix_millis(i64::try_from(millis).ok()?)
+            })
+            .map(crate::clock::Timestamp::to_iso);
+        Ok(BackupOverview {
+            target: display_path(&target),
+            default_target,
+            same_drive: !default_target && backup::control::same_drive(&target, library.path()),
+            automatic,
+            keep,
+            running: lock(&self.backup).running,
+            last_backup_at,
+        })
+    }
+
+    /// Sets the backup target (`None`: back to `backups/` of the library).
+    pub async fn set_backup_target(
+        &self,
+        target: Option<PathBuf>,
+    ) -> Result<BackupOverview, CommandError> {
+        {
+            let slot = self.slot.lock().await;
+            let library = match &*slot {
+                Slot::Open { library, .. } => library,
+                Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+                Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+            };
+            let id = library.manifest().id.hyphenated().to_string();
+            let target = match target {
+                Some(path) => Some(
+                    library
+                        .backups()
+                        .check_target(&path)
+                        .map_err(backup_error)?,
+                ),
+                None => None,
+            };
+            let text = match &target {
+                Some(path) => Some(
+                    path.to_str()
+                        .ok_or_else(|| CommandError::new(ErrorCode::PathNotUnicode))?
+                        .to_owned(),
+                ),
+                None => None,
+            };
+            lock(&self.settings)
+                .update(|settings| match text {
+                    Some(text) => {
+                        settings.backup_targets.insert(id, text);
+                    }
+                    None => {
+                        settings.backup_targets.remove(&id);
+                    }
+                })
+                .map_err(|error| {
+                    log::warn!("backup target not saved: {error}");
+                    CommandError::new(ErrorCode::SettingsNotSaved)
+                })?;
+        }
+        self.backup_overview().await
+    }
+
+    /// Changes the automatic backup and how many are kept.
+    pub async fn set_backup_options(
+        &self,
+        automatic: Option<bool>,
+        keep: Option<u32>,
+    ) -> Result<BackupOverview, CommandError> {
+        {
+            let slot = self.slot.lock().await;
+            let library = match &*slot {
+                Slot::Open { library, .. } => library,
+                Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+                Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+            };
+            let settings = library.settings();
+            let failed = |error: crate::services::settings::library::SettingsError| {
+                log::warn!("backup setting not saved: {error}");
+                CommandError::new(ErrorCode::SettingsNotSaved)
+            };
+            if let Some(automatic) = automatic {
+                settings
+                    .set::<crate::services::settings::library::BackupAutomatic>(&automatic)
+                    .await
+                    .map_err(failed)?;
+            }
+            if let Some(keep) = keep {
+                settings
+                    .set::<crate::services::settings::library::BackupKeep>(&keep)
+                    .await
+                    .map_err(failed)?;
+            }
+        }
+        self.backup_overview().await
+    }
+
+    /// The backups, target and settings of the open library, without
+    /// holding the session for the length of a backup.
+    async fn backup_parts(
+        &self,
+    ) -> Result<
+        (
+            backup::Backups,
+            crate::services::settings::library::LibrarySettings,
+            PathBuf,
+        ),
+        CommandError,
+    > {
+        let slot = self.slot.lock().await;
+        let library = match &*slot {
+            Slot::Open { library, .. } => library,
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let (target, _) = self.backup_target_of(library)?;
+        Ok((library.backups(), library.settings(), target))
+    }
+
+    /// "Backup erstellen": writes a backup into the target and keeps the
+    /// newest ones.
+    pub async fn create_backup(
+        &self,
+        progress: impl Fn(BackupProgress) + Send + Sync + 'static,
+    ) -> Result<BackupSummary, CommandError> {
+        let (backups, settings, target) = self.backup_parts().await?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        let _running = Running::start(&self.backup, cancel.clone())?;
+        run_backup(&backups, &settings, &target, cancel, progress).await
+    }
+
+    /// A new, empty folder for checking a backup: in `tmp/` of the open
+    /// library, else next to the app settings. The caller removes it.
+    pub async fn scratch_dir(&self) -> Result<PathBuf, CommandError> {
+        let base = {
+            let slot = self.slot.lock().await;
+            match &*slot {
+                Slot::Open { library, .. } => {
+                    library
+                        .root()
+                        .create_dir_all(crate::services::library::layout::TMP_DIR)
+                        .map_err(|_| CommandError::new(ErrorCode::FileSystem))?;
+                    library
+                        .root()
+                        .resolve(crate::services::library::layout::TMP_DIR)
+                        .map_err(|_| CommandError::new(ErrorCode::FileSystem))?
+                }
+                _ => self.dirs.config.join("tmp"),
+            }
+        };
+        let dir = base.join(format!("check-{}", self.generators.new_id().simple()));
+        fs::create_dir_all(&dir).map_err(|error| {
+            log::error!("folder for checking not created: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        })?;
+        Ok(dir)
+    }
+
+    /// The new folder a backup is restored into, inside `parent` (stage 5:
+    /// never over an existing library).
+    pub fn restore_target(&self, parent: &Path) -> Result<PathBuf, CommandError> {
+        if !parent.is_dir() {
+            return Err(CommandError::new(ErrorCode::FileSystem));
+        }
+        let target = parent.join(format!(
+            "ProjectWrite-Wiederherstellung-{}",
+            self.generators.now().to_compact()
+        ));
+        if target.exists() {
+            return Err(CommandError::new(ErrorCode::FolderNotEmpty));
+        }
+        Ok(target)
+    }
+
+    /// Opens a restored library and makes it the open one; the old one stays
+    /// where it is (stage 5).
+    pub async fn open_restored(&self, path: &Path) -> Result<LibraryStatus, CommandError> {
+        let mut slot = self.slot.lock().await;
+        if matches!(*slot, Slot::Moving) {
+            return Err(CommandError::new(ErrorCode::LibraryBusy));
+        }
+        let (library, report) = Library::open(
+            path,
+            OpenOptions { accept_moved: true },
+            self.generators.clone(),
+        )
+        .await
+        .map_err(library_error)?;
+        self.switch_to(&mut slot, library, &report).await;
+        Ok(self.describe(&slot).await)
+    }
+
+    /// Stops a running backup between two files.
+    pub fn cancel_backup(&self) -> bool {
+        match &lock(&self.backup).cancel {
+            Some(cancel) => {
+                cancel.store(true, Ordering::Relaxed);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Section 21: once a day at start, in the background.
+    fn start_automatic_backup(&self, library: &Library) {
+        if !self.automatic_backups.load(Ordering::Relaxed) {
+            return;
+        }
+        let Ok((target, _)) = self.backup_target_of(library) else {
+            return;
+        };
+        let backups = library.backups();
+        let settings = library.settings();
+        let activity = self.backup.clone();
+        let id = library.manifest().id;
+        // What an interrupted backup left there.
+        if let Err(error) = backup::remove_partial(&target, id) {
+            log::warn!("partial backups not removed: {error}");
+        }
+        tokio::spawn(async move {
+            tokio::time::sleep(backup::control::AUTOMATIC_DELAY).await;
+            let automatic = settings
+                .get::<crate::services::settings::library::BackupAutomatic>()
+                .await
+                .unwrap_or(true);
+            if !automatic || !backup::control::due(&target, id, std::time::SystemTime::now()) {
+                return;
+            }
+            let cancel = Arc::new(AtomicBool::new(false));
+            let Ok(_running) = Running::start(&activity, cancel.clone()) else {
+                return;
+            };
+            match run_backup(&backups, &settings, &target, cancel, |_| {}).await {
+                Ok(summary) => log::info!(
+                    "automatic backup: {} documents, {} media",
+                    summary.documents,
+                    summary.media
+                ),
+                Err(error) => log::warn!("automatic backup failed: {:?}", error.code),
+            }
+        });
+    }
+}
+
+/// End-to-end builds started with `PW_E2E_NO_AUTO_BACKUP` leave out the
+/// automatic backup: it would run in the middle of the measurements.
+fn automatic_backups_wanted() -> bool {
+    #[cfg(feature = "e2e")]
+    if std::env::var_os("PW_E2E_NO_AUTO_BACKUP").is_some() {
+        return false;
+    }
+    true
+}
+
+async fn run_backup(
+    backups: &backup::Backups,
+    settings: &crate::services::settings::library::LibrarySettings,
+    target: &Path,
+    cancel: Arc<AtomicBool>,
+    progress: impl Fn(BackupProgress) + Send + Sync + 'static,
+) -> Result<BackupSummary, CommandError> {
+    let outcome = backups
+        .create(target, cancel, progress)
+        .await
+        .map_err(backup_error)?;
+    let keep = settings
+        .get::<crate::services::settings::library::BackupKeep>()
+        .await
+        .unwrap_or(7);
+    if let Err(error) = backup::prune(target, backups.library_id(), keep as usize) {
+        log::warn!("old backups not removed: {error}");
+    }
+    Ok(outcome.summary)
 }
 
 pub(crate) fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {

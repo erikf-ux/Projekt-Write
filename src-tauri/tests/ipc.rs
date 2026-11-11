@@ -2743,3 +2743,142 @@ fn search_finds_documents_and_rejects_invalid_requests_uniformly() {
     assert_uniform_error(&error, "request");
     app.shut_down();
 }
+
+/// The folder of the open library, from its status.
+fn library_folder(app: &TestApp) -> PathBuf {
+    let status = call(app, "library_status", json!({})).unwrap();
+    PathBuf::from(status["library"]["displayPath"].as_str().unwrap())
+}
+
+#[test]
+fn backups_are_created_checked_and_restored_through_the_commands() {
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Notiz", "format": "md" }),
+    )
+    .unwrap();
+    let id = created["id"].as_str().unwrap().to_owned();
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Gesichert\n" }),
+    )
+    .unwrap();
+
+    let overview = call(&app, "backup_overview", json!({})).unwrap();
+    assert_eq!(overview["defaultTarget"], true);
+    assert_eq!(overview["sameDrive"], false);
+    assert_eq!(overview["automatic"], true);
+    assert_eq!(overview["keep"], 7);
+    assert_eq!(overview["running"], false);
+    assert_eq!(overview["lastBackupAt"], Value::Null);
+
+    let summary = invoke(
+        &app.webview,
+        "backup_create",
+        json!({ "request": {}, "onProgress": "__CHANNEL__:11" }),
+    )
+    .unwrap();
+    assert_eq!(summary["documents"], 1);
+    let overview = call(&app, "backup_overview", json!({})).unwrap();
+    assert!(overview["lastBackupAt"].is_string(), "{overview}");
+    let backups_dir = library_folder(&app).join("backups");
+    let backup_file = std::fs::read_dir(&backups_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "pwbackup"))
+        .expect("a backup in backups/");
+
+    let overview = call(
+        &app,
+        "backup_set_options",
+        json!({ "automatic": false, "keep": 3 }),
+    )
+    .unwrap();
+    assert_eq!(overview["automatic"], false);
+    assert_eq!(overview["keep"], 3);
+
+    // Another target, outside the library; one inside is refused.
+    let outside = app.path("Sicherungen");
+    std::fs::create_dir_all(&outside).unwrap();
+    app.picker.push(Some(outside.clone()));
+    let overview = call(&app, "backup_choose_target", json!({ "title": "Ziel" })).unwrap();
+    assert_eq!(overview["defaultTarget"], false, "{overview}");
+    app.picker
+        .push(Some(library_folder(&app).join("documents")));
+    let error = call(&app, "backup_choose_target", json!({ "title": "Ziel" })).unwrap_err();
+    assert_error_code(&error, "BACKUP_TARGET_INSIDE_LIBRARY");
+    app.picker.push(None);
+    assert_eq!(
+        call(&app, "backup_choose_target", json!({ "title": "Ziel" })).unwrap(),
+        Value::Null
+    );
+    let overview = call(&app, "backup_reset_target", json!({})).unwrap();
+    assert_eq!(overview["defaultTarget"], true);
+
+    // "Backup prüfen".
+    app.picker.push(Some(backup_file.clone()));
+    let checked = invoke(
+        &app.webview,
+        "backup_check",
+        json!({ "request": { "title": "Backup prüfen" }, "onProgress": "__CHANNEL__:12" }),
+    )
+    .unwrap();
+    assert_eq!(checked["documents"], 1);
+    // A damaged file is refused in the uniform format.
+    let damaged = app.path("kaputt.pwbackup");
+    std::fs::write(&damaged, b"PK\x03\x04 kein Archiv").unwrap();
+    app.picker.push(Some(damaged));
+    let error = invoke(
+        &app.webview,
+        "backup_check",
+        json!({ "request": { "title": "Backup prüfen" }, "onProgress": "__CHANNEL__:13" }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "BACKUP_REFUSED");
+
+    // Stage 5: into a new folder inside the chosen one; that library opens.
+    let parent = app.path("Wiederherstellung");
+    std::fs::create_dir_all(&parent).unwrap();
+    app.picker.push(Some(backup_file));
+    app.picker.push(Some(parent.clone()));
+    let status = invoke(
+        &app.webview,
+        "backup_restore",
+        json!({
+            "request": { "fileTitle": "Backup wählen", "folderTitle": "Ordner wählen" },
+            "onProgress": "__CHANNEL__:14"
+        }),
+    )
+    .unwrap();
+    assert_eq!(status["state"], "open", "{status}");
+    let restored = library_folder(&app);
+    assert!(restored.starts_with(&parent), "{}", restored.display());
+    let read = call(&app, "document_read", json!({ "id": id })).unwrap();
+    assert_eq!(read["text"], "Gesichert\n");
+
+    for (command, request, field) in [
+        ("backup_check", json!({ "title": "" }), "title"),
+        (
+            "backup_choose_target",
+            json!({ "title": "x", "path": "/" }),
+            "request",
+        ),
+        ("backup_set_options", json!({ "keep": 0 }), "keep"),
+        ("backup_set_options", json!({ "keep": 101 }), "keep"),
+        ("backup_restore", json!({ "fileTitle": "a" }), "request"),
+        ("backup_create", json!({ "target": "/tmp" }), "request"),
+    ] {
+        let body = if matches!(command, "backup_check" | "backup_restore" | "backup_create") {
+            json!({ "request": request, "onProgress": "__CHANNEL__:15" })
+        } else {
+            json!({ "request": request })
+        };
+        let error = invoke(&app.webview, command, body).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    app.shut_down();
+}

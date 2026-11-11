@@ -19,6 +19,7 @@
 //! lock, `-wal`/`-shm`) can get in.
 
 pub mod archive;
+pub mod control;
 
 use std::fs;
 use std::io::{self, BufWriter, Write};

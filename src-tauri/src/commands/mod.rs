@@ -6,6 +6,7 @@
 //! * is listed in [`COMMAND_NAMES`], in the app manifest in `build.rs` and in
 //!   the window capability (checked by `tests/security_config.rs`).
 
+pub mod backup;
 pub mod documents;
 pub mod external;
 pub mod input;
@@ -111,6 +112,14 @@ pub const COMMAND_NAMES: &[&str] = &[
     "structure_history",
     "search_query",
     "search_rebuild",
+    "backup_overview",
+    "backup_choose_target",
+    "backup_reset_target",
+    "backup_set_options",
+    "backup_create",
+    "backup_cancel",
+    "backup_check",
+    "backup_restore",
     "external_open",
     "external_read",
     "external_check",
@@ -218,6 +227,14 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         structure::structure_history,
         search::search_query,
         search::search_rebuild,
+        backup::backup_overview,
+        backup::backup_choose_target,
+        backup::backup_reset_target,
+        backup::backup_set_options,
+        backup::backup_create,
+        backup::backup_cancel,
+        backup::backup_check,
+        backup::backup_restore,
         external::external_open,
         external::external_read,
         external::external_check,

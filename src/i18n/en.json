@@ -804,5 +804,10 @@
   "search.rebuild.unreadable": "Search index rebuilt ({indexed} documents); {unreadable} files could not be read.",
   "search.rebuild.failed": "The search index could not be rebuilt.",
   "settings.searchIndex": "Search index",
-  "settings.searchIndex.hint": "Builds the index of the global search anew from the library. Only needed when results are missing."
+  "settings.searchIndex.hint": "Builds the index of the global search anew from the library. Only needed when results are missing.",
+  "error.backupRefused": "The backup is damaged, changed or incomplete and was not used.",
+  "error.backupNewer": "This backup comes from a newer version of Project Write.",
+  "error.backupRunning": "A backup is already running.",
+  "error.backupTargetInsideLibrary": "The target lies inside the library. Please choose a folder outside it.",
+  "error.backupCancelled": "The backup was cancelled. Nothing of it was kept."
 }

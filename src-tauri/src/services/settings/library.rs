@@ -68,6 +68,42 @@ impl LibrarySetting for TrashRetentionDays {
     }
 }
 
+/// Automatic backups at start, once a day (section 21: on by default).
+pub struct BackupAutomatic;
+
+impl LibrarySetting for BackupAutomatic {
+    const KEY: &'static str = "backup.automatic";
+    type Value = bool;
+
+    fn default_value() -> Self::Value {
+        true
+    }
+
+    fn validate(_: &Self::Value) -> Result<(), &'static str> {
+        Ok(())
+    }
+}
+
+/// Backups kept in the target (section 21: 7).
+pub struct BackupKeep;
+
+impl LibrarySetting for BackupKeep {
+    const KEY: &'static str = "backup.keep";
+    type Value = u32;
+
+    fn default_value() -> Self::Value {
+        7
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if (1..=100).contains(value) {
+            Ok(())
+        } else {
+            Err("between 1 and 100 backups")
+        }
+    }
+}
+
 /// Largest image accepted, in megapixels (section 17: "Grenzwerte schützen
 /// vor Bildbomben, Startwert 100 Megapixel"; ADR 0019, decision 4).
 pub struct MediaMaxMegapixels;

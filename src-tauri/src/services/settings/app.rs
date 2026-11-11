@@ -46,6 +46,9 @@ pub struct AppSettings {
     pub recent_files: Vec<RecentFile>,
     /// The tabs of the last session (stage 1, ADR 0016).
     pub session: Option<SavedSession>,
+    /// Backup target per library id (ADR 0021, decision 7): a path of this
+    /// computer, so not in the library database.
+    pub backup_targets: std::collections::BTreeMap<String, String>,
     /// Fields of newer versions, kept unchanged.
     pub other: Map<String, Value>,
 }
@@ -59,6 +62,7 @@ impl Default for AppSettings {
             window: None,
             recent_files: Vec::new(),
             session: None,
+            backup_targets: std::collections::BTreeMap::new(),
             other: Map::new(),
         }
     }
@@ -128,6 +132,7 @@ const KEY_FORMAT_VERSION: &str = "formatVersion";
 const KEY_LIBRARY_PATH: &str = "libraryPath";
 const KEY_RECENT_FILES: &str = "recentFiles";
 const KEY_SESSION: &str = "session";
+const KEY_BACKUP_TARGETS: &str = "backupTargets";
 
 impl AppSettings {
     /// Reads the settings from the top-level object of the file.
@@ -160,6 +165,17 @@ impl AppSettings {
                 session.tabs.truncate(MAX_SESSION_TABS);
                 session
             });
+        // Entries that are not text are dropped one by one.
+        let backup_targets = match object.remove(KEY_BACKUP_TARGETS) {
+            Some(Value::Object(entries)) => entries
+                .into_iter()
+                .filter_map(|(id, path)| match path {
+                    Value::String(path) if !path.is_empty() => Some((id, path)),
+                    _ => None,
+                })
+                .collect(),
+            _ => std::collections::BTreeMap::new(),
+        };
         Ok(Self {
             format_version,
             library_path,
@@ -167,6 +183,7 @@ impl AppSettings {
             window,
             recent_files,
             session,
+            backup_targets,
             other: object,
         })
     }
@@ -197,6 +214,19 @@ impl AppSettings {
             None => {
                 object.remove(KEY_SESSION);
             }
+        }
+        if self.backup_targets.is_empty() {
+            object.remove(KEY_BACKUP_TARGETS);
+        } else {
+            object.insert(
+                KEY_BACKUP_TARGETS.to_owned(),
+                Value::Object(
+                    self.backup_targets
+                        .iter()
+                        .map(|(id, path)| (id.clone(), Value::from(path.as_str())))
+                        .collect(),
+                ),
+            );
         }
         if self.recent_files.is_empty() {
             object.remove(KEY_RECENT_FILES);

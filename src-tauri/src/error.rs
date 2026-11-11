@@ -143,11 +143,21 @@ pub enum ErrorCode {
     ImportNotFound,
     /// The system could not open a medium with its standard program.
     MediaOpenFailed,
+    /// A backup or package is damaged, changed or incomplete (`details.reason`).
+    BackupRefused,
+    /// A backup or package from a newer version of the app.
+    BackupNewer,
+    /// A backup is already running.
+    BackupRunning,
+    /// The backup target lies inside the library (other than `backups/`).
+    BackupTargetInsideLibrary,
+    /// The backup was cancelled; nothing of it stays.
+    BackupCancelled,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 61] = [
+    pub const ALL: [ErrorCode; 66] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -209,6 +219,11 @@ impl ErrorCode {
         ErrorCode::MediaInUse,
         ErrorCode::ImportNotFound,
         ErrorCode::MediaOpenFailed,
+        ErrorCode::BackupRefused,
+        ErrorCode::BackupNewer,
+        ErrorCode::BackupRunning,
+        ErrorCode::BackupTargetInsideLibrary,
+        ErrorCode::BackupCancelled,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -275,6 +290,11 @@ impl ErrorCode {
             ErrorCode::MediaInUse => "error.mediaInUse",
             ErrorCode::ImportNotFound => "error.importNotFound",
             ErrorCode::MediaOpenFailed => "error.mediaOpenFailed",
+            ErrorCode::BackupRefused => "error.backupRefused",
+            ErrorCode::BackupNewer => "error.backupNewer",
+            ErrorCode::BackupRunning => "error.backupRunning",
+            ErrorCode::BackupTargetInsideLibrary => "error.backupTargetInsideLibrary",
+            ErrorCode::BackupCancelled => "error.backupCancelled",
         }
     }
 }
