@@ -395,7 +395,7 @@ async fn media_are_found_by_name_description_tags_and_subnets() {
 
     // The file name is metadata; the title starts as the name.
     let hits = search(&library, "leuchtturm").await;
-    assert_eq!(ids(&hits), [id.clone()]);
+    assert_eq!(ids(&hits), std::slice::from_ref(&id));
     assert_eq!(hits[0].kind, SearchKind::Image);
 
     library
@@ -403,20 +403,29 @@ async fn media_are_found_by_name_description_tags_and_subnets() {
         .update_details(medium, Some("Westerhever"), Some("Rot und weiß gestreift"))
         .await
         .unwrap();
-    assert_eq!(ids(&search(&library, "Westerhever").await), [id.clone()]);
+    assert_eq!(
+        ids(&search(&library, "Westerhever").await),
+        std::slice::from_ref(&id)
+    );
     assert_eq!(
         ids(&search(&library, "weiss gestreift").await),
-        [id.clone()]
+        std::slice::from_ref(&id)
     );
     // Still found by its file name.
-    assert_eq!(ids(&search(&library, "skizze").await), [id.clone()]);
+    assert_eq!(
+        ids(&search(&library, "skizze").await),
+        std::slice::from_ref(&id)
+    );
 
     let structure = library.structure();
     structure
         .tag_element(ElementKind::Media, medium, "Nordfriesland")
         .await
         .unwrap();
-    assert_eq!(ids(&search(&library, "Nordfriesland").await), [id.clone()]);
+    assert_eq!(
+        ids(&search(&library, "Nordfriesland").await),
+        std::slice::from_ref(&id)
+    );
 
     let only_documents = SearchOptions {
         kinds: vec![SearchKind::Document],

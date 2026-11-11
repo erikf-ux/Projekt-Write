@@ -242,21 +242,26 @@ async fn fts5_is_compiled_in_and_both_search_tables_work() {
         "compile options: {options:?}"
     );
 
-    // The exact definitions from section 19, as real tables.
-    sqlx::query(AssertSqlSafe(format!(
-        "CREATE VIRTUAL TABLE search_words USING fts5({})",
-        fts::SEARCH_WORDS_DEFINITION
-    )))
-    .execute(db.writer())
-    .await
-    .expect("create search_words");
-    sqlx::query(AssertSqlSafe(format!(
-        "CREATE VIRTUAL TABLE search_parts USING fts5({})",
-        fts::SEARCH_PARTS_DEFINITION
-    )))
-    .execute(db.writer())
-    .await
-    .expect("create search_parts");
+    // Migration 0009 creates both tables with the exact definitions of
+    // section 19 (the same text the Phase 1 probe uses).
+    for (table, definition) in [
+        ("search_words", fts::SEARCH_WORDS_DEFINITION),
+        ("search_parts", fts::SEARCH_PARTS_DEFINITION),
+    ] {
+        let sql: String = sqlx::query_scalar("SELECT sql FROM sqlite_schema WHERE name = ?1")
+            .bind(table)
+            .fetch_one(db.reader())
+            .await
+            .expect(table);
+        let normalised = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(
+            normalised(&sql),
+            normalised(&format!(
+                "CREATE VIRTUAL TABLE {table} USING fts5( {definition} )"
+            )),
+            "{table}"
+        );
+    }
 
     let body = "Programmieren in C++ im Krankenhaus mit Herrn Müller";
     sqlx::query("INSERT INTO search_words (title, body, tags, subnets, meta) VALUES ('Notiz', ?1, '', '', '')")
