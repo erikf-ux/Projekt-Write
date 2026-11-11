@@ -7,6 +7,10 @@
 //! * Words query (`search_words`): every word must match, as a word or the
 //!   beginning of one. A word that ends in a sign (`C++`) must match as a
 //!   whole word: its beginning alone (`c`) would match nearly everything.
+//! * A word with a sign in it (`C++`, `E-Mail`) loses the sign in the words
+//!   index (`C++` becomes `c`). With three or more characters it must also
+//!   occur as typed in title or body (`exact`, looked up in the trigram
+//!   index); otherwise `C++` would find every text with a lone `C`.
 //! * Parts query (`search_parts`, trigram): every word of three or more
 //!   characters must occur inside a word; shorter words must still match
 //!   in the words index (FTS5's trigram cannot look for them).
@@ -35,6 +39,9 @@ pub struct Expressions {
     /// Words below three characters, for `search_words`, that parts hits
     /// must match as well.
     pub short_words: Option<String>,
+    /// Words with a sign, for `search_parts`, that words hits must contain
+    /// as typed.
+    pub exact: Option<String>,
 }
 
 impl Expressions {
@@ -117,7 +124,14 @@ pub fn expressions(input: &str) -> Expressions {
         .iter()
         .partition(|term| term.chars().count() >= MIN_PART_CHARS);
     let parts = join(long.iter().map(|term| part_group(term)).collect());
+    let exact = join(
+        long.iter()
+            .filter(|term| !term.chars().all(char::is_alphanumeric))
+            .map(|term| part_group(term))
+            .collect(),
+    );
     Expressions {
+        exact,
         words: join(terms.iter().map(|term| word_group(term)).collect()),
         short_words: parts
             .as_ref()
@@ -172,6 +186,8 @@ mod tests {
             Some(r#"("strasse" OR "straße") AND ("c++")"#)
         );
         assert_eq!(built.short_words, None);
+        assert_eq!(built.exact.as_deref(), Some(r#"("c++")"#));
+        assert_eq!(expressions("haus c#").exact, None);
     }
 
     #[test]

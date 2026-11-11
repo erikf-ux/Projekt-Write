@@ -128,6 +128,10 @@ fn collect_text(node: &Value, out: &mut String) {
 }
 
 fn separate(out: &mut String, with: char) {
+    if with == '\n' && out.ends_with(' ') {
+        // A block ends after an image: the line break replaces the space.
+        out.pop();
+    }
     if !out.is_empty() && !out.ends_with(char::is_whitespace) {
         out.push(with);
     }
@@ -172,7 +176,7 @@ mod tests {
         let text = searchable_text(DocumentFormat::Pwrite, &pwrite::to_bytes(&file));
         assert_eq!(
             text,
-            "Krankenhaus\nHerr Müller\nStraße Häuser Am Fluss \nC++\n"
+            "Krankenhaus\nHerr Müller\nStraße Häuser Am Fluss\nC++\n"
         );
     }
 

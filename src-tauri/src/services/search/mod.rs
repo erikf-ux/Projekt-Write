@@ -247,12 +247,17 @@ impl SearchIndex {
         let limit = options.limit.clamp(1, MAX_HITS);
         let filters = filters(options);
         let reader = self.database.reader();
-        let mut hits: Vec<SearchHit> =
-            rows::search_words(reader, words, &filters, i64::from(limit))
-                .await?
-                .into_iter()
-                .filter_map(|row| hit(row, SearchMatch::Words))
-                .collect();
+        let mut hits: Vec<SearchHit> = rows::search_words(
+            reader,
+            words,
+            expressions.exact.as_deref(),
+            &filters,
+            i64::from(limit),
+        )
+        .await?
+        .into_iter()
+        .filter_map(|row| hit(row, SearchMatch::Words))
+        .collect();
         let remaining = limit.saturating_sub(u32::try_from(hits.len()).unwrap_or(limit));
         if remaining > 0
             && let Some(parts) = expressions.parts.as_deref()
@@ -261,6 +266,7 @@ impl SearchIndex {
                 rows::search_parts(
                     reader,
                     Some(words),
+                    expressions.exact.as_deref(),
                     parts,
                     expressions.short_words.as_deref(),
                     &filters,

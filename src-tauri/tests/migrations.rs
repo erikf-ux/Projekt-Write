@@ -106,6 +106,14 @@ const FIXTURES: &[(i64, &str, &str)] = &[
          JOIN document_media AS d ON d.media_id = x.id \
          WHERE x.title = 'Skizze' AND m.is_primary = 1 AND d.page = 0",
     ),
+    (
+        9,
+        "UPDATE search_entries SET indexed_sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' \
+         WHERE document_id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11'",
+        "SELECT count(*) FROM search_entries \
+         WHERE document_id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11' \
+           AND indexed_sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -150,6 +158,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         8,
         "media",
         "874c21ba69336c1a9fe3cdc69e497a66fc25cfcf4be418082a9e5c362ad3b046ea1c214a085908b44d40173d2d8708a2",
+    ),
+    (
+        9,
+        "search",
+        "fc1760406e5f82b6fcd1d67447324aa9027791036d9aeb0c044af46e5a92eb3572a1ee995c8296c76cd692ff04bf9f09",
     ),
 ];
 
@@ -231,6 +244,60 @@ async fn every_earlier_schema_version_upgrades_to_the_current_one() {
         assert!(violations.is_empty(), "foreign key violations from {start}");
         db.close().await;
     }
+}
+
+/// Migration 0009 puts what exists into the search index: titles, tags,
+/// subnets and file names; the bodies of documents follow when the library
+/// opens (tests/search.rs).
+#[tokio::test]
+async fn migration_9_indexes_the_existing_elements() {
+    let dir = common::temp_dir("pw-migrate-");
+    let db = fresh(&dir, "from-8.db").await;
+    db.migrate_to(8).await.unwrap();
+    for (version, insert, _) in FIXTURES.iter().filter(|f| f.0 <= 8) {
+        sqlx::raw_sql(AssertSqlSafe(*insert))
+            .execute(db.writer())
+            .await
+            .unwrap_or_else(|e| panic!("fixture {version}: {e}"));
+    }
+    db.migrate().await.unwrap();
+    let count = |sql: &'static str| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(sql)
+                .fetch_one(db.reader())
+                .await
+                .unwrap()
+        }
+    };
+    // Two documents, one medium, one subnet.
+    assert_eq!(count("SELECT count(*) FROM search_entries").await, 4);
+    assert_eq!(count("SELECT count(*) FROM search_words").await, 4);
+    assert_eq!(count("SELECT count(*) FROM search_parts").await, 4);
+    // "Äpfel" is the tag of the document "Notiz" and of the medium.
+    assert_eq!(
+        count("SELECT count(*) FROM search_words WHERE search_words MATCH 'tags:apfel'").await,
+        2
+    );
+    assert_eq!(
+        count("SELECT count(*) FROM search_words WHERE search_words MATCH 'subnets:projekte'")
+            .await,
+        2
+    );
+    assert_eq!(
+        count("SELECT count(*) FROM search_words WHERE search_words MATCH 'meta:skizze'").await,
+        1
+    );
+    assert_eq!(
+        count("SELECT count(*) FROM search_parts WHERE search_parts MATCH '\"jekt\"'").await,
+        1
+    );
+    // No body is indexed yet.
+    assert_eq!(
+        count("SELECT count(*) FROM search_entries WHERE indexed_sha256 IS NOT NULL").await,
+        0
+    );
+    db.close().await;
 }
 
 #[test]

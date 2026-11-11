@@ -221,12 +221,14 @@ const WORDS_SQL: &str = concat!(
        SELECT rowid, \
               snippet(search_words, -1, char(57344), char(57345), '…', 16) AS snippet, \
               bm25(search_words, 10.0, 1.0, 5.0, 3.0, 2.0) AS rank \
-       FROM search_words WHERE search_words MATCH ?1) AS hit",
+       FROM search_words WHERE search_words MATCH ?1 \
+       AND (?12 IS NULL OR rowid IN (SELECT rowid FROM search_parts WHERE search_parts MATCH ?12))) AS hit",
     element_and_filters!()
 );
 
 // ?12 parts of words, ?13 short words (below three characters) that must
-// match as words too, ?1 the words query whose hits are already listed.
+// match as words too, ?1 and ?14 the words query whose hits are already
+// listed (with its exact words).
 const PARTS_SQL: &str = concat!(
     "SELECT * FROM (SELECT ",
     element_columns!(),
@@ -236,7 +238,8 @@ const PARTS_SQL: &str = concat!(
               bm25(search_parts, 10.0, 1.0) AS rank \
        FROM search_parts WHERE search_parts MATCH ?12 \
        AND (?13 IS NULL OR rowid IN (SELECT rowid FROM search_words WHERE search_words MATCH ?13)) \
-       AND (?1 IS NULL OR rowid NOT IN (SELECT rowid FROM search_words WHERE search_words MATCH ?1))) AS hit",
+       AND (?1 IS NULL OR rowid NOT IN (SELECT rowid FROM search_words WHERE search_words MATCH ?1 \
+            AND (?14 IS NULL OR rowid IN (SELECT rowid FROM search_parts WHERE search_parts MATCH ?14))))) AS hit",
     element_and_filters!()
 );
 
@@ -258,14 +261,17 @@ fn bind_filters<'q>(
         .bind(limit)
 }
 
-/// Hits of the words index (`search_words`), best first.
+/// Hits of the words index (`search_words`), best first; `exact` (for the
+/// parts index) must match as well.
 pub async fn search_words(
     pool: &SqlitePool,
     words: &str,
+    exact: Option<&str>,
     filters: &Filters,
     limit: i64,
 ) -> Result<Vec<HitRow>, sqlx::Error> {
     bind_filters(sqlx::query(WORDS_SQL).bind(words), filters, limit)
+        .bind(exact)
         .fetch_all(pool)
         .await?
         .iter()
@@ -278,6 +284,7 @@ pub async fn search_words(
 pub async fn search_parts(
     pool: &SqlitePool,
     words: Option<&str>,
+    exact: Option<&str>,
     parts: &str,
     short_words: Option<&str>,
     filters: &Filters,
@@ -286,6 +293,7 @@ pub async fn search_parts(
     bind_filters(sqlx::query(PARTS_SQL).bind(words), filters, limit)
         .bind(parts)
         .bind(short_words)
+        .bind(exact)
         .fetch_all(pool)
         .await?
         .iter()
