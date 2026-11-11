@@ -4,6 +4,7 @@ pub mod backup;
 pub mod dialog;
 pub mod documents;
 pub mod encoding;
+pub mod export;
 pub mod external;
 pub mod history;
 pub mod import;
