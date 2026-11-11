@@ -2,9 +2,9 @@
 //! 0005). Only the document repository (`services::documents`) calls these
 //! functions.
 //!
-//! Content changes write the row and the links of the document in one
-//! transaction (ADR 0015, decision 14): the links never describe another
-//! content than the row.
+//! Content changes write the row, the links, the media uses and the indexed
+//! body of the document in one transaction (ADR 0015, decision 14; ADR
+//! 0020): none of them ever describes another content than the row.
 
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqliteConnection, SqlitePool};
@@ -65,7 +65,7 @@ pub async fn insert(
 ) -> Result<(), sqlx::Error> {
     let mut transaction = pool.begin().await?;
     insert_row(&mut transaction, row).await?;
-    replace_references(&mut transaction, &row.id, references).await?;
+    replace_references(&mut transaction, &row.id, references, &row.content_sha256).await?;
     transaction.commit().await
 }
 
@@ -94,15 +94,18 @@ async fn insert_row(
     Ok(())
 }
 
-/// Replaces links (`document_links`) and media uses (`document_media`) of
-/// `source` (ADR 0019, decision 11).
+/// Replaces links (`document_links`), media uses (`document_media`, ADR
+/// 0019, decision 11) and the indexed body (ADR 0020) of `source`.
 async fn replace_references(
     connection: &mut SqliteConnection,
     source: &str,
     references: &References,
+    content_sha256: &str,
 ) -> Result<(), sqlx::Error> {
     replace_links(connection, source, &references.links).await?;
-    crate::database::media::replace_document_media(connection, source, &references.media).await
+    crate::database::media::replace_document_media(connection, source, &references.media).await?;
+    crate::database::search::set_document_body(connection, source, &references.text, content_sha256)
+        .await
 }
 
 /// Replaces the outgoing links of `source`.
@@ -227,7 +230,7 @@ pub async fn update_content(
     .await?
     .rows_affected();
     if changed > 0 {
-        replace_references(&mut transaction, id, references).await?;
+        replace_references(&mut transaction, id, references, content_sha256).await?;
     }
     transaction.commit().await?;
     Ok(changed)
@@ -258,7 +261,7 @@ pub async fn update_format(
     .await?
     .rows_affected();
     if changed > 0 {
-        replace_references(&mut transaction, id, references).await?;
+        replace_references(&mut transaction, id, references, content_sha256).await?;
     }
     transaction.commit().await?;
     Ok(changed)

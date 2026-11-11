@@ -15,6 +15,7 @@
 //! 8. Remove the files of unfinished imports (their journals name them),
 //!    compare the document and media folders with the database (report
 //!    only).
+//! 9. Fill in the bodies the search index lacks (ADR 0020).
 
 pub mod layout;
 pub mod lock;
@@ -33,6 +34,7 @@ use crate::filesystem::location::{self, StorageLocation};
 use crate::security::paths::{self, PathError, SafeRoot};
 use crate::services::documents::DocumentRepository;
 use crate::services::media::{self, MediaLibrary};
+use crate::services::search::SearchIndex;
 use crate::services::settings::library::{LibrarySettings, TrashRetentionDays};
 use crate::services::structure::{Journal, Structure};
 
@@ -303,10 +305,14 @@ impl Library {
                     cleared_tmp_entries,
                     documents,
                 };
-                Ok((
-                    Self::assemble(root, manifest, location, database, generators, lock),
-                    report,
-                ))
+                let library = Self::assemble(root, manifest, location, database, generators, lock);
+                // Bodies missing from the search index (after migration 0009
+                // or a rebuild) are filled in now; a failure only leaves them
+                // for the next opening.
+                if let Err(error) = library.search().fill_stale().await {
+                    log::warn!("search index not completed: {error}");
+                }
+                Ok((library, report))
             }
             Err(error) => {
                 database.close().await;
@@ -432,6 +438,15 @@ impl Library {
             self.generators.clone(),
             self.write_lock.clone(),
             self.imports.clone(),
+        )
+    }
+
+    /// The search index (section 19, ADR 0020).
+    pub fn search(&self) -> SearchIndex {
+        SearchIndex::new(
+            self.root.clone(),
+            self.database.clone(),
+            self.write_lock.clone(),
         )
     }
 

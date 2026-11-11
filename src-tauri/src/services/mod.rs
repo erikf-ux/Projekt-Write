@@ -13,6 +13,7 @@ pub mod media;
 pub mod opening;
 pub mod pwrite;
 pub mod recovery;
+pub mod search;
 pub mod session;
 pub mod settings;
 pub mod structure;

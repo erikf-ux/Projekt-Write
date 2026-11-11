@@ -1042,19 +1042,22 @@ pub const INTERNAL_LINK_PREFIX: &str = "pwrite://";
 pub const MEDIA_PREFIX: &str = "pwmedia://";
 
 /// What a content refers to: documents it links to and media it uses (with
-/// the page of a PDF reference, 0 for the whole medium). Written with the
-/// content in one transaction.
+/// the page of a PDF reference, 0 for the whole medium), and the text the
+/// search index holds (ADR 0020). Written with the content in one
+/// transaction.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct References {
     pub links: Vec<String>,
     pub media: Vec<(String, u32)>,
+    pub text: String,
 }
 
-/// Links and media of a content.
+/// Links, media and searchable text of a content.
 pub fn references_in(format: DocumentFormat, content: &[u8]) -> References {
     References {
         links: links_in(format, content),
         media: media_in(format, content),
+        text: crate::services::search::text::searchable_text(format, content),
     }
 }
 
