@@ -69,6 +69,8 @@
     "allow-structure-undo",
     "allow-structure-redo",
     "allow-structure-history",
+    "allow-search-query",
+    "allow-search-rebuild",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",

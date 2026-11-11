@@ -31,6 +31,7 @@ use crate::services::library::layout::{MANIFEST_FILE, SYSTEM_JUNK_FILES};
 use crate::services::library::relocate::{self, MoveError, MoveProgress};
 use crate::services::library::{Library, LibraryError, OpenOptions, OpenReport};
 use crate::services::media::MediaLibrary;
+use crate::services::search::SearchIndex;
 use crate::services::settings::app::{AppSettingsStore, LoadOutcome, SavedSession};
 use crate::services::settings::library::{
     AcceptedLocation, HistoryDailyDays, HistoryKeepAllHours, HistoryWeeklyDays, TrashRetentionDays,
@@ -398,6 +399,23 @@ impl LibrarySession {
             Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
         };
         let result = operation(media, structure).await;
+        drop(slot);
+        result
+    }
+
+    /// Runs `operation` with the search index of the open library.
+    pub async fn with_search<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(SearchIndex) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let search = match &*slot {
+            Slot::Open { library, .. } => library.search(),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(search).await;
         drop(slot);
         result
     }

@@ -88,6 +88,9 @@ import type { StructureUpdate } from '@/types/generated/StructureUpdate';
 import type { TagNameRequest } from '@/types/generated/TagNameRequest';
 import type { TagRequest } from '@/types/generated/TagRequest';
 import type { UndoHistory } from '@/types/generated/UndoHistory';
+import type { RebuildReport } from '@/types/generated/RebuildReport';
+import type { SearchHit } from '@/types/generated/SearchHit';
+import type { SearchRequest } from '@/types/generated/SearchRequest';
 import type { UpdateSubnetRequest } from '@/types/generated/UpdateSubnetRequest';
 import type { VersionRequest } from '@/types/generated/VersionRequest';
 import type { VersionSummary } from '@/types/generated/VersionSummary';
@@ -145,6 +148,8 @@ export interface Commands {
   structure_state: { request: EmptyRequest; response: StructureState };
   structure_document: { request: StructureDocumentRequest; response: DocumentStructure };
   structure_history: { request: EmptyRequest; response: UndoHistory };
+  search_query: { request: SearchRequest; response: SearchHit[] };
+  search_rebuild: { request: EmptyRequest; response: RebuildReport };
   structure_undo: { request: EmptyRequest; response: StructureUpdate | null };
   structure_redo: { request: EmptyRequest; response: StructureUpdate | null };
   subnet_create: { request: CreateSubnetRequest; response: StructureUpdate };

@@ -13,6 +13,7 @@ pub mod library;
 pub mod links;
 pub mod media;
 pub mod recovery;
+pub mod search;
 pub mod structure;
 pub mod system;
 pub mod ui;
@@ -108,6 +109,8 @@ pub const COMMAND_NAMES: &[&str] = &[
     "media_import_commit",
     "media_import_cancel",
     "structure_history",
+    "search_query",
+    "search_rebuild",
     "external_open",
     "external_read",
     "external_check",
@@ -213,6 +216,8 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         media::media_import_commit,
         media::media_import_cancel,
         structure::structure_history,
+        search::search_query,
+        search::search_rebuild,
         external::external_open,
         external::external_read,
         external::external_check,

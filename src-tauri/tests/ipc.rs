@@ -2628,3 +2628,118 @@ fn subnets_memberships_and_tags_through_the_commands() {
     assert_uniform_error(&error, "subnetId");
     app.shut_down();
 }
+
+#[test]
+fn search_finds_documents_and_rejects_invalid_requests_uniformly() {
+    let app = app();
+    let error = call(&app, "search_query", json!({ "query": "x" })).unwrap_err();
+    assert_error_code(&error, "LIBRARY_NOT_OPEN");
+    app.shut_down();
+
+    let app = app_with_library();
+    let created = call(
+        &app,
+        "document_create",
+        json!({ "title": "Brief", "format": "txt" }),
+    )
+    .unwrap();
+    let id = created["id"].as_str().unwrap().to_owned();
+    call(
+        &app,
+        "document_save",
+        json!({ "id": id, "text": "Sehr geehrter Herr Müller, Hauptstraße 5" }),
+    )
+    .unwrap();
+
+    for query in ["Mueller", "strasse", "\"", "C++"] {
+        let hits = call(&app, "search_query", json!({ "query": query })).unwrap();
+        assert!(hits.is_array(), "{query}: {hits}");
+    }
+    let hits = call(&app, "search_query", json!({ "query": "Mueller" })).unwrap();
+    assert_eq!(hits.as_array().unwrap().len(), 1);
+    let hit = &hits[0];
+    assert_eq!(hit["id"], id.as_str());
+    assert_eq!(hit["kind"], "document");
+    assert_eq!(hit["format"], "txt");
+    assert_eq!(hit["match"], "words");
+    assert_eq!(hit["archived"], false);
+    assert!(
+        hit["snippet"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|part| part["hit"] == true)
+    );
+    // Nothing else is in a hit: no path, no content beyond the snippet.
+    let mut keys: Vec<&str> = hit
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        [
+            "archived",
+            "deleted",
+            "favorite",
+            "format",
+            "id",
+            "kind",
+            "match",
+            "snippet",
+            "title",
+            "updatedAt"
+        ]
+    );
+    let hits = call(
+        &app,
+        "search_query",
+        json!({
+            "query": "strasse",
+            "kinds": ["document"],
+            "tagIds": [],
+            "updatedFrom": "2000-01-01T00:00:00Z",
+            "includeArchived": true,
+            "limit": 5
+        }),
+    )
+    .unwrap();
+    assert_eq!(hits[0]["match"], "parts");
+
+    let report = call(&app, "search_rebuild", json!({})).unwrap();
+    assert_eq!(report["indexed"], 1);
+    assert_eq!(report["unreadable"], 0);
+
+    let bad = "../../etc/passwd";
+    for (request, field) in [
+        (json!({}), "request"),
+        (json!({ "query": 5 }), "request"),
+        (json!({ "query": "x", "path": "/" }), "request"),
+        (json!({ "query": "x".repeat(1_001) }), "query"),
+        (json!({ "query": "x", "kinds": ["folder"] }), "request"),
+        (json!({ "query": "x", "tagIds": [bad] }), "tagIds"),
+        (json!({ "query": "x", "subnetId": bad }), "subnetId"),
+        (
+            json!({ "query": "x", "updatedFrom": "gestern" }),
+            "updatedFrom",
+        ),
+        (
+            json!({ "query": "x", "updatedBefore": "2026-13-01" }),
+            "updatedBefore",
+        ),
+        (json!({ "query": "x", "limit": 0 }), "limit"),
+        (json!({ "query": "x", "limit": 201 }), "limit"),
+        (
+            json!({ "query": "x", "tagIds": vec!["1f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c"; 51] }),
+            "tagIds",
+        ),
+    ] {
+        let error = call(&app, "search_query", request.clone()).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    let error = call(&app, "search_rebuild", json!({ "all": true })).unwrap_err();
+    assert_uniform_error(&error, "request");
+    app.shut_down();
+}

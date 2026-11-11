@@ -88,6 +88,8 @@ fn main() {
         "media_import_commit",
         "media_import_cancel",
         "structure_history",
+        "search_query",
+        "search_rebuild",
         "external_open",
         "external_read",
         "external_check",
