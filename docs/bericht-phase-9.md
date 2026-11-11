@@ -97,11 +97,12 @@ Keine bekannten.
 
 ## Behobene Fehler
 
-F-46 bis F-49 in `docs/status.md`:
+F-46 bis F-50 in `docs/status.md`:
 
 - **F-46** (Widerspruch, entschieden): `quick_check` beim Start brauchte mit dem Suchindex 4,1 s.
 - **F-47** (Fehler der Suche, von einem Rust-Test gefunden): `C++` fand jeden Text mit einem einzelnen `C`, weil der Wortindex die Zeichen verliert.
 - **F-48** (Leistung, von der E2E-Messung gefunden): Ein einzelnes Zeichen als Wortanfang brauchte im Programm 350 ms; jetzt ganzes Wort, und 50 statt 100 Treffer.
+- **F-50** (Fehler eines Tests, CI-Lauf 108 unter Linux): Der Kürzel-Konflikttest lud die Seite neu, bevor die App die Tabs gespeichert hatte (2 s nach einer Änderung; beim Beenden sofort); dann kam die leere Sitzung des vorigen Starts zurück. Der Test wartet jetzt, bis Rust die offenen Tabs hält. Wahrscheinlich war das auch die Ursache von F-44 unter Windows in Phase 8.
 - **F-49** (Fehler der Tests): Ein Phase-1-Test legte die Suchtabellen selbst an, die es seit Migration 0009 gibt; die Workbench-Prüfung erwartete die alte Activity Bar; der E2E-Test tippte ein Suchwort, das schon im Feld stand (keine neue Suche); zwei Vitest-Erwartungen nannten deutsche Texte, die Tests laufen auf Englisch.
 
 ## Gefundene Widersprüche und Abweichungen
@@ -120,7 +121,23 @@ F-46 bis F-49 in `docs/status.md`:
 
 ## CI
 
-CI_ABSCHNITT
+Zwischenstände trugen `[skip ci]` in der Betreffzeile.
+
+- **Lauf 108** (Commit `8368d30`): Audit, Release-Prüfung und Windows vollständig grün (E2E 17 von 17 Dateien). Linux: alle Prüfungen grün bis auf einen E2E-Test, den Kürzel-Konflikttest aus Phase 3 (F-50, ein Fehler des Tests). Die Werte beider Systeme stehen unten.
+- **Lauf 109** (Korrektur von F-50): LAUF_109
+
+Werte aus Lauf 108 (volle Referenzbibliothek):
+
+| Wert (Ziel)                                                                  | Linux        | Windows          |
+| ---------------------------------------------------------------------------- | ------------ | ---------------- |
+| Suche, erste Treffer auf dem Bildschirm, 60 ms Pause eingerechnet (≤ 300 ms) | 97–175 ms    | 108–204 ms       |
+| Explorer steht nach dem Öffnen (≤ 1 s)                                       | 476–575 ms   | 977–992 ms       |
+| Auf- und Zuklappen, 95 % (≤ 100 ms)                                          | 32 ms        | 47,8 ms          |
+| Tag-Filter (≤ 100 ms)                                                        | 48 ms        | 31,0 ms          |
+| Scrollen im Explorer, 95 % (≤ 33 ms)                                         | 18–19 ms     | 15,7 ms          |
+| Galerie, erster und zweiter Durchgang, 95 %                                  | 39 und 25 ms | 17,3 und 17,3 ms |
+
+Die Windows-Werte des Explorers liegen wie in Phase 8 knapp unter 1 s (Phase 8, Lauf 107: 946–1.085 ms).
 
 ## Nächster Schritt
 
