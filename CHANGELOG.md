@@ -4,6 +4,21 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 9 – Suche
+
+#### Hinzugefügt
+
+- Globale Suche (`Ctrl + Shift + F`, Activity Bar, Menü „Bearbeiten“) als Seitenleiste neben dem Explorer: Titel, Inhalte, Tags, Medien (Titel, Beschreibung, Dateiname), Subnetze und Metadaten.
+- `Muller` und `Mueller` finden `Müller`, `Strasse` findet `Straße` (Schreibvarianten `ß`/`ss`, `ä`/`ae`, `ö`/`oe`, `ü`/`ue`), `haus` findet `Krankenhaus` (Teilwörter ab drei Zeichen). Ganze Wörter und Wortanfänge stehen vor Teilwörtern; Titel zählen mehr als Tags, Subnetze, Metadaten und Inhalt. Eingaben wie `C++` oder ein einzelnes `"` sind kein Fehler.
+- Filter: Typ, Tags (alle müssen zutreffen), Subnetz mit Untersubnetzen, Änderungsdatum, nur Favoriten, Archiv und Papierkorb einbeziehen. Archivierte und gelöschte Elemente erscheinen nur über den Filter.
+- Trefferliste mit Textausschnitt und markiertem Suchwort, Pfeiltasten, Bild auf/ab und Enter; ein Dokument öffnet an der Fundstelle (Suchleiste mit dem Wort), ein Medium in seiner Ansicht, Subnetze und Elemente im Papierkorb im Explorer.
+- „Suchindex neu aufbauen“ in den Einstellungen der Bibliothek und in der Befehlspalette.
+- Migration 0009 (`search_entries`, `search_words`, `search_parts`): Der Index wird in derselben Transaktion wie die Daten aktualisiert; das erste Öffnen nach der Aktualisierung trägt den Text der Dokumente nach.
+
+#### Geändert
+
+- Beim Öffnen einer Bibliothek auf einem lokalen Datenträger prüft `quick_check` jede Tabelle einzeln; die ganze Datenbank prüft die App 10 s später im Hintergrund und baut bei einem Fehler den Suchindex neu auf (ADR 0020, Punkt 14). In Sync-Ordnern und auf Netzlaufwerken bleibt die vollständige Prüfung beim Öffnen.
+
 ### Phase 8 – Medien
 
 #### Hinzugefügt

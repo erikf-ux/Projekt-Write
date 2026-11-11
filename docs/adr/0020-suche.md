@@ -1,6 +1,6 @@
 # ADR 0020 – Suche: Index, Anfragen, Filter und Aktualität
 
-- Status: vorgeschlagen (Phase 9 in Arbeit; die Oberfläche folgt)
+- Status: angenommen
 - Datum: 11. November 2026
 - Phase: 9
 
@@ -36,7 +36,7 @@ Abschnitt 19 legt die beiden FTS5-Tabellen fest (`search_words` mit `unicode61 r
 
 7. **Anfragen baut Rust.** Die Eingabe wird an Leerraum geteilt, in Kleinbuchstaben gewandelt, Wiederholungen entfallen; höchstens 16 Wörter zu je 100 Zeichen, die ganze Anfrage höchstens 1.000 Zeichen. Ein Wort ohne Buchstaben und Ziffern (`"`, `+`, `-`) wird ignoriert; bleibt nichts, ist das Ergebnis leer – ohne Fehler. Jedes Wort wird gequotet (`"` verdoppelt) und um seine Schreibvarianten erweitert (`ß`/`ss`, `ä`/`ae`, `ö`/`oe`, `ü`/`ue`, in beide Richtungen, je Paar alle Vorkommen zugleich, höchstens acht Varianten je Wort). Alle Wörter müssen zutreffen (`AND`).
 
-8. **Wortindex.** Jede Variante als Wortanfang (`"strasse"*`). Ein Wort, das auf ein Zeichen endet (`C++`), gilt nur als ganzes Wort: `"c++"*` hieße „alles, was mit c beginnt“. Weil der Wortindex Zeichen verliert (`C++` wird `c`), muss ein Wort mit Zeichen ab drei Zeichen zusätzlich wörtlich in Titel oder Inhalt stehen (Abfrage im Teilwortindex); sonst fände `C++` jeden Text mit einem einzelnen `C`. Kürzere Wörter mit Zeichen (`C#`) bleiben bei der losen Bedeutung.
+8. **Wortindex.** Jede Variante als Wortanfang (`"strasse"*`). Ein Wort, das auf ein Zeichen endet (`C++`), gilt nur als ganzes Wort: `"c++"*` hieße „alles, was mit c beginnt“. Weil der Wortindex Zeichen verliert (`C++` wird `c`), muss ein Wort mit Zeichen ab drei Zeichen zusätzlich wörtlich in Titel oder Inhalt stehen (Abfrage im Teilwortindex); sonst fände `C++` jeden Text mit einem einzelnen `C`. Kürzere Wörter mit Zeichen (`C#`) bleiben bei der losen Bedeutung. Ein einzelnes Zeichen (`e`) gilt ebenfalls nur als ganzes Wort: Als Wortanfang trifft es fast jeden Text (in der App mit der Referenzbibliothek 350 ms), und der Präfixindex aus Abschnitt 19 beginnt bei zwei Zeichen.
 
 9. **Teilwortindex.** Wörter ab drei Zeichen als Teilwort (`"haus"` findet `Krankenhaus`); kürzere Wörter derselben Anfrage müssen im Wortindex zutreffen. Treffer, die schon der Wortindex lieferte, werden übersprungen.
 
@@ -52,12 +52,19 @@ Abschnitt 19 legt die beiden FTS5-Tabellen fest (`search_words` mit `unicode61 r
     - **WAL-Modus** (lokale Datenträger): Beim Öffnen prüft `quick_check` jede Tabelle einzeln mit ihren Indizes (`pragma_quick_check(<Tabelle>)`), die Schattentabellen von FTS5 eingeschlossen; nur die Neuzerlegung entfällt. 10 s nach dem Öffnen prüft ein Hintergrundauftrag die ganze Datenbank über einen Lesezugang; im WAL-Modus hält das niemanden auf. Scheitert die Prüfung, wird der Suchindex neu aufgebaut (er hält nur abgeleitete Daten) und erneut geprüft; scheitert sie dann noch, steht das im Protokoll (`DatabaseCheck::Failed`). Schließen bricht den Auftrag ab.
     - **Rollback-Journal** (Sync-Ordner, Netzlaufwerke): Ein langes Lesen hielte dort jedes Schreiben auf; deshalb bleibt es beim `quick_check` der ganzen Datenbank beim Öffnen.
     - Was die Einzelprüfung nicht abdeckt: Seiten der Freiliste und Seiten, die keiner Tabelle gehören. Beides prüft der Hintergrundauftrag; `integrity_check` nach Backup und Wiederherstellung bleibt (Abschnitt 21).
-    - Offen: Die Oberfläche zeigt `Failed` noch nicht an; das kommt mit der Oberfläche der Suche.
+    - Offen: Die Oberfläche zeigt `Failed` noch nicht an; das Ergebnis steht im Protokoll. Ein Hinweis in der Oberfläche gehört zu „Datenintegrität“ und kommt mit Backup und Wiederherstellung (Phase 10).
+
+15. **Oberfläche** (Abschnitt 11: „Seitenleiste mit Explorer oder Suche“). Die Seitenleiste zeigt Explorer oder Suche; die Activity Bar, `Ctrl + Shift + F` („Global suchen“, auch im Menü „Bearbeiten“) und `Ctrl + Shift + E` schalten um. Der Explorer bleibt unter der Suche eingehängt, damit Baum und Scrollstellung bleiben. Welche Seitenleiste zuletzt offen war, merkt sich die App nicht über einen Neustart hinaus.
+    - Die Suche startet 60 ms nach dem letzten Tastendruck; eine Antwort, die eine neuere Anfrage überholt hat, wird verworfen. Ein Filter sucht sofort neu. 50 Treffer je Anfrage.
+    - Trefferliste als `listbox`; das Feld behält den Fokus, Pfeiltasten, Bild auf/ab und Enter wirken aus dem Feld und aus der Liste. Jeder Treffer zeigt Art (Symbol und Text für Screenreader), Titel, Favorit/Archiv/Papierkorb und den Ausschnitt mit `<mark>`.
+    - **Öffnen an der Fundstelle:** Ein Dokument öffnet im Tab; die Suchleiste des Dokuments sucht das erste markierte Wort des Ausschnitts, der erste Treffer wird ausgewählt und ins Bild gescrollt. Ein Medium öffnet in seiner Ansicht, ein Subnetz wird im Explorer gezeigt, ein Element im Papierkorb in der Gruppe „Papierkorb“ (dort lässt es sich wiederherstellen).
+    - Datumsfilter in Ortszeit: „ab“ ab Mitternacht des Tages, „bis“ einschließlich des ganzen Tages.
+    - „Suchindex neu aufbauen“ in Einstellungen › Bibliothek und in der Befehlspalette, mit Rückmeldung (Zahl der Dokumente, unlesbare Dateien).
 
 ## Folgen
 
 - Kein Pfad zum Index ohne Transaktion: Trigger und `References` decken jeden Schreibweg ab; Tests prüfen Anlegen, Speichern, Umbenennen, Tags, Subnetze, Medien, Papierkorb, Struktur-Undo, endgültiges Löschen und den Neuaufbau, jeweils mit gleicher Zahl von Einträgen und FTS-Zeilen.
 - Migration 0009 indexiert alles außer dem Text der Dokumente sofort; den Text trägt das erste Öffnen nach (einmalig, je nach Größe der Bibliothek einige Sekunden).
-- Speicherbedarf mit der Referenzbibliothek (81 MB Text): Datenbank 480 MB, davon Teilwortindex 187 MB, Wortindex 62 MB und zweimal rund 90 MB gespeicherter Text. Öffnen 0,64 s, langsamste von 16 Suchen 149–162 ms (Container, Debug-Build mit optimiertem SQLite).
+- Speicherbedarf mit der Referenzbibliothek (81 MB Text): Datenbank 480 MB, davon Teilwortindex 187 MB, Wortindex 62 MB und zweimal rund 90 MB gespeicherter Text. Öffnen 0,64 s; langsamste von 16 Suchen in Rust 65 ms, in der App vom Tippen bis zu den Treffern auf dem Bildschirm 122–180 ms einschließlich der Pause von 60 ms (Container, Debug-Build mit optimiertem SQLite).
 - Markdown erscheint im Ausschnitt als Quelltext (`**fett**`). Ein Ausschnitt ohne Markdown-Zeichen wäre eine spätere Verbesserung.
 - Eine deutsche Wortstammsuche (Abschnitt 19: später) und eine lokale semantische Suche bleiben offen.
