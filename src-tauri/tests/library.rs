@@ -447,11 +447,24 @@ async fn pending_migrations_are_preceded_by_a_checked_backup() {
     assert_eq!(report.schema_version_before, 1);
     assert_eq!(report.schema_version, Database::supported_version());
     let backup = report.migration_backup.expect("backup before migrating");
-    assert!(backup.starts_with("backups/pre-migration/projectwrite-schema-1-"));
+    assert!(
+        backup.starts_with("backups/pre-migration/projectwrite-"),
+        "{backup}"
+    );
+    assert!(backup.ends_with(".pwbackup"), "{backup}");
     library.close().await;
 
-    // The copy is a complete, intact schema-1 database with the data.
-    let copy = path.join(&backup);
+    // Since Phase 10 a full backup (ADR 0021): restored, its database is
+    // a complete, intact schema-1 database with the data.
+    let restored = dir.path().join("restored");
+    project_write_lib::services::backup::restore(
+        &path.join(&backup),
+        &restored,
+        std::sync::Arc::new(|_| {}),
+    )
+    .await
+    .unwrap();
+    let copy = restored.join("database/projectwrite.db");
     assert!(diagnostics::integrity_check_file(&copy).await.unwrap());
     let copy_db = Database::open_existing(&copy, JournalMode::Rollback)
         .await
@@ -492,14 +505,12 @@ async fn only_the_newest_pre_migration_backups_are_kept() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();
-    // 6 old + 1 new = 7 copies, the 5 newest stay; foreign files stay too.
-    assert_eq!(names.len(), 6, "{names:?}");
+    // Copies of earlier versions: of 6 the 5 newest stay; the full backup
+    // of this migration and foreign files stay too.
+    assert_eq!(names.len(), 7, "{names:?}");
     assert!(names.contains(&"my-own-copy.db".to_owned()));
-    assert!(
-        !names
-            .iter()
-            .any(|n| n.contains("20261001") || n.contains("20261002"))
-    );
+    assert!(!names.iter().any(|n| n.contains("20261001")));
+    assert!(names.iter().any(|n| n.contains("20261002")));
     let newest = Path::new(&report.migration_backup.unwrap())
         .file_name()
         .unwrap()

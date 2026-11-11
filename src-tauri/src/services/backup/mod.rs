@@ -481,22 +481,34 @@ impl Backups {
     async fn library_files(&self) -> Result<Vec<String>, BackupError> {
         let pool = self.database.writer();
         let database = |error: sqlx::Error| BackupError::Database(error.to_string());
+        // Before a migration the schema can be old: a table that does not
+        // exist yet has no files.
+        let tables: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM sqlite_schema WHERE type = 'table'")
+                .fetch_all(pool)
+                .await
+                .map_err(database)?;
+        let has = |table: &str| tables.iter().any(|name| name == table);
         let mut files = vec![MANIFEST_FILE.to_owned()];
-        for (id, format) in crate::database::documents::all_file_keys(pool)
-            .await
-            .map_err(database)?
-        {
-            let format =
-                DocumentFormat::parse(&format).ok_or_else(|| refused("unknown document format"))?;
-            let id = Uuid::try_parse(&id).map_err(|_| refused("document id"))?;
-            files.push(format.relative_path(id));
+        if has("documents") {
+            for (id, format) in crate::database::documents::all_file_keys(pool)
+                .await
+                .map_err(database)?
+            {
+                let format = DocumentFormat::parse(&format)
+                    .ok_or_else(|| refused("unknown document format"))?;
+                let id = Uuid::try_parse(&id).map_err(|_| refused("document id"))?;
+                files.push(format.relative_path(id));
+            }
         }
-        for (id, kind, extension) in crate::database::media::all_file_keys(pool)
-            .await
-            .map_err(database)?
-        {
-            let kind = MediaKind::parse(&kind).ok_or_else(|| refused("unknown media kind"))?;
-            files.push(media::relative_path(kind, &id, &extension));
+        if has("media") {
+            for (id, kind, extension) in crate::database::media::all_file_keys(pool)
+                .await
+                .map_err(database)?
+            {
+                let kind = MediaKind::parse(&kind).ok_or_else(|| refused("unknown media kind"))?;
+                files.push(media::relative_path(kind, &id, &extension));
+            }
         }
         files.sort();
         Ok(files)

@@ -267,7 +267,15 @@ impl Library {
                     error.into()
                 }
             })?;
-        match Self::prepare_database(&root, &database, &generators, location.journal_mode()).await {
+        match Self::prepare_database(
+            &root,
+            &database,
+            &generators,
+            location.journal_mode(),
+            &manifest,
+        )
+        .await
+        {
             Ok((schema_version_before, schema_version, migration_backup)) => {
                 if let Err(error) = media::recover_imports(&root, &database, &import_journals).await
                 {
@@ -343,6 +351,7 @@ impl Library {
         database: &Database,
         generators: &Generators,
         journal: JournalMode,
+        manifest: &LibraryManifest,
     ) -> Result<(i64, i64, Option<String>), LibraryError> {
         // WAL: every table now, the whole database in the background (ADR
         // 0020, decision 14). Rollback journal: a long read there holds
@@ -373,7 +382,7 @@ impl Library {
             .into());
         }
         let backup = if before > 0 && before < supported {
-            Some(backup_before_migration(root, database, before, generators).await?)
+            Some(backup_before_migration(root, database, before, generators, manifest).await?)
         } else {
             None
         };
@@ -720,31 +729,43 @@ async fn backup_before_migration(
     database: &Database,
     version: i64,
     generators: &Generators,
+    manifest: &LibraryManifest,
 ) -> Result<String, LibraryError> {
+    // Section 21: a full backup before every migration (ADR 0021,
+    // decision 7). Nothing else runs yet, so the lock is a fresh one.
     root.create_dir_all(PRE_MIGRATION_BACKUPS_DIR)?;
-    let relative = format!(
-        "{PRE_MIGRATION_BACKUPS_DIR}/projectwrite-schema-{version}-{}.db",
-        generators.now().to_compact()
+    let target = root.resolve(PRE_MIGRATION_BACKUPS_DIR)?;
+    let backups = crate::services::backup::Backups::new(
+        root.clone(),
+        database.clone(),
+        generators.clone(),
+        Arc::new(tokio::sync::Mutex::new(())),
+        manifest.id,
+        manifest.format_version,
     );
-    let target = root.resolve(&relative)?;
-    let failed = |reason: String| {
-        let _ = fs::remove_file(&target);
-        LibraryError::BackupFailed(reason)
-    };
-    database
-        .vacuum_into(&target)
+    let outcome = backups
+        .create(
+            &target,
+            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            |_| {},
+        )
         .await
-        .map_err(|error| failed(error.to_string()))?;
-    match diagnostics::integrity_check_file(&target).await {
-        Ok(true) => {}
-        Ok(false) => return Err(failed("integrity check of the copy failed".to_owned())),
-        Err(error) => return Err(failed(error.to_string())),
-    }
+        .map_err(|error| LibraryError::BackupFailed(error.to_string()))?;
+    crate::services::backup::prune(&target, manifest.id, PRE_MIGRATION_BACKUPS_KEPT)?;
     prune_pre_migration_backups(root)?;
-    log::info!("database copied to {relative} before migrating from schema {version}");
+    let name = outcome
+        .path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_owned();
+    let relative = format!("{PRE_MIGRATION_BACKUPS_DIR}/{name}");
+    log::info!("library backed up to {relative} before migrating from schema {version}");
     Ok(relative)
 }
 
+/// Database copies of versions before Phase 10 (`projectwrite-schema-*.db`):
+/// the newest five stay.
 fn prune_pre_migration_backups(root: &SafeRoot) -> Result<(), LibraryError> {
     let dir = root.resolve(PRE_MIGRATION_BACKUPS_DIR)?;
     let mut copies: Vec<PathBuf> = fs::read_dir(&dir)?
