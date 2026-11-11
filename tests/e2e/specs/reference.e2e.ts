@@ -21,6 +21,9 @@
  * through thumbnails it has not loaded yet and once more through the same
  * stretch; the values are logged for the report.
  *
+ * Phase 9 measures the global search: from typing a query to its hits on
+ * screen, against the target of section 6 (300 ms).
+ *
  * Runs in a new app process after reference-prepare.e2e.ts.
  */
 import { $, browser, expect } from '@wdio/globals';
@@ -35,6 +38,10 @@ const FILTER_LIMIT_MS = 200;
 const FRAME_LIMIT_MS = 50;
 /** Gallery, first pass through not yet loaded thumbnails (Phase 8). */
 const GALLERY_FIRST_PASS_LIMIT_MS = 150;
+/** Global search, first hits (section 6: 300 ms; Phase 9). */
+const SEARCH_LIMIT_MS = 300;
+/** The pause of the search field after the last keystroke (searchStore.ts). */
+const SEARCH_DELAY_MS = 60;
 
 function percentile(values: number[], share: number): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -276,5 +283,65 @@ describe('Gallery with the reference library (Phase 8)', () => {
     // thumbnail) a limit that catches a regression (bericht-phase-8.md).
     expect(percentile(result.again, 0.95)).toBeLessThanOrEqual(FRAME_LIMIT_MS);
     expect(percentile(result.first, 0.95)).toBeLessThanOrEqual(GALLERY_FIRST_PASS_LIMIT_MS);
+  });
+});
+
+describe('Search with the reference library (Phase 9)', () => {
+  it('shows the first hits within 300 ms (section 6)', async () => {
+    await browser.keys(['Control', 'Shift', 'f']);
+    await $('[data-testid="search-field"]').waitForDisplayed();
+    const queries = [
+      'Krankenhaus',
+      'haus',
+      'Muller',
+      'Mueller',
+      'Strasse',
+      'C++',
+      'Kapitel',
+      'e',
+      'zuerich',
+      'Literatur Quelle Zitat',
+    ];
+    const samples = await browser.execute(async (texts: string[]) => {
+      const field = document.querySelector<HTMLInputElement>('[data-testid="search-field"]');
+      if (!field) {
+        throw new Error('no search field');
+      }
+      const shown = () => performance.getEntriesByName('pw:search-shown');
+      const results: { query: string; ms: number; hits: number }[] = [];
+      // Twice: the first round also warms SQLite's page cache.
+      for (let round = 0; round < 2; round += 1) {
+        for (const text of texts) {
+          const before = shown().length;
+          field.focus();
+          field.select();
+          const start = performance.now();
+          // eslint-disable-next-line @typescript-eslint/no-deprecated -- the path the WebDriver types on
+          document.execCommand('insertText', false, text);
+          const until = start + 10_000;
+          while (shown().length === before && performance.now() < until) {
+            await new Promise((resolve) => setTimeout(resolve, 2));
+          }
+          const mark = shown()[before];
+          if (round === 1) {
+            results.push({
+              query: text,
+              ms: mark ? mark.startTime - start : Number.POSITIVE_INFINITY,
+              hits: document.querySelectorAll('[data-testid="search-results"] [data-hit]').length,
+            });
+          }
+        }
+      }
+      return results;
+    }, queries);
+    console.log(
+      `Search in the reference library (${process.platform}), from typing to hits on screen (${String(SEARCH_DELAY_MS)} ms pause included): ${samples
+        .map((sample) => `${sample.query} ${sample.ms.toFixed(0)} ms (${String(sample.hits)})`)
+        .join('; ')}`,
+    );
+    for (const sample of samples) {
+      expect(sample.hits).toBeGreaterThan(0);
+    }
+    expect(Math.max(...samples.map((sample) => sample.ms))).toBeLessThanOrEqual(SEARCH_LIMIT_MS);
   });
 });

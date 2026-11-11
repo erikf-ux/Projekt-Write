@@ -181,13 +181,13 @@ describe('Project Write – Phase 3 workbench', () => {
     await expect($('[data-testid="explorer"]')).toBeDisplayed();
     await expect($('[data-testid="status-bar"]')).toBeDisplayed();
     await expect($('[data-testid="status-rollback"]')).toBeDisplayed();
-    // Explorer and writing surface; search and Mesh come with their phases.
+    // Explorer, search (Phase 9) and writing surface; the Mesh comes with its phase.
     const views = await $$('[data-testid="activity-bar"] button').getElements();
     const commands: string[] = [];
     for (const view of views) {
       commands.push((await view.getAttribute('data-command')) ?? '');
     }
-    expect(commands).toEqual(['explorer.focus', 'editor.focus', 'settings.open']);
+    expect(commands).toEqual(['explorer.focus', 'search.focus', 'editor.focus', 'settings.open']);
     // The document of the first start is in the Explorer.
     await expect($('[data-testid="explorer"] [data-group-member="unassigned"]')).toHaveText(
       expect.stringContaining('Unbenannt'),
