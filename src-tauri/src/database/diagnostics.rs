@@ -27,6 +27,32 @@ pub async fn foreign_keys_enabled(pool: &SqlitePool) -> Result<bool, sqlx::Error
     Ok(value == 1)
 }
 
+/// `PRAGMA quick_check` of every table that holds rows, one table at a time
+/// (with its indexes), without the FTS5 tables themselves. Since SQLite 3.44
+/// a check of the whole database also re-tokenises the full text of every
+/// FTS5 table (ADR 0020, decision 14); their shadow tables, which hold the
+/// pages, are checked here like any other table. Pages on the freelist are
+/// only covered by the check of the whole database.
+pub async fn quick_check_tables(pool: &SqlitePool) -> Result<bool, sqlx::Error> {
+    let tables: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM sqlite_schema \
+         WHERE type = 'table' AND sql NOT LIKE 'CREATE VIRTUAL TABLE%' ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+    for table in tables {
+        let rows: Vec<String> = sqlx::query_scalar("SELECT * FROM pragma_quick_check(?1)")
+            .bind(&table)
+            .fetch_all(pool)
+            .await?;
+        if rows.len() != 1 || rows[0] != "ok" {
+            log::error!("quick_check of {table}: {}", rows.join("; "));
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// `PRAGMA quick_check` (section 18: run at start). `true` means `ok`.
 pub async fn quick_check(pool: &SqlitePool) -> Result<bool, sqlx::Error> {
     let rows: Vec<String> = sqlx::query_scalar("PRAGMA quick_check")

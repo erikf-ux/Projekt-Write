@@ -9,7 +9,9 @@
 //! 4. Read the import journals in `tmp/` (ADR 0019), then empty `tmp/`.
 //! 5. Classify the location: WAL locally, rollback journal in sync folders
 //!    and on network drives.
-//! 6. Open the database, `PRAGMA quick_check`.
+//! 6. Open the database, `PRAGMA quick_check`: in WAL mode table by table
+//!    (the whole database follows in the background, ADR 0020), with a
+//!    rollback journal of the whole database.
 //! 7. Refuse a newer schema; before pending migrations copy the database to
 //!    `backups/pre-migration/` and check the copy; then migrate.
 //! 8. Remove the files of unfinished imports (their journals name them),
@@ -170,6 +172,10 @@ pub struct Library {
     journal: Arc<std::sync::Mutex<Journal>>,
     /// Prepared media imports (ADR 0019), for this opening only.
     imports: Arc<std::sync::Mutex<media::import::Batches>>,
+    /// Result of the check of the whole database (ADR 0020, decision 14).
+    check: Arc<std::sync::Mutex<DatabaseCheck>>,
+    /// The check running in the background; stopped when the library closes.
+    check_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     // Declared last: released after everything else.
     _lock: LibraryLock,
 }
@@ -213,7 +219,12 @@ impl Library {
             documents: DocumentScan::default(),
         };
         Ok((
-            Self::assemble(root, manifest, location, database, generators, lock),
+            {
+                let library = Self::assemble(root, manifest, location, database, generators, lock);
+                // A new database: nothing to check.
+                *lock_check(&library.check) = DatabaseCheck::Passed;
+                library
+            },
             report,
         ))
     }
@@ -256,7 +267,7 @@ impl Library {
                     error.into()
                 }
             })?;
-        match Self::prepare_database(&root, &database, &generators).await {
+        match Self::prepare_database(&root, &database, &generators, location.journal_mode()).await {
             Ok((schema_version_before, schema_version, migration_backup)) => {
                 if let Err(error) = media::recover_imports(&root, &database, &import_journals).await
                 {
@@ -312,6 +323,11 @@ impl Library {
                 if let Err(error) = library.search().fill_stale().await {
                     log::warn!("search index not completed: {error}");
                 }
+                if library.journal_mode() == JournalMode::Wal {
+                    library.start_background_check(BACKGROUND_CHECK_DELAY);
+                } else {
+                    *lock_check(&library.check) = DatabaseCheck::Passed;
+                }
                 Ok((library, report))
             }
             Err(error) => {
@@ -326,8 +342,16 @@ impl Library {
         root: &SafeRoot,
         database: &Database,
         generators: &Generators,
+        journal: JournalMode,
     ) -> Result<(i64, i64, Option<String>), LibraryError> {
-        match diagnostics::quick_check(database.writer()).await {
+        // WAL: every table now, the whole database in the background (ADR
+        // 0020, decision 14). Rollback journal: a long read there holds
+        // back every write, so the whole check runs now.
+        let check = match journal {
+            JournalMode::Wal => diagnostics::quick_check_tables(database.writer()).await,
+            JournalMode::Rollback => diagnostics::quick_check(database.writer()).await,
+        };
+        match check {
             Ok(true) => {}
             Ok(false) => return Err(LibraryError::DatabaseDamaged),
             Err(error) => {
@@ -377,6 +401,8 @@ impl Library {
             write_lock: Arc::new(tokio::sync::Mutex::new(())),
             journal: Arc::new(std::sync::Mutex::new(Journal::default())),
             imports: Arc::new(std::sync::Mutex::new(media::import::Batches::default())),
+            check: Arc::new(std::sync::Mutex::new(DatabaseCheck::Pending)),
+            check_task: std::sync::Mutex::new(None),
             _lock: lock,
         }
     }
@@ -488,13 +514,104 @@ impl Library {
         }
     }
 
+    /// Result of the check of the whole database so far.
+    pub fn database_check(&self) -> DatabaseCheck {
+        *lock_check(&self.check)
+    }
+
+    /// Checks the whole database now (`PRAGMA quick_check` on a read-only
+    /// connection) and repairs the search index if that is what fails: it
+    /// holds nothing but data derived from the tables and files.
+    pub async fn check_database(&self) -> DatabaseCheck {
+        let outcome = check_whole_database(&self.database, &self.search()).await;
+        *lock_check(&self.check) = outcome;
+        outcome
+    }
+
+    /// Runs [`Self::check_database`] after `delay`, in the background: in WAL
+    /// mode the read blocks no one. Started once per opening.
+    fn start_background_check(&self, delay: std::time::Duration) {
+        let database = self.database.clone();
+        let search = self.search();
+        let check = self.check.clone();
+        let task = tokio::spawn(async move {
+            tokio::time::sleep(delay).await;
+            let outcome = check_whole_database(&database, &search).await;
+            *lock_check(&check) = outcome;
+        });
+        *self
+            .check_task
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(task);
+    }
+
     /// Closes the database, then releases the lock.
     pub async fn close(self) {
         let id = self.manifest.id;
+        if let Some(task) = self
+            .check_task
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+        {
+            task.abort();
+        }
         // Wait for running writes to finish.
         let _guard = self.write_lock.lock().await;
         self.database.close().await;
         log::info!("library {id} closed");
+    }
+}
+
+/// Seconds after opening until the whole database is checked: the interface
+/// loads first.
+pub const BACKGROUND_CHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Outcome of the check of the whole database (ADR 0020, decision 14).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DatabaseCheck {
+    /// Not run yet (WAL: it runs in the background after opening).
+    Pending,
+    /// `quick_check` reported `ok`.
+    Passed,
+    /// It failed, the search index was rebuilt, and then it passed.
+    RepairedSearchIndex,
+    /// It fails with a rebuilt search index too, or could not run.
+    Failed,
+}
+
+fn lock_check(check: &std::sync::Mutex<DatabaseCheck>) -> std::sync::MutexGuard<'_, DatabaseCheck> {
+    check
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+async fn check_whole_database(database: &Database, search: &SearchIndex) -> DatabaseCheck {
+    match diagnostics::quick_check(database.reader()).await {
+        Ok(true) => return DatabaseCheck::Passed,
+        Ok(false) => log::error!("database check failed; rebuilding the search index"),
+        Err(error) => {
+            log::error!("database check not run: {error}");
+            return DatabaseCheck::Failed;
+        }
+    }
+    if let Err(error) = search.rebuild().await {
+        log::error!("search index not rebuilt: {error}");
+        return DatabaseCheck::Failed;
+    }
+    match diagnostics::quick_check(database.reader()).await {
+        Ok(true) => {
+            log::warn!("search index rebuilt after a failed database check");
+            DatabaseCheck::RepairedSearchIndex
+        }
+        Ok(false) => {
+            log::error!("database check fails with a rebuilt search index too");
+            DatabaseCheck::Failed
+        }
+        Err(error) => {
+            log::error!("database check not run: {error}");
+            DatabaseCheck::Failed
+        }
     }
 }
 

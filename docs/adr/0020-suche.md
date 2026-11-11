@@ -48,10 +48,16 @@ Abschnitt 19 legt die beiden FTS5-Tabellen fest (`search_words` mit `unicode61 r
 
 13. **Befehle.** `search_query` (Anfrage und Filter, geprüft wie jeder Befehl: unbekannte Felder, IDs, Zeiten, Grenzen) und `search_rebuild` („Suchindex neu aufbauen“: leert beide FTS-Tabellen und `search_entries`, baut sie aus den Tabellen neu auf und liest die Dateien). Beide über die Bibliothekssitzung; Lesen über die Lesezugänge, Schreiben unter der Schreibsperre der Bibliothek.
 
+14. **Prüfung beim Start** (Abschnitt 18: `PRAGMA quick_check` beim Start). Seit SQLite 3.44 ruft `quick_check` der ganzen Datenbank auch die Integritätsprüfung jeder FTS5-Tabelle auf; sie zerlegt den ganzen Text neu. Mit der Referenzbibliothek: 4,1 s für die ganze Datenbank, 0,19 s für alle Tabellen einzeln; das Öffnen dauerte 4,8 s, Widerspruch zum Kaltstart ≤ 2 s (Abschnitt 6, F-46). Entscheidung (Vorschlag aus dem Bericht, „Fahre fort“):
+    - **WAL-Modus** (lokale Datenträger): Beim Öffnen prüft `quick_check` jede Tabelle einzeln mit ihren Indizes (`pragma_quick_check(<Tabelle>)`), die Schattentabellen von FTS5 eingeschlossen; nur die Neuzerlegung entfällt. 10 s nach dem Öffnen prüft ein Hintergrundauftrag die ganze Datenbank über einen Lesezugang; im WAL-Modus hält das niemanden auf. Scheitert die Prüfung, wird der Suchindex neu aufgebaut (er hält nur abgeleitete Daten) und erneut geprüft; scheitert sie dann noch, steht das im Protokoll (`DatabaseCheck::Failed`). Schließen bricht den Auftrag ab.
+    - **Rollback-Journal** (Sync-Ordner, Netzlaufwerke): Ein langes Lesen hielte dort jedes Schreiben auf; deshalb bleibt es beim `quick_check` der ganzen Datenbank beim Öffnen.
+    - Was die Einzelprüfung nicht abdeckt: Seiten der Freiliste und Seiten, die keiner Tabelle gehören. Beides prüft der Hintergrundauftrag; `integrity_check` nach Backup und Wiederherstellung bleibt (Abschnitt 21).
+    - Offen: Die Oberfläche zeigt `Failed` noch nicht an; das kommt mit der Oberfläche der Suche.
+
 ## Folgen
 
 - Kein Pfad zum Index ohne Transaktion: Trigger und `References` decken jeden Schreibweg ab; Tests prüfen Anlegen, Speichern, Umbenennen, Tags, Subnetze, Medien, Papierkorb, Struktur-Undo, endgültiges Löschen und den Neuaufbau, jeweils mit gleicher Zahl von Einträgen und FTS-Zeilen.
 - Migration 0009 indexiert alles außer dem Text der Dokumente sofort; den Text trägt das erste Öffnen nach (einmalig, je nach Größe der Bibliothek einige Sekunden).
-- Speicherbedarf: Text zweimal (Wort- und Teilwortindex) plus Trigramm-Index. Werte mit der Referenzbibliothek im Bericht.
+- Speicherbedarf mit der Referenzbibliothek (81 MB Text): Datenbank 480 MB, davon Teilwortindex 187 MB, Wortindex 62 MB und zweimal rund 90 MB gespeicherter Text. Öffnen 0,64 s, langsamste von 16 Suchen 149–162 ms (Container, Debug-Build mit optimiertem SQLite).
 - Markdown erscheint im Ausschnitt als Quelltext (`**fett**`). Ein Ausschnitt ohne Markdown-Zeichen wäre eine spätere Verbesserung.
 - Eine deutsche Wortstammsuche (Abschnitt 19: später) und eine lokale semantische Suche bleiben offen.

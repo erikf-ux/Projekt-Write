@@ -725,3 +725,50 @@ async fn first_hits_in_the_reference_library() {
     library.close().await;
     assert!(worst <= std::time::Duration::from_millis(300), "{worst:?}");
 }
+
+/// ADR 0020, decision 14: in WAL mode opening checks every table; the check
+/// of the whole database runs afterwards and rebuilds a damaged search
+/// index.
+#[tokio::test]
+async fn a_damaged_search_index_is_found_and_rebuilt() {
+    use project_write_lib::services::library::DatabaseCheck;
+
+    let dir = common::temp_dir("pw-search-");
+    let path = dir.path().join("lib");
+    let library = create(&path).await;
+    let note = document(
+        &library,
+        "Logbuch",
+        DocumentFormat::Txt,
+        "Kompass und Sextant",
+    )
+    .await;
+    library.close().await;
+
+    let library = open(&path).await;
+    // Still waiting for its turn in the background.
+    assert_eq!(library.database_check(), DatabaseCheck::Pending);
+    assert_eq!(library.check_database().await, DatabaseCheck::Passed);
+
+    // The stored text no longer matches the index.
+    sqlx::query("UPDATE search_words_content SET c1 = 'Ganz anderer Inhalt'")
+        .execute(library.database().writer())
+        .await
+        .unwrap();
+    assert_eq!(
+        library.check_database().await,
+        DatabaseCheck::RepairedSearchIndex
+    );
+    assert_eq!(library.database_check(), DatabaseCheck::RepairedSearchIndex);
+    assert_eq!(
+        ids(&search(&library, "Sextant").await),
+        [note.id.to_string()]
+    );
+    assert!(search(&library, "anderer").await.is_empty());
+    assert_consistent(&library).await;
+    assert_eq!(library.check_database().await, DatabaseCheck::Passed);
+    // Closing does not wait for the check still due in the background.
+    let started = std::time::Instant::now();
+    library.close().await;
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+}

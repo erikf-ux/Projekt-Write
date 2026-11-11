@@ -13,7 +13,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 - Befehle `search_query`, `search_rebuild` mit IPC-Vertragstest; Rust-Tests für alle Abnahmefälle (`tests/search.rs`).
 - Messung mit der vollen Referenzbibliothek (Container, Debug-Build): langsamste von 16 Anfragen 162 ms (Ziel 300 ms).
 
-**Offene Frage an den Auftraggeber (F-46):** Mit dem Suchindex wächst die Datenbank der Referenzbibliothek auf 480 MB (Index rund 430 MB bei 81 MB Text). `PRAGMA quick_check` beim Start (Abschnitt 18) ruft seit SQLite 3.44 auch die Integritätsprüfung der FTS5-Tabellen auf, die den ganzen Text neu zerlegt: 4,1 s statt rund 0,25 s für alle übrigen Tabellen. Das Öffnen beim Start dauert damit 4,8 s – Widerspruch zum Ziel „Kaltstart ≤ 2 s“ (Abschnitt 6). Bis zur Entscheidung ruht die Arbeit an Phase 9.
+**F-46 (entschieden):** `PRAGMA quick_check` der ganzen Datenbank zerlegt seit SQLite 3.44 den Text aller FTS5-Tabellen neu; mit der Referenzbibliothek dauerte das Öffnen 4,8 s. Auf „Fahre fort“ umgesetzt wie vorgeschlagen (ADR 0020, Punkt 14): im WAL-Modus jede Tabelle einzeln beim Öffnen, die ganze Datenbank 10 s später im Hintergrund, bei einem Fehler Neuaufbau des Suchindex; mit Rollback-Journal weiter die ganze Prüfung beim Öffnen. Öffnen jetzt 0,64 s.
 
 Offen in Phase 9: Oberfläche (Suchfeld, Filter, Trefferliste, Navigation zur Fundstelle), Einstellung „Suchindex neu aufbauen“, E2E-Tests mit Messung im echten Programm, Bericht.
 
