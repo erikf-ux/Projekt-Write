@@ -467,6 +467,18 @@ impl Library {
         )
     }
 
+    /// Backups of this library (section 21, ADR 0021).
+    pub fn backups(&self) -> crate::services::backup::Backups {
+        crate::services::backup::Backups::new(
+            self.root.clone(),
+            self.database.clone(),
+            self.generators.clone(),
+            self.write_lock.clone(),
+            self.manifest.id,
+            self.manifest.format_version,
+        )
+    }
+
     /// The search index (section 19, ADR 0020).
     pub fn search(&self) -> SearchIndex {
         SearchIndex::new(

@@ -1,5 +1,6 @@
 //! Backend services. Commands call services; services call the database layer.
 
+pub mod backup;
 pub mod dialog;
 pub mod documents;
 pub mod encoding;

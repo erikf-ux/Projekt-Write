@@ -73,6 +73,19 @@ impl MediaKind {
 }
 
 impl MediaType {
+    /// The whole positive list.
+    pub const ALL: [MediaType; 9] = [
+        MediaType::Png,
+        MediaType::Jpeg,
+        MediaType::Gif,
+        MediaType::Webp,
+        MediaType::Svg,
+        MediaType::Pdf,
+        MediaType::Docx,
+        MediaType::Xlsx,
+        MediaType::Pptx,
+    ];
+
     pub fn kind(self) -> MediaKind {
         match self {
             MediaType::Png
@@ -104,19 +117,9 @@ impl MediaType {
     }
 
     pub fn from_mime_type(mime: &str) -> Option<Self> {
-        [
-            MediaType::Png,
-            MediaType::Jpeg,
-            MediaType::Gif,
-            MediaType::Webp,
-            MediaType::Svg,
-            MediaType::Pdf,
-            MediaType::Docx,
-            MediaType::Xlsx,
-            MediaType::Pptx,
-        ]
-        .into_iter()
-        .find(|candidate| candidate.mime_type() == mime)
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.mime_type() == mime)
     }
 
     /// Whether `extension` (lower case, without dot) names this type.
