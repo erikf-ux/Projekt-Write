@@ -4,13 +4,13 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt und lokal geprüft; CI-Lauf siehe unten; Bericht in `docs/bericht-phase-8.md`. Wartet auf die Freigabe von Phase 9.
+**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt, lokal und in CI geprüft (Lauf 107 grün); Bericht in `docs/bericht-phase-8.md`. Wartet auf die Freigabe von Phase 9.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Entscheidungen: ADR 0019 (Medien, mit Nachträgen); Neubewertung des Isolation Pattern in ADR 0005 (bleibt aus). Die Suche mit Filtern folgt in Phase 9.
 
-CI: Lauf 101 grün (Abschluss Phase 7; Lauf 100 scheiterte an F-32 und F-33). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26).
+CI: Lauf 107 grün (Abschluss Phase 8; Läufe 102 bis 106 mit F-41 bis F-45, siehe Bericht). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 8
 

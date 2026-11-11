@@ -1,6 +1,6 @@
 # Bericht Phase 8 – Medien
 
-Stand: 10. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig). Entwicklungsumgebung: Cloud-Container, Ubuntu 24.04, 4 vCPU, 15 GB RAM, keine GPU (Xvfb, Software-Rendering), WebKitGTK, Rust 1.99.1, Node.js 22. CI: GitHub Actions `windows-latest` und `ubuntu-24.04`; macOS ist auf Wunsch des Auftraggebers zurückgestellt. Entwickelt und geprüft wurde lokal unter Linux; den CI-Lauf nennt der Abschnitt „CI“.
+Stand: 11. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig). Entwicklungsumgebung: Cloud-Container, Ubuntu 24.04, 4 vCPU, 15 GB RAM, keine GPU (Xvfb, Software-Rendering), WebKitGTK, Rust 1.99.1, Node.js 22. CI: GitHub Actions `windows-latest` und `ubuntu-24.04`; macOS ist auf Wunsch des Auftraggebers zurückgestellt. Entwickelt und geprüft wurde lokal unter Linux; den CI-Lauf nennt der Abschnitt „CI“.
 
 **Die vier Abnahmekriterien sind erfüllt**, jeweils in Rust-Tests und im echten Programm (E2E): Originale bleiben bytegleich, ein abgebrochener Import hinterlässt weder Dateien noch Zeilen, ein SVG mit Skript und eine Test-PDF nach dem Muster von CVE-2024-4367 führen nichts aus.
 
@@ -156,7 +156,30 @@ Außerdem fand der vollständige lokale Lauf vor dem CI-Lauf zwei Dinge, die mei
 
 ## CI
 
-CI_ABSCHNITT
+Zwischenstände trugen `[skip ci]`. Ein Push ohne `[skip ci]` startet CI selbst; einen zusätzlichen Lauf von Hand zu starten, war mein Fehler: Die Workflow-Gruppe `concurrency` bricht dann den älteren Lauf ab.
+
+- **Lauf 102** (Commit `ec53ad9`): Der erste Versuch wurde abgebrochen, weil mein zusätzlicher Lauf 103 (von Hand) ihn ablöste; 103 habe ich selbst abgebrochen. Wiederholt: rot. Linux: Lizenzliste wich ab (F-41); Windows: Clippy (F-42). Audit und Release-Prüfung grün, die volle Referenzbibliothek unter Linux reproduzierbar.
+- **Lauf 104** (Commit `6bda567`): Linux vollständig grün (E2E 16 von 16), Windows rot an einem Rust-Test (F-43).
+- **Lauf 105** (Commit `b3c619c`): Windows erstmals bis zu den E2E-Tests, dort 10 von 16 Dateien rot (F-44); Linux grün.
+- **Lauf 106** (Commit `453dd2d`): **grün** auf beiden Systemen, aber der Explorer stand später (F-45).
+- **Lauf 107** (Commit `2cf4531`): **grün**, alle vier Jobs:
+  - Windows und Linux: Prettier, ESLint, Typen, Vitest, rustfmt, Clippy, Rust-Tests, Referenzbibliothek reproduzierbar (Linux voll mit 10.000 Dokumenten und 5.000 Medien, Windows mit 1.000 und 500), erzeugte Typen und Lizenzliste aktuell, E2E 16 von 16 Dateien;
+  - Dependency audit: `cargo audit`, `cargo deny`, `npm audit`;
+  - Release-Build ohne Test-Plugins.
+
+Werte aus Lauf 107 (volle Referenzbibliothek auf beiden Systemen; Windows erzeugte sie in 260 s, Linux in 206 s):
+
+| Wert (Ziel)                                 | Linux        | Windows          |
+| ------------------------------------------- | ------------ | ---------------- |
+| Explorer steht nach dem Öffnen (≤ 1 s)      | 896–941 ms   | 946–1.085 ms     |
+| Auf- und Zuklappen, 95 % (≤ 100 ms)         | 43 ms        | 32,2 ms          |
+| Tag-Filter (≤ 100 ms)                       | 82 ms        | 30,9 ms          |
+| Scrollen im Explorer, 95 % (≤ 33 ms)        | 26–30 ms     | 15,7 ms          |
+| Galerie, erster und zweiter Durchgang, 95 % | 60 und 45 ms | 17,0 und 17,0 ms |
+| Tippen bei 50.000 Wörtern, 95 % (≤ 50 ms)   | 35 ms        | 16,2 ms          |
+| 50.000 Wörter öffnen (≤ 500 ms)             | 257–317 ms   | 192–282 ms       |
+
+**Zum Explorer:** Unter Windows lag einer von drei Werten über 1 s (Phase 7: 817–833 ms). Seit Phase 8 lädt der Start zusätzlich die Liste der 5.000 Medien; der Test prüft gegen die Regressionsgrenze von 1,5 s (F-28). Die Werte schwanken zwischen CI-Rechnern deutlich (Linux in Lauf 104: 530–540 ms, in Lauf 107: 896–941 ms). Ein nächster Schritt wäre, die Medienliste erst zu laden, wenn „Medien“, die Galerie oder ein Subnetz mit Medien sie braucht. Ich schlage vor, das mit der Messung auf dem Referenzgerät zu entscheiden.
 
 ## Nächster Schritt
 
