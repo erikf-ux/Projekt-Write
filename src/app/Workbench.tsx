@@ -11,6 +11,7 @@ import {
   Maximize2,
   PanelLeft,
   Save,
+  Search,
   Settings,
   SquareTerminal,
 } from 'lucide-react';
@@ -48,6 +49,8 @@ import { useLibrary } from '@/modules/library/libraryStore';
 import { MediaImportDialog } from '@/modules/media/MediaImportDialog';
 import { MediaPanels } from '@/modules/media/MediaPanels';
 import { mediaById, useMedia } from '@/modules/media/mediaStore';
+import { SearchPanel } from '@/modules/search/SearchPanel';
+import { useSearch } from '@/modules/search/searchStore';
 import { useUi } from '@/modules/settings/uiStore';
 import { Breadcrumbs } from '@/modules/structure/Breadcrumbs';
 import { SubnetDialog } from '@/modules/structure/SubnetDialog';
@@ -75,6 +78,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const library = status?.state === 'open' ? status.library : null;
   const settings = useUi((state) => state.state?.settings);
   const focusMode = useUi((state) => state.focusMode);
+  const sideView = useUi((state) => state.sideView);
   const update = useUi((state) => state.update);
   const openSettings = useUi((state) => state.openSettings);
   const workspace = useWorkspace();
@@ -103,6 +107,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       useStructure.getState().reset();
       useMedia.getState().reset();
       useExplorer.getState().reset();
+      useSearch.getState().reset();
       // Documents and their subnets and tags (Phase 7) load side by side,
       // before the tabs come back. Media (Phase 8) are asked for in the
       // same moment, but last – their answer, thousands of entries in a
@@ -245,7 +250,11 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
             items={[
               item('explorer.focus', Files, {
                 label: t('activity.explorer'),
-                pressed: settings.sidebar.visible,
+                pressed: settings.sidebar.visible && sideView === 'explorer',
+              }),
+              item('search.focus', Search, {
+                label: t('activity.search'),
+                pressed: settings.sidebar.visible && sideView === 'search',
               }),
               item('editor.focus', FileText, { label: t('activity.editor') }),
             ]}
@@ -264,7 +273,9 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               }
             }}
           >
-            <div className="flex h-full min-h-0 flex-col">
+            {/* The Explorer stays mounted under the search: its tree and
+                scroll position survive the switch. */}
+            <div className="flex h-full min-h-0 flex-col" hidden={sideView !== 'explorer'}>
               <div className="min-h-0 flex-1">
                 <Explorer
                   onNewDocument={run('document.new')}
@@ -274,6 +285,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
               </div>
               <Connections />
             </div>
+            {sideView === 'search' ? <SearchPanel /> : null}
           </Sidebar>
         ) : null}
         <main className="flex min-w-0 flex-1 flex-col" aria-label={t('main.label')}>

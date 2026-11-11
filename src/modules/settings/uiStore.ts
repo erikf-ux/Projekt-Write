@@ -28,10 +28,15 @@ export interface Notice {
   action?: { labelKey: MessageKey; run: () => void };
 }
 
+/** What the side bar shows (section 11: Explorer or Suche). */
+export type SideView = 'explorer' | 'search';
+
 interface UiStore {
   state: UiState | null;
   loadError: CommandError | null;
   focusMode: boolean;
+  sideView: SideView;
+  setSideView: (view: SideView) => void;
   paletteOpen: boolean;
   settingsSection: SettingsSection | null;
   /** The shortcut recorder has the keyboard. */
@@ -82,6 +87,10 @@ export const useUi = create<UiStore>((set, get) => ({
   state: null,
   loadError: null,
   focusMode: false,
+  sideView: 'explorer',
+  setSideView: (sideView) => {
+    set({ sideView });
+  },
   paletteOpen: false,
   settingsSection: null,
   recording: false,

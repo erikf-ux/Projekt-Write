@@ -34,6 +34,7 @@ export const defaultKeybindings: Readonly<Partial<Record<CommandId, readonly str
   'app.quit': ['Ctrl+Q'],
   'sidebar.toggle': ['Ctrl+Shift+B'],
   'explorer.focus': ['Ctrl+Shift+E'],
+  'search.focus': ['Ctrl+Shift+F'],
   'focus.toggle': ['F11'],
   'editor.toggleSource': ['Ctrl+/'],
   'find.show': ['Ctrl+F'],

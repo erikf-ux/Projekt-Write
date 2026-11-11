@@ -392,6 +392,16 @@ export class EditorSession {
     this.editor.commands.goToNextResult();
   }
 
+  /** Selects the first result and scrolls it into view (global search, Phase 9). */
+  revealFirstResult(): void {
+    if (this.searchResults().count === 0) {
+      return;
+    }
+    // From result 0, "next" and back is result 0, selected and scrolled to.
+    this.editor.commands.goToNextResult();
+    this.editor.commands.goToPreviousResult();
+  }
+
   findPrevious(): void {
     this.editor.commands.goToPreviousResult();
   }

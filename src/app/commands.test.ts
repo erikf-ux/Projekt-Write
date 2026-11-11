@@ -140,6 +140,7 @@ describe('command availability (the palette shows only working commands)', () =>
       'edit.redo': true,
       'find.show': true,
       'replace.show': true,
+      'search.focus': true,
       'editor.toggleSource': true,
       'statistics.show': true,
       'format.bold': true,

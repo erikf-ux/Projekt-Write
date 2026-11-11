@@ -49,6 +49,8 @@ export type CommandId =
   | 'app.quit'
   | 'sidebar.toggle'
   | 'explorer.focus'
+  | 'search.focus'
+  | 'search.rebuild'
   | 'editor.focus'
   | 'editor.toggleSource'
   | 'statistics.show'

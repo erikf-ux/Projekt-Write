@@ -63,6 +63,8 @@ pub enum MenuCommand {
     FindShow,
     #[serde(rename = "replace.show")]
     ReplaceShow,
+    #[serde(rename = "search.focus")]
+    SearchFocus,
     #[serde(rename = "editor.toggleSource")]
     EditorToggleSource,
     #[serde(rename = "statistics.show")]
@@ -108,7 +110,7 @@ pub enum MenuCommand {
 }
 
 impl MenuCommand {
-    pub const ALL: [MenuCommand; 38] = [
+    pub const ALL: [MenuCommand; 39] = [
         MenuCommand::DocumentNew,
         MenuCommand::DocumentSave,
         MenuCommand::DocumentOpenFile,
@@ -126,6 +128,7 @@ impl MenuCommand {
         MenuCommand::EditRedo,
         MenuCommand::FindShow,
         MenuCommand::ReplaceShow,
+        MenuCommand::SearchFocus,
         MenuCommand::EditorToggleSource,
         MenuCommand::StatisticsShow,
         MenuCommand::FormatBold,
@@ -169,6 +172,7 @@ impl MenuCommand {
             MenuCommand::EditRedo => "edit.redo",
             MenuCommand::FindShow => "find.show",
             MenuCommand::ReplaceShow => "replace.show",
+            MenuCommand::SearchFocus => "search.focus",
             MenuCommand::EditorToggleSource => "editor.toggleSource",
             MenuCommand::StatisticsShow => "statistics.show",
             MenuCommand::FormatBold => "format.bold",
@@ -295,6 +299,7 @@ const LAYOUT: [(&str, &[Option<MenuCommand>]); 4] = [
             None,
             Some(MenuCommand::FindShow),
             Some(MenuCommand::ReplaceShow),
+            Some(MenuCommand::SearchFocus),
             None,
             Some(MenuCommand::EditorToggleSource),
             Some(MenuCommand::StatisticsShow),

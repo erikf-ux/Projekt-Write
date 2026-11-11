@@ -23,6 +23,8 @@ import { useMedia } from '@/modules/media/mediaStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
+import { rebuildSearchIndex } from '@/modules/search/rebuild';
+import { useSearch } from '@/modules/search/searchStore';
 import type { TextFormat } from '@/types/generated/TextFormat';
 import type { UiSettings } from '@/types/generated/UiSettings';
 import { focusEditor, focusExplorer } from './focus';
@@ -573,7 +575,31 @@ export function createAppCommands(): CommandDefinition[] {
         if (current && !current.sidebar.visible) {
           await ui().update({ sidebar: { ...current.sidebar, visible: true } });
         }
+        ui().setSideView('explorer');
         focusExplorer();
+      },
+    },
+    {
+      id: 'search.focus',
+      category: 'view',
+      titleKey: 'command.search.focus',
+      isAvailable: () => libraryOpen() && settings() !== null && !ui().focusMode,
+      run: async () => {
+        const current = settings();
+        if (current && !current.sidebar.visible) {
+          await ui().update({ sidebar: { ...current.sidebar, visible: true } });
+        }
+        ui().setSideView('search');
+        useSearch.getState().requestFocus();
+      },
+    },
+    {
+      id: 'search.rebuild',
+      category: 'app',
+      titleKey: 'command.search.rebuild',
+      isAvailable: libraryOpen,
+      run: async () => {
+        await rebuildSearchIndex();
       },
     },
     {

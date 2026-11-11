@@ -59,6 +59,7 @@ const MENU_COMMANDS: Record<MenuCommand, true> = {
   'edit.redo': true,
   'find.show': true,
   'replace.show': true,
+  'search.focus': true,
   'editor.toggleSource': true,
   'statistics.show': true,
   'format.bold': true,

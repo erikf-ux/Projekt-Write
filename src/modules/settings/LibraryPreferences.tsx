@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { errorText } from '@/components/errorText';
 import { useT, type MessageKey } from '@/i18n';
 import { useLibrary } from '@/modules/library/libraryStore';
+import { rebuildSearchIndex } from '@/modules/search/rebuild';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
 import type { LibraryPreferences as Preferences } from '@/types/generated/LibraryPreferences';
@@ -38,6 +39,7 @@ export function LibraryPreferences() {
   const open = useLibrary((state) => state.status?.state === 'open');
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [drafts, setDrafts] = useState<Partial<Record<Field, string>>>({});
+  const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<CommandError | null>(null);
 
   useEffect(() => {
@@ -119,6 +121,26 @@ export function LibraryPreferences() {
         {input('dailyDays')}
         {input('weeklyDays')}
         <p className="text-ui mt-1 text-muted">{t('settings.library.historyHint')}</p>
+      </fieldset>
+      <fieldset className={FIELDSET} data-testid="search-index-preferences">
+        <legend className="text-ui font-semibold tracking-wide text-muted uppercase">
+          {t('settings.searchIndex')}
+        </legend>
+        <button
+          type="button"
+          className="text-ui mt-2 inline-flex h-7 items-center rounded-pw border border-muted px-3 text-fg hover:bg-surface disabled:opacity-50"
+          data-testid="search-rebuild"
+          disabled={rebuilding}
+          onClick={() => {
+            setRebuilding(true);
+            void rebuildSearchIndex().finally(() => {
+              setRebuilding(false);
+            });
+          }}
+        >
+          {t('command.search.rebuild')}
+        </button>
+        <p className="text-ui mt-1 text-muted">{t('settings.searchIndex.hint')}</p>
       </fieldset>
       {error ? (
         <p role="alert" className="text-ui mb-4 text-danger">
