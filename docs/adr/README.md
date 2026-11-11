@@ -25,3 +25,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0018](0018-sqlite-sicherheitsupdate.md)          | Sicherheitsupdate von SQLite über eine gepatchte Kopie von `sqlx-sqlite`     | angenommen (vorübergehend)                    |
 | [0019](0019-medien.md)                            | Medien: Import, Typprüfung, Medien-Handler, Vorschaubilder, PDF und Verweise | angenommen                                    |
 | [0020](0020-suche.md)                             | Suche: Index, Anfragen, Filter und Aktualität                                | angenommen                                    |
+| [0021](0021-export-und-backup.md)                 | Export, Drucken, Backup und Wiederherstellung (Stufe 5)                      | vorgeschlagen (Phase 10 in Arbeit)            |
