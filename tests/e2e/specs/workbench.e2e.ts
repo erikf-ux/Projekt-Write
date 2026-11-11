@@ -268,6 +268,24 @@ describe('Project Write – Phase 3 workbench', () => {
     // As if settings.json had been edited by hand: two commands on Ctrl+N.
     await setKeybindings({ 'palette.show': ['Ctrl+N'] });
     try {
+      // The app saves the tabs 2 s after they change (and at once when it
+      // quits); a reload is no quit. Wait until Rust holds the open tabs,
+      // or the reload restores an older session (F-50).
+      await browser.waitUntil(
+        () =>
+          browser.execute(async () => {
+            const internals = (
+              window as unknown as {
+                __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> };
+              }
+            ).__TAURI_INTERNALS__;
+            const saved = (await internals.invoke('session_restore', { request: {} })) as {
+              tabs: unknown[];
+            };
+            return saved.tabs.length > 0;
+          }),
+        { timeout: 15_000, timeoutMsg: 'the session was not saved before the reload' },
+      );
       // The interface reads the settings at start.
       await browser.refresh();
       await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
