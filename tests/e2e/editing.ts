@@ -90,8 +90,13 @@ export async function runFromPalette(command: string): Promise<void> {
   await browser.keys(['Control', 'Shift', 'p']);
   const option = $(`[data-testid="command-palette"] [data-command="${command}"]`);
   await option.waitForExist({ timeoutMsg: `${command} is not offered` });
-  // The list scrolls; an entry below its end counts as hidden for some drivers.
-  await option.scrollIntoView({ block: 'nearest' });
+  // The list scrolls; an entry below its end counts as hidden for some
+  // drivers. Scrolled in the page: WebdriverIO's scrollIntoView is a timed
+  // wheel action and would add about two seconds.
+  const element = await option.getElement();
+  await browser.execute((entry: HTMLElement) => {
+    entry.scrollIntoView({ block: 'nearest' });
+  }, element);
   await option.waitForDisplayed({ timeoutMsg: `${command} is not offered` });
   await option.click();
   await $('[data-testid="command-palette"]').waitForExist({ reverse: true });

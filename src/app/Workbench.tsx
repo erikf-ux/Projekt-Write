@@ -104,10 +104,13 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       useMedia.getState().reset();
       useExplorer.getState().reset();
       // Documents and their subnets and tags (Phase 7) load side by side,
-      // before the tabs come back. Media (Phase 8) load alongside; the tabs
-      // do not wait for them.
+      // before the tabs come back. Media (Phase 8) are asked for in the
+      // same moment, but last – their answer, thousands of entries in a
+      // large library, must not hold up the Explorer – and the tabs do not
+      // wait for them.
+      const treeLoaded = Promise.all([useWorkspace.getState().refresh(), useStructure.getState().load()]);
       void useMedia.getState().load();
-      await Promise.all([useWorkspace.getState().refresh(), useStructure.getState().load()]);
+      await treeLoaded;
       await createSampleSubnets();
       void useWorkspace.getState().refreshTrash();
       // Stage 2: unsaved changes from a crash are offered first.
