@@ -4,7 +4,18 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt, lokal und in CI geprüft (Lauf 107 grün); Bericht in `docs/bericht-phase-8.md`. Wartet auf die Freigabe von Phase 9.
+**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt, lokal und in CI geprüft (Lauf 107 grün); Bericht in `docs/bericht-phase-8.md`. Phase 9 noch nicht freigegeben.
+
+**Phase 9 – Suche** (Abschnitt 19): auf Wunsch des Auftraggebers ein erster Teil vorab („Bearbeite schon mal einen Teil von Phase 9“). Erledigt, lokal geprüft, noch ohne CI-Lauf (alle Commits `[skip ci]`):
+
+- Migration 0009 (`search_entries`, `search_words`, `search_parts`, drei Ansichten, Trigger), Text der Dokumente in der Transaktion des Inhalts, Nachtragen beim Öffnen, „Suchindex neu aufbauen“ (ADR 0020, vorgeschlagen).
+- Anfragen: Quoten, Schreibvarianten, Wörter vor Teilwörtern, `bm25()`-Gewichte, Filter (Typ, Tags, Subnetz, Datum, Favoriten, Archiv, Papierkorb), Ausschnitte mit Markierung.
+- Befehle `search_query`, `search_rebuild` mit IPC-Vertragstest; Rust-Tests für alle Abnahmefälle (`tests/search.rs`).
+- Messung mit der vollen Referenzbibliothek (Container, Debug-Build): langsamste von 16 Anfragen 162 ms (Ziel 300 ms).
+
+**Offene Frage an den Auftraggeber (F-46):** Mit dem Suchindex wächst die Datenbank der Referenzbibliothek auf 480 MB (Index rund 430 MB bei 81 MB Text). `PRAGMA quick_check` beim Start (Abschnitt 18) ruft seit SQLite 3.44 auch die Integritätsprüfung der FTS5-Tabellen auf, die den ganzen Text neu zerlegt: 4,1 s statt rund 0,25 s für alle übrigen Tabellen. Das Öffnen beim Start dauert damit 4,8 s – Widerspruch zum Ziel „Kaltstart ≤ 2 s“ (Abschnitt 6). Bis zur Entscheidung ruht die Arbeit an Phase 9.
+
+Offen in Phase 9: Oberfläche (Suchfeld, Filter, Trefferliste, Navigation zur Fundstelle), Einstellung „Suchindex neu aufbauen“, E2E-Tests mit Messung im echten Programm, Bericht.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
