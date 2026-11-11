@@ -37,18 +37,18 @@ Keine neuen Abhängigkeiten.
 
 ## Welche Tests wurden durchgeführt?
 
-Umfang: **TESTZAHLEN**.
+Umfang: **428 Rust-Tests** (280 Unit, 148 Integration; Phase 8: 397), **717 Vitest-Tests** in 40 Dateien (708 in 39), **71 WebdriverIO-Tests** in 17 Dateien (64 in 16).
 
 Lokal (Linux-Container, Xvfb, D-Bus-Sitzung), alle ausgeführt und bestanden:
 
-| Prüfung                                                                                                         | Ergebnis         |
-| --------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Prettier, ESLint (`--max-warnings 0`), TypeScript (App und Node-Teil), Vitest                                   | bestanden        |
-| rustfmt, Clippy `-D warnings` (Linux, Linux + `e2e`, Windows-Ziel)                                              | bestanden        |
-| Rust-Tests, darunter die Migrationen ab jeder früheren Version (0 bis 8 → 9) und das Befüllen bestehender Daten | bestanden        |
-| Erzeugte TypeScript-Typen neu geschrieben                                                                       | bestanden        |
-| Messung in Rust mit der vollen Referenzbibliothek (16 Anfragen)                                                 | langsamste 65 ms |
-| E2E-Gesamtlauf                                                                                                  | E2E_ERGEBNIS     |
+| Prüfung                                                                                                         | Ergebnis                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Prettier, ESLint (`--max-warnings 0`), TypeScript (App und Node-Teil), Vitest                                   | bestanden                                                                                                         |
+| rustfmt, Clippy `-D warnings` (Linux, Linux + `e2e`, Windows-Ziel)                                              | bestanden                                                                                                         |
+| Rust-Tests, darunter die Migrationen ab jeder früheren Version (0 bis 8 → 9) und das Befüllen bestehender Daten | bestanden                                                                                                         |
+| Erzeugte TypeScript-Typen neu geschrieben                                                                       | bestanden                                                                                                         |
+| Messung in Rust mit der vollen Referenzbibliothek (16 Anfragen)                                                 | langsamste 65 ms                                                                                                  |
+| E2E-Gesamtlauf                                                                                                  | bestanden: 17 von 17 Dateien; erste Treffer mit der Referenzbibliothek 132–181 ms, Explorer steht nach 760–896 ms |
 
 Was die Tests zeigen, im Einzelnen:
 

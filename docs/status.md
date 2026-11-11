@@ -4,24 +4,23 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 8 – Medien** (Abschnitte 9, 17, 20): umgesetzt, lokal und in CI geprüft (Lauf 107 grün); Bericht in `docs/bericht-phase-8.md`. Phase 9 noch nicht freigegeben.
-
-**Phase 9 – Suche** (Abschnitt 19): auf Wunsch des Auftraggebers ein erster Teil vorab („Bearbeite schon mal einen Teil von Phase 9“). Erledigt, lokal geprüft, noch ohne CI-Lauf (alle Commits `[skip ci]`):
-
-- Migration 0009 (`search_entries`, `search_words`, `search_parts`, drei Ansichten, Trigger), Text der Dokumente in der Transaktion des Inhalts, Nachtragen beim Öffnen, „Suchindex neu aufbauen“ (ADR 0020, vorgeschlagen).
-- Anfragen: Quoten, Schreibvarianten, Wörter vor Teilwörtern, `bm25()`-Gewichte, Filter (Typ, Tags, Subnetz, Datum, Favoriten, Archiv, Papierkorb), Ausschnitte mit Markierung.
-- Befehle `search_query`, `search_rebuild` mit IPC-Vertragstest; Rust-Tests für alle Abnahmefälle (`tests/search.rs`).
-- Messung mit der vollen Referenzbibliothek (Container, Debug-Build): langsamste von 16 Anfragen 162 ms (Ziel 300 ms).
-
-**F-46 (entschieden):** `PRAGMA quick_check` der ganzen Datenbank zerlegt seit SQLite 3.44 den Text aller FTS5-Tabellen neu; mit der Referenzbibliothek dauerte das Öffnen 4,8 s. Auf „Fahre fort“ umgesetzt wie vorgeschlagen (ADR 0020, Punkt 14): im WAL-Modus jede Tabelle einzeln beim Öffnen, die ganze Datenbank 10 s später im Hintergrund, bei einem Fehler Neuaufbau des Suchindex; mit Rollback-Journal weiter die ganze Prüfung beim Öffnen. Öffnen jetzt 0,64 s.
-
-Offen in Phase 9: Oberfläche (Suchfeld, Filter, Trefferliste, Navigation zur Fundstelle), Einstellung „Suchindex neu aufbauen“, E2E-Tests mit Messung im echten Programm, Bericht.
+**Phase 9 – Suche** (Abschnitt 19): umgesetzt und lokal geprüft (E2E 17 von 17 Dateien); CI-Lauf siehe Bericht `docs/bericht-phase-9.md`. Begonnen auf „Bearbeite schon mal einen Teil von Phase 9“, fortgesetzt auf „Fahre fort“. Wartet auf die Freigabe von Phase 10.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0019 (Medien, mit Nachträgen); Neubewertung des Isolation Pattern in ADR 0005 (bleibt aus). Die Suche mit Filtern folgt in Phase 9.
+Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46).
 
-CI: Lauf 107 grün (Abschluss Phase 8; Läufe 102 bis 106 mit F-41 bis F-45, siehe Bericht). Zwischenstände und reine Doku-Commits tragen `[skip ci]`; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 107 grün (Abschluss Phase 8). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+
+## Stand Phase 9
+
+| Schritt | Inhalt                                                                                                                                                                                | Stand                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1       | ADR 0020, Migration 0009 (`search_entries`, `search_words`, `search_parts`, Ansichten, Trigger), Text der Dokumente in der Transaktion des Inhalts, Nachtragen beim Öffnen, Neuaufbau | erledigt                   |
+| 2       | Anfragen (Quoten, Schreibvarianten, Wörter vor Teilwörtern, `bm25()`), Filter, Ausschnitte, Befehle `search_query` und `search_rebuild`, Rust- und IPC-Tests                          | erledigt                   |
+| 3       | Prüfung beim Start je Tabelle, ganze Datenbank im Hintergrund (F-46)                                                                                                                  | erledigt                   |
+| 4       | Oberfläche: Seitenleiste „Suche“, Filter, Trefferliste, Öffnen an der Fundstelle, „Suchindex neu aufbauen“, Vitest                                                                    | erledigt                   |
+| 5       | E2E (Abnahme), Messung mit der Referenzbibliothek, Doku, Bericht                                                                                                                      | erledigt; CI siehe Bericht |
 
 ## Stand Phase 8
 
@@ -177,6 +176,10 @@ CI: Lauf 107 grün (Abschluss Phase 8; Läufe 102 bis 106 mit F-41 bis F-45, sie
 | F-43 | CI-Lauf 104 (Windows): Ein Medientest verglich den Pfad eines Vorschaubilds mit `canonicalize()` der Bibliothek; unter Windows hat nur die eine Seite die Form `\\?\`                                                                                                                                                                 | Beide Seiten kanonisch verglichen; ein Fehler des Tests, nicht der App                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | F-44 | CI-Lauf 105 (Windows, erster E2E-Lauf der Phase): Nach dem Neuladen im Kürzel-Konflikttest kamen die Tabs nicht zurück; der Test ließ dadurch den absichtlichen Konflikt `Strg + N` in den Einstellungen stehen, und in allen folgenden Dateien wirkten weder `Strg + N` noch die Befehlspalette (10 von 16 Dateien rot)              | Die Wiederherstellung der Tabs wartet nicht mehr auf das Laden der Medien (seit Phase 8 lag es davor); der Test setzt die Kürzel in jedem Fall zurück und nennt beim Scheitern, welche Befehle beim Start antworten; die Befehlspalette scrollt einen Eintrag vor der Prüfung ins Bild. Ursache unter Windows noch nicht bestätigt (nächster CI-Lauf)                                                                                                                                                                                                                                  |
 | F-45 | CI-Lauf 106: Nach der Änderung zu F-44 stand der Explorer der Referenzbibliothek erst nach 998–1.124 ms (Linux, vorher 530–540 ms) bzw. 1.163–1.178 ms (Windows); die Anfrage nach den 5.000 Medien ging als erste hinaus und hielt Dokumente und Struktur auf. Außerdem kostete `scrollIntoView` der Befehlspalette im Test rund 2 s | Medien werden im selben Moment, aber als letzte angefragt, die Tabs warten weiter nicht auf sie; der Test scrollt den Eintrag direkt im DOM                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F-46 | Mit dem Suchindex brauchte `PRAGMA quick_check` beim Start 4,1 s (SQLite ≥ 3.44 zerlegt dabei den Text aller FTS5-Tabellen neu); das Öffnen der Referenzbibliothek dauerte 4,8 s, Widerspruch zu „Kaltstart ≤ 2 s“                                                                                                                    | Auf „Fahre fort“ wie vorgeschlagen (ADR 0020, Punkt 14): lokal jede Tabelle einzeln beim Öffnen (0,19 s), die ganze Datenbank 10 s später im Hintergrund, bei einem Fehler Neuaufbau des Index; mit Rollback-Journal weiter die ganze Prüfung beim Öffnen. Öffnen 0,64 s                                                                                                                                                                                                                                                                                                               |
+| F-47 | `C++` fand jeden Text mit einem einzelnen `C` (der Wortindex verliert die Zeichen; gefunden von einem Rust-Test)                                                                                                                                                                                                                      | Wörter mit Zeichen ab drei Zeichen müssen zusätzlich wörtlich in Titel oder Inhalt stehen (Abfrage im Teilwortindex)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| F-48 | Ein einzelnes Zeichen als Wortanfang (`e`) brauchte im Programm mit der Referenzbibliothek 350 ms, `Krankenhaus` 303 ms (Ziel 300 ms; gefunden von der E2E-Messung)                                                                                                                                                                   | Ein einzelnes Zeichen sucht nur das ganze Wort (der Präfixindex beginnt bei zwei Zeichen), 50 statt 100 Treffer; danach 122–181 ms                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| F-49 | Fehler der Tests: ein Phase-1-Test legte die Suchtabellen selbst an, die Workbench-Prüfung erwartete die alte Activity Bar, der E2E-Test tippte ein Wort, das schon im Feld stand, zwei Vitest-Erwartungen nannten deutsche statt englische Texte                                                                                     | Tests angepasst                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Offene Aufgaben
 
@@ -198,7 +201,7 @@ CI: Lauf 107 grün (Abschluss Phase 8; Läufe 102 bis 106 mit F-41 bis F-45, sie
 - Native Menüklicks sind in CI nicht bedienbar; der Weg Menü → Kanal → Befehl ist in Rust und TypeScript getestet, der Klick selbst nicht.
 - Explorer-Messung (F-28) auf dem Referenzgerät wiederholen (Release-Build, Hardware-Rendering); danach die Regressionsgrenzen im E2E-Test durch die Zielwerte ersetzen.
 - Gepatchte Kopie von `sqlx-sqlite` entfernen (`src-tauri/vendor/sqlx-sqlite/`, `[patch.crates-io]`), sobald eine SQLx-Version `libsqlite3-sys` 0.39 oder neuer zulässt (ADR 0018, F-32).
-- Archiv „im Mesh grau“ (Phase 11); Archiv in der Standardsuche ausblenden (Phase 9).
+- Archiv „im Mesh grau“ (Phase 11).
 - Neue Befehle der Phase 7 stehen in Befehlspalette und Kontextmenüs, noch nicht im nativen Menü.
 - Phase 10: Wiederherstellung Stufe 5 (Backup); während des Backups schreibt Autosave nur nach `recovery/` (Abschnitt 21).
 - Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
@@ -209,6 +212,7 @@ CI: Lauf 107 grün (Abschluss Phase 8; Läufe 102 bis 106 mit F-41 bis F-45, sie
 - Unter macOS schreibt der Webview der E2E-Tests Caches in den Benutzerordner der CI-Maschine (ADR 0003).
 - npm-Audit-Funde in Entwicklungswerkzeugen bei jedem Update von WebdriverIO/ESLint neu bewerten (`docs/dependencies.md`).
 - TypeScript 7 und WebdriverIO 10, sobald `typescript-eslint` und `@wdio/tauri-service` sie unterstützen (ADR 0001).
+- Suche: Hinweis in der Oberfläche, wenn die Prüfung der ganzen Datenbank im Hintergrund scheitert (heute nur im Protokoll; mit Backup und Wiederherstellung, Phase 10). Größe des Index (480 MB bei 81 MB Text der Referenzbibliothek) auf dem Referenzgerät bewerten; gegebenenfalls FTS5 mit gemeinsamer Inhaltstabelle (ADR 0020). Text in PDFs und Office-Dateien durchsuchen (später).
 - Isolation Pattern vor Phase 14 neu bewerten (ADR 0005; vor Phase 8 bewertet, bleibt aus).
 
 ### Entscheidungen des Auftraggebers
@@ -226,4 +230,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 9 (Suche; Abschnitt 25).
+Nach Freigabe: Phase 10 (Export und Backup; Abschnitt 25).
