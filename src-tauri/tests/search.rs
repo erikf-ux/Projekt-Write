@@ -665,3 +665,63 @@ async fn links_and_media_ids_are_not_indexed() {
     assert!(search(&library, &part_of_id).await.is_empty());
     library.close().await;
 }
+
+/// Phase 9, "Erste Treffer erscheinen in der Referenzbibliothek innerhalb
+/// des Zielwerts" (section 6: 300 ms), measured below the interface: the
+/// time of `SearchIndex::search` with the reference library that
+/// `scripts/reference-library.mjs` built inside `target/`. The app adds the
+/// IPC call and drawing the list; the E2E test measures that.
+///
+/// `PW_REFERENCE_LIBRARY=<folder> cargo test --test search -- --ignored`
+/// (SQLite is optimised in debug builds too, see Cargo.toml).
+#[tokio::test]
+#[ignore = "needs the reference library (PW_REFERENCE_LIBRARY)"]
+async fn first_hits_in_the_reference_library() {
+    let Some(path) = std::env::var_os("PW_REFERENCE_LIBRARY") else {
+        panic!("PW_REFERENCE_LIBRARY is not set");
+    };
+    let path = std::path::PathBuf::from(path);
+    let target = Path::new(env!("CARGO_TARGET_TMPDIR")).parent().unwrap();
+    assert!(
+        path.canonicalize()
+            .unwrap()
+            .starts_with(target.canonicalize().unwrap()),
+        "only a reference library inside target/"
+    );
+    let started = std::time::Instant::now();
+    let library = open(&path).await;
+    println!("opened in {:?}", started.elapsed());
+    let queries = [
+        "Krankenhaus",
+        "haus",
+        "Muller",
+        "Mueller",
+        "Strasse",
+        "C++",
+        "\"",
+        "Kapitel",
+        "der",
+        "e",
+        "Notizen Entwurf",
+        "Zürich",
+        "zuerich",
+        "rechtschreib",
+        "xyzzy",
+        "Literatur Quelle Zitat",
+    ];
+    let mut worst = std::time::Duration::ZERO;
+    for round in 0..2 {
+        for query in queries {
+            let started = std::time::Instant::now();
+            let hits = library.search().search(query, &options()).await.unwrap();
+            let elapsed = started.elapsed();
+            if round == 1 {
+                worst = worst.max(elapsed);
+                println!("{query:>24}: {:>4} hits in {elapsed:?}", hits.len());
+            }
+        }
+    }
+    println!("slowest: {worst:?}");
+    library.close().await;
+    assert!(worst <= std::time::Duration::from_millis(300), "{worst:?}");
+}
