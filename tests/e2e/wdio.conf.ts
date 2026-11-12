@@ -16,6 +16,7 @@ import {
   pickedExport,
   root,
   sandbox,
+  tempDir,
 } from './sandbox';
 
 if (!fs.existsSync(application)) {
@@ -33,10 +34,16 @@ if (!process.env['WDIO_WORKER_ID']) {
 for (const dir of ['data', 'config', 'cache', 'webview2']) {
   fs.mkdirSync(path.join(sandbox, dir), { recursive: true });
 }
+fs.mkdirSync(tempDir, { recursive: true });
 process.env['XDG_DATA_HOME'] = path.join(sandbox, 'data');
 process.env['XDG_CONFIG_HOME'] = path.join(sandbox, 'config');
 process.env['XDG_CACHE_HOME'] = path.join(sandbox, 'cache');
 process.env['WEBVIEW2_USER_DATA_FOLDER'] = path.join(sandbox, 'webview2');
+// Temporary files too (the print command of the WebDriver writes its PDF
+// there first).
+for (const name of ['TMPDIR', 'TMP', 'TEMP']) {
+  process.env[name] = tempDir;
+}
 
 // App folders of the e2e build and the answers of the folder dialog
 // (WebDriver cannot operate native dialogs; see ADR 0008).

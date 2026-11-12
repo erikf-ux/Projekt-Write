@@ -75,6 +75,15 @@ export const pickedExport = {
   restoreFolder: restoreParent,
 };
 
+/** A document printed to PDF by the engine of the webview (export-backup.e2e.ts). */
+export const printedPdf = path.join(sandbox, 'Drucken', 'Druckprobe.pdf');
+
+/**
+ * The temporary folder of the app and the WebDriver (the WebDriver prints to
+ * a file there before it hands the PDF over).
+ */
+export const tempDir = path.join(sandbox, 'tmp');
+
 /** Passed to a second start of the app (not a dialog answer). */
 export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
 

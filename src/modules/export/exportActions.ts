@@ -229,6 +229,24 @@ export const PRINT_ROOT_ID = 'pw-print';
  * CSS (section 21). A copy of the writing surface of the active document,
  * with its title, is the only thing printed.
  */
+/**
+ * Removes from the print copy what only the screen shows: the hits of find
+ * and replace (an open find bar, or a document opened from a search hit),
+ * the selected image and the gap cursor.
+ */
+export function stripScreenMarks(copy: HTMLElement): void {
+  for (const mark of copy.querySelectorAll('.find-and-replace-result, .find-and-replace-result-current')) {
+    mark.replaceWith(...mark.childNodes);
+  }
+  for (const node of copy.querySelectorAll('.ProseMirror-selectednode')) {
+    node.classList.remove('ProseMirror-selectednode');
+  }
+  for (const cursor of copy.querySelectorAll('.ProseMirror-gapcursor')) {
+    cursor.remove();
+  }
+  copy.normalize();
+}
+
 export async function printActive(asPdf: boolean): Promise<boolean> {
   const workspace = useWorkspace.getState();
   const document = activeDocument(workspace);
@@ -259,6 +277,7 @@ export async function printActive(asPdf: boolean): Promise<boolean> {
   for (const editable of copy.querySelectorAll('[contenteditable]')) {
     editable.removeAttribute('contenteditable');
   }
+  stripScreenMarks(copy);
   root.append(title, copy);
   window.document.body.append(root);
   const previousTitle = window.document.title;
@@ -266,8 +285,14 @@ export async function printActive(asPdf: boolean): Promise<boolean> {
   window.document.title = document.title;
   window.document.documentElement.setAttribute('data-printing', '');
   // Not every webview blocks in print(): clean up when printing is over.
+  // Not every webview says so either (WebKitGTK sends no afterprint after
+  // Cancel, F-53): the next key press or click after print() returned
+  // cleans up too. While the system dialog is open the webview gets no
+  // input, so a print still being prepared keeps its copy.
   const cleanUp = () => {
     window.removeEventListener('afterprint', cleanUp);
+    window.removeEventListener('keydown', cleanUp, true);
+    window.removeEventListener('pointerdown', cleanUp, true);
     window.document.documentElement.removeAttribute('data-printing');
     window.document.title = previousTitle;
     root.remove();
@@ -278,6 +303,10 @@ export async function printActive(asPdf: boolean): Promise<boolean> {
   } catch {
     cleanUp();
     return false;
+  }
+  if (root.isConnected) {
+    window.addEventListener('keydown', cleanUp, true);
+    window.addEventListener('pointerdown', cleanUp, true);
   }
   return true;
 }

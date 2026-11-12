@@ -5,7 +5,7 @@ import { useWorkspace } from '@/modules/documents/workspaceStore';
 import { panelElementId } from '@/modules/editor/DocumentEditor';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useUi } from '@/modules/settings/uiStore';
-import { exportLibrary, PRINT_ROOT_ID, printActive } from './exportActions';
+import { exportLibrary, PRINT_ROOT_ID, printActive, stripScreenMarks } from './exportActions';
 
 const ID = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11';
 
@@ -62,6 +62,35 @@ describe('printing', () => {
     expect(document.getElementById(PRINT_ROOT_ID)).toBeNull();
     expect(document.documentElement.hasAttribute('data-printing')).toBe(false);
     expect(document.title).toBe('Project Write');
+  });
+
+  it('cleans up at the next key press when the webview sends no afterprint (Cancel in WebKitGTK)', async () => {
+    vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    document.title = 'Project Write';
+    expect(await printActive(false)).toBe(true);
+    expect(document.getElementById(PRINT_ROOT_ID)).not.toBeNull();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+    expect(document.getElementById(PRINT_ROOT_ID)).toBeNull();
+    expect(document.documentElement.hasAttribute('data-printing')).toBe(false);
+    expect(document.title).toBe('Project Write');
+    // A late afterprint changes nothing any more.
+    document.title = 'Anders';
+    window.dispatchEvent(new Event('afterprint'));
+    expect(document.title).toBe('Anders');
+  });
+
+  it('leaves the marks of find and replace and the selected image out of the print copy', () => {
+    const copy = document.createElement('div');
+    copy.innerHTML =
+      '<p>Ein <span class="find-and-replace-result find-and-replace-result-current">Treffer</span> und <span class="find-and-replace-result">noch einer</span>.</p>' +
+      '<figure class="ProseMirror-selectednode"><img alt="Hafen"></figure><div class="ProseMirror-gapcursor"></div>';
+    stripScreenMarks(copy);
+    expect(
+      copy.querySelector('.find-and-replace-result, .ProseMirror-selectednode, .ProseMirror-gapcursor'),
+    ).toBeNull();
+    expect(copy.textContent).toBe('Ein Treffer und noch einer.');
+    expect(copy.querySelector('p')?.childNodes).toHaveLength(1);
+    expect(copy.querySelector('figure img')).not.toBeNull();
   });
 
   it('names the PDF printer for "Als PDF exportieren"', async () => {

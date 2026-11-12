@@ -4,7 +4,7 @@ Stand: 12. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzu
 
 **Fünf der sechs Abnahmekriterien sind erfüllt**, in Rust-Tests und im echten Programm: Ein Backup während laufender Eingaben ist konsistent; ein Abbruch während des Backups hinterlässt keine fertig aussehende Datei; nach der Wiederherstellung stimmen alle Prüfsummen; ein verändertes oder beschädigtes Backup wird abgelehnt; das Backup enthält keine früheren Backups.
 
-**Das sechste ist nur teilweise erfüllt** – „PDF-Export und Drucken sind auf allen drei Betriebssystemen getestet“: Geprüft sind unter Windows und Linux die Druckkopie, das Druck-CSS und der Aufruf des Systemdrucks. Den Druckdialog selbst kann der eingebettete WebDriver nicht bedienen (ADR 0003), und macOS ist zurückgestellt. Das echte Drucken und „Als PDF speichern“ braucht einen Handtest je System (Punkt 1 unter „Gefundene Widersprüche und Abweichungen“).
+**Das sechste ist für Windows und Linux erfüllt, macOS ist zurückgestellt** – „PDF-Export und Drucken sind auf allen drei Betriebssystemen getestet“. Auf Wunsch des Auftraggebers („teste das Drucken selber“) habe ich nachgetestet. Unter Linux habe ich den echten GTK-Druckdialog einmal lokal bedient: „Drucken“ in eine Datei und „Abbrechen“. In CI druckt jetzt auf beiden Systemen die Engine des Webviews ein Dokument über mehrere Seiten als PDF, und der Test prüft das Ergebnis. Den Druckdialog von WebView2 unter Windows kann der WebDriver nicht bedienen. Geprüft ist dort, was WebView2 beim Speichern als PDF druckt, nicht der Dialog. Dabei kamen zwei Fehler heraus (F-52, F-53), beide behoben (Abschnitt „Drucken nachgetestet“).
 
 ## Was wurde implementiert?
 
@@ -54,23 +54,23 @@ Was die Tests zeigen, im Einzelnen:
 - **Keine früheren Backups** (Rust): Zwei Backups nacheinander in `backups/`; das zweite enthält nur `manifest.json`, `library.json`, die Datenbank und die Dateien der Zeilen – keine Backups, keine Entwürfe, Exporte oder Dateien ohne Zeile.
 - **Export** (Rust, E2E): Links eines Gesamtexports führen zu ihren Dateien (auch über Unterordner hinweg), `index.md` vollständig, Archiv und Papierkorb richtig, Dateinamen bereinigt, Abbruch ohne Rest; TXT mit Warnung, Markdown mit Medienordner.
 - **Pakete** (Rust, E2E): hin und zurück, zweiter Import verwendet das vorhandene Medium, fünf veränderte Pakete und ein als Bild getarntes Programm abgelehnt, ohne Zeilen oder Dateien zu hinterlassen.
-- **Drucken** (Vitest, E2E): die Druckkopie hat Titel und Text und keine bearbeitbaren Elemente, der Fenstertitel ist der Dokumenttitel, nach `afterprint` ist alles wie vorher; die Druckregeln für `#pw-print` sind geladen.
+- **Drucken** (Vitest, E2E): die Druckkopie hat Titel und Text und keine bearbeitbaren Elemente, der Fenstertitel ist der Dokumenttitel, nach `afterprint` ist alles wie vorher; die Druckregeln für `#pw-print` sind geladen. Neu: Die Engine des Webviews druckt ein Dokument von fünf Seiten mit Bild, Link, Liste und Fettdruck als PDF (WebKitGTK: Druckauftrag in eine Datei, WebView2: `PrintToPdf`). Der Test liest die PDF mit pdf.js und prüft: Seitenzahl, alle 40 Absätze in Reihenfolge, Titel auf Seite 1 und Schluss auf der letzten Seite, kein Tab und kein Explorer, das Bild, die Adresse des Links, unter Windows auch die Linkfläche, und Ränder auf jeder Seite. Außerdem darf die Markierung der Suche nicht in der Kopie stehen.
 - **IPC-Vertrag:** jeder neue Befehl mit gültigen und ungültigen Anfragen, ein Ziel in der Bibliothek abgelehnt.
 
 ## Abnahmekriterien Phase 10
 
-| Kriterium                                                                 | Stand                                                                                                                                                               |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PDF-Export und Drucken auf allen drei Betriebssystemen getestet           | **teilweise**: Druckkopie, Druck-CSS und Aufruf des Systemdrucks unter Windows und Linux (E2E); der Systemdialog selbst ist ein Handtest, macOS ist zurückgestellt. |
-| Ein Backup während laufender Eingaben ist konsistent                      | **erfüllt** (Rust: 20 Dokumente, 5 Backups; E2E: Speichern in einer Schleife).                                                                                      |
-| Ein Abbruch während des Backups hinterlässt keine fertig aussehende Datei | **erfüllt** (Rust: 25 harte Abbrüche; Abbrechen in Rust).                                                                                                           |
-| Nach der Wiederherstellung stimmen alle Prüfsummen                        | **erfüllt** (Rust und E2E).                                                                                                                                         |
-| Ein verändertes oder beschädigtes Backup wird abgelehnt                   | **erfüllt** (Rust: 13 Fälle; E2E).                                                                                                                                  |
-| Das Backup enthält keine früheren Backups                                 | **erfüllt** (Rust).                                                                                                                                                 |
+| Kriterium                                                                 | Stand                                                                                                                                                                        |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PDF-Export und Drucken auf allen drei Betriebssystemen getestet           | **Windows und Linux erfüllt**: PDF der Engine in CI auf beiden Systemen, unter Linux zusätzlich der echte Systemdialog (lokal: Drucken und Abbrechen); macOS zurückgestellt. |
+| Ein Backup während laufender Eingaben ist konsistent                      | **erfüllt** (Rust: 20 Dokumente, 5 Backups; E2E: Speichern in einer Schleife).                                                                                               |
+| Ein Abbruch während des Backups hinterlässt keine fertig aussehende Datei | **erfüllt** (Rust: 25 harte Abbrüche; Abbrechen in Rust).                                                                                                                    |
+| Nach der Wiederherstellung stimmen alle Prüfsummen                        | **erfüllt** (Rust und E2E).                                                                                                                                                  |
+| Ein verändertes oder beschädigtes Backup wird abgelehnt                   | **erfüllt** (Rust: 13 Fälle; E2E).                                                                                                                                           |
+| Das Backup enthält keine früheren Backups                                 | **erfüllt** (Rust).                                                                                                                                                          |
 
 ## Was konnte nicht getestet werden und warum?
 
-- **Der Systemdruckdialog und „Als PDF speichern“:** ein natives Fenster, das der eingebettete WebDriver nicht bedient (ADR 0003). Ein Handtest unter Windows und Linux steht aus.
+- **Der Druckdialog von WebView2 (Windows):** Den bedient der WebDriver nicht, und lokal habe ich kein Windows. Geprüft ist, was WebView2 als PDF druckt. Den GTK-Dialog unter Linux habe ich einmal lokal mit xdotool bedient (unten). Er läuft nicht in CI, weil er von Fensterkoordinaten abhängt.
 - **macOS:** zurückgestellt.
 - **Windows:** läuft in CI (Rust, Vitest, E2E mit WebView2). Lokal nur Linux.
 - **Echte Sync-Ordner und Netzlaufwerke als Backup-Ziel:** keine im Container; harte Links fallen dort auf Kopien zurück (in Rust geprüft ist nur der Rückfallweg im Code, nicht ein echtes Netzlaufwerk).
@@ -80,7 +80,24 @@ Was die Tests zeigen, im Einzelnen:
 
 Keine bekannten. Eine Beobachtung: Im ersten lokalen E2E-Gesamtlauf lag die Galerie-Messung aus Phase 8 (zweiter Durchgang, 95 % der Bildwechsel) bei 64 ms, Grenze 50 ms. Im zweiten Lauf waren es 42 ms; in CI bisher immer darunter. Phase 10 ändert an der Galerie nichts, und die Backup-Automatik ist in E2E abgeschaltet; ich halte es für Schwankung des Containers (Software-Rendering, 4 vCPU). Tritt es wieder auf, gehe ich ihm nach.
 
+## Drucken nachgetestet
+
+Unter Linux habe ich den echten Weg geprüft: Xvfb mit 1600 × 1000 Pixeln, das E2E-Programm, `Ctrl + P`. xdotool wählt im GTK-Dialog „Print to File“ und dann „Print“ bzw. drückt Escape. Danach habe ich die PDF mit Poppler gelesen und jede Seite als Bild angesehen. Ergebnis:
+
+- **Drucken:** Die PDF hat den Dokumenttitel als Titel, ist A4 und enthält nur das Dokument, mit Titel und Text. Sofort danach ist die Oberfläche wie vorher, auch der Fenstertitel.
+- **Abbrechen:** WebKitGTK sendet kein `afterprint`. Kopie, Fenstertitel und Druckattribut blieben stehen (F-53). Jetzt räumt der nächste Tastendruck oder Klick auf, nachdem `print()` zurückgekehrt ist.
+- **Seiten:** Absätze werden zwischen den Seiten getrennt, nicht mitten in einer Zeile. Ränder sind auf allen Seiten da. Der Link ist unterstrichen und zeigt seine Adresse.
+- **Suchmarkierung:** Ein Dokument, das aus einem Suchtreffer geöffnet war, druckte die blaue Markierung des Treffers mit (F-52). Jetzt entfernt die Druckkopie die Markierungen von Suchen und Ersetzen, das ausgewählte Bild und den Lückencursor.
+- **Links in der PDF:** WebKitGTK schreibt keine Linkflächen, die Adresse steht aber als Text da. WebView2 schreibt Linkflächen; in CI geprüft.
+- **Dateiname unter Linux:** Der GTK-Dialog schlägt `output.pdf` im Arbeitsordner des Programms vor, nicht den Dokumenttitel. In der Datei selbst steht der Titel. Abhilfe wäre ein eigener Druckauftrag über WebKitGTK mit dem Titel als Dateiname (eine direkte Abhängigkeit `webkit2gtk`, die schon im Abhängigkeitsbaum steckt). Ich habe das nicht gebaut; das entscheidest du.
+
+Der Versuch lief in einem temporären Ordner im Projekt und wurde danach gelöscht. Die PDF entstand im Projektordner und wurde dort entfernt. Der WebDriver schreibt seine Druckdatei zuerst in einen temporären Ordner; der liegt in E2E jetzt in `tests/e2e/.tmp/tmp` (Abschnitt 2).
+
 ## Behobene Fehler
+
+F-52 (eigener Test): Die Markierung eines Suchtreffers wurde mitgedruckt. Die Druckkopie entfernt jetzt alles, was nur der Bildschirm zeigt.
+
+F-53 (eigener Test, Linux): Nach „Abbrechen“ im Druckdialog blieben Druckkopie und Fenstertitel stehen, weil WebKitGTK kein `afterprint` sendet. Jetzt räumt die nächste Eingabe auf.
 
 F-51 (CI-Lauf 110, Windows): Nach der Prüfung eines Backups mit beschädigter Datenbank blieb die Prüfkopie im Arbeitsordner liegen. Die Integritätsprüfung brach mit einem Fehler ab und schloss die Datenbankverbindung nicht selbst; geschlossen wurde sie erst später im Hintergrund, und so lange verweigert Windows das Löschen. Jetzt wird die Verbindung in jedem Fall geschlossen, bevor der Fehler zurückkommt; ebenso beim Vergleich der Datenbankkopie beim Verschieben einer Bibliothek (Phase 2). Unter Linux tritt das nicht auf, weil dort auch offene Dateien gelöscht werden können.
 
@@ -88,7 +105,7 @@ Während der Arbeit fanden die Tests außerdem: einen Typfehler in einer Meldung
 
 ## Gefundene Widersprüche und Abweichungen
 
-1. **Drucken und PDF auf allen drei Systemen** (Abschnitt 25): macOS ist zurückgestellt, und den Druckdialog kann niemand im Test bedienen. Ich schlage vor: ein kurzer Handtest je System mit einer Checkliste (drucken, als PDF speichern, Seitenränder, Bilder, Links) – sag mir, ob du ihn selbst machen willst oder ob ich eine Checkliste in `docs/` anlegen soll.
+1. **Drucken und PDF auf allen drei Systemen** (Abschnitt 25): macOS ist zurückgestellt. Den Druckdialog von Windows bedient der Test nicht (siehe oben).
 2. **„Während des Backups schreibt Autosave nur nach `recovery/`“** (Abschnitt 21): Gelöst über die Schreibsperre nur für den kurzen Schnappschuss (Datenbankkopie und harte Links); so lange wartet das Speichern, die Recovery-Entwürfe laufen weiter. Das Ergebnis ist dasselbe – kein Verlust, ein fester Stand –, ohne einen zweiten Speicherweg.
 3. **Vor jeder Migration ein vollständiges Backup** statt der Datenbankkopie aus Abschnitt 18 (wie `docs/database.md` es für Phase 10 vorsah). Bei großen Bibliotheken dauert das erste Öffnen nach einem Update entsprechend länger.
 4. **Pakete:** Medien über 100 MiB werden abgelehnt (Grenze des Medienimports für Dateien, die nicht aus dem Dateidialog kommen).

@@ -134,4 +134,13 @@
   #pw-print [contenteditable] {
     outline: none;
   }
+
+  /* Marks of the screen are removed from the copy; should one remain, it
+     prints as plain text. */
+  #pw-print .find-and-replace-result,
+  #pw-print .find-and-replace-result-current,
+  #pw-print .ProseMirror-selectednode {
+    background: none;
+    outline: none;
+  }
 }
