@@ -14,7 +14,7 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur 
 
 Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout, Vorschläge).
 
-CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Windows an F-51). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100); Lauf 116 läuft. Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 12
 
