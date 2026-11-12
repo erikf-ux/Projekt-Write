@@ -65,6 +65,7 @@ Entscheidungen in ADR 0022.
 - `modules/commands/{types,keymap}.ts`
 - `modules/documents/workspaceStore.ts`, `modules/media/MediaPanels.tsx`
 - `modules/settings/ShortcutSettings.tsx` (F-54)
+- `modules/documents/sessionTabs.ts` mit Test, `app/Workbench.tsx` (F-56)
 - `services/ipc.ts`, `i18n/{de,en}.json`, `types/generated/`
 - `vite.config.ts` (d3-color unter dem eingefrorenen Prototyp)
 
@@ -105,11 +106,29 @@ Lokal (Linux-Container, Xvfb), ausgeführt und bestanden: Prettier, ESLint, Type
 
 ## Lasttest
 
-LASTTEST
+Gemessen in der Referenzbibliothek (`reference.e2e.ts`): Der Cluster „Nicht zugeordnet“ wird geöffnet, dann zeichnet das Mesh 1.000 Knoten und 531 Kanten. Gemessen werden je 120 Bilder Zoomen und Verschieben. Angegeben ist das 95. Perzentil der Bildzeiten, Ziel 33,3 ms (30 Bilder pro Sekunde, Abschnitt 6).
+
+| Stand                      | Umgebung                        | Zoom (95 %)  | Verschieben (95 %) |
+| -------------------------- | ------------------------------- | ------------ | ------------------ |
+| erste Fassung              | CI Windows, WebView2 (Lauf 113) | 207 ms       | 37,1 ms            |
+| erste Fassung              | CI Linux, WebKitGTK (Lauf 113)  | 158 ms       | 125 ms             |
+| gerade Kanten, Detailstufe | Container (zwei Läufe)          | 147 / 181 ms | 83 / 91 ms         |
+| gerade Kanten, Detailstufe | CI Windows (Lauf 116)           | 220 ms       | 34,6 ms            |
+| gerade Kanten, Detailstufe | CI Linux (Lauf 116)             | 124 ms       | 60 ms              |
+
+Keine der Umgebungen hat eine GPU. Unter Windows liegt Verschieben im Median bei 31,2 ms und damit im Ziel; beim 95. Perzentil fehlen 1,3 ms. Zoomen liegt dort im Median bei 20,1 ms, die Ausreißer bis 220 ms entstehen beim Neurastern in einem neuen Maßstab. Ein leeres Bild braucht 16 bis 17 ms. Der Rest ist Malen in Software.
+
+**Ergebnis:** Der Zielwert ist ohne GPU nicht erreicht. Wie Abschnitt 25 es für diesen Fall verlangt, entscheidet ADR 0022 über den Renderer: React Flow bleibt hinter der Renderer-Schnittstelle. Auf einem Referenzgerät mit GPU wird der Lasttest wiederholt. Verfehlt das Mesh dort den Zielwert, kommt ein Canvas- oder WebGL-Renderer mit neuer ADR. Die Messung ist als offene Aufgabe eingetragen. Der Test meldet den Zielwert, erzwingt ihn aber nicht.
 
 ## Abnahmekriterien Phase 11
 
-ABNAHME
+| Kriterium (Abschnitt 25)                                                                                   | Stand                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Das Mesh erreicht den Zielwert aus Abschnitt 6, sonst liegt eine ADR zum Renderer vor                      | Zielwert ohne GPU nicht erreicht (Windows: Verschieben 34,6 ms, Zoomen 220 ms bei 95 %); ADR 0022 mit Entscheidung liegt vor |
+| Nach einem Vorschlagslauf sind alle bestätigten Beziehungen unverändert, belegt durch einen Datenvergleich | erfüllt (Rust, Vergleich aller Beziehungstabellen vor und nach dem Lauf; E2E)                                                |
+| Vorschläge stehen nur in `mesh_suggestions`. Abgelehnte kommen nicht wieder                                | erfüllt (Rust, E2E)                                                                                                          |
+| Abgeleitete Verbindungen stehen nicht in `mesh_connections`                                                | erfüllt (Rust)                                                                                                               |
+| Das Mesh ist auch per Tastatur bedienbar                                                                   | erfüllt (E2E: Ansichten, Verbinden, Entfernen, Rückgängig, Kontextmenü per Tastatur)                                         |
 
 ## Was konnte nicht getestet werden und warum?
 
