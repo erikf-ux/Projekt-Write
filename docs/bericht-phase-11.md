@@ -2,7 +2,7 @@
 
 Stand: 12. November 2026. Zweig `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig). Entwicklungsumgebung: Cloud-Container, Ubuntu 24.04, 4 vCPU, keine GPU (Xvfb, Software-Rendering), WebKitGTK. CI: GitHub Actions `windows-latest` und `ubuntu-24.04`, beide ohne GPU; macOS ist zurückgestellt.
 
-ZUSAMMENFASSUNG
+Phase 11 ist umgesetzt: das Mesh mit Gesamtnetz, Subnetz- und Fokusansicht, bestätigten Verbindungen, automatischem Layout in einem Web Worker, Vorschlägen im Hintergrund und vollständiger Tastaturbedienung. Die Abnahmekriterien zu Daten und Tastatur sind durch Tests belegt. Den Zielwert von 30 Bildern pro Sekunde erreicht das Mesh mit 1.000 Knoten ohne GPU nicht. Dazu liegt, wie Abschnitt 25 es für diesen Fall verlangt, ADR 0022 mit der Entscheidung zum Renderer vor. Eine Messung auf einem Gerät mit GPU steht aus.
 
 ## Was wurde implementiert?
 
@@ -85,7 +85,13 @@ Neue Abhängigkeiten:
 
 ## Welche Tests wurden durchgeführt?
 
-TESTZAHLEN
+| Art                      | Anzahl                            | Ergebnis                                 |
+| ------------------------ | --------------------------------- | ---------------------------------------- |
+| Rust (Unit, Integration) | 516 (511 ausgeführt, 5 ignoriert) | bestanden                                |
+| Vitest                   | 730 in 42 Dateien                 | bestanden                                |
+| E2E (WebdriverIO)        | 19 Spec-Dateien                   | bestanden (lokal, Linux; CI siehe unten) |
+
+Von den 5 ignorierten Rust-Tests sind 4 Hilfsprozesse, die andere Tests selbst starten (harte Abbrüche, Sperre der Bibliothek). Einer braucht die Referenzbibliothek und läuft über `PW_REFERENCE_LIBRARY`.
 
 Lokal (Linux-Container, Xvfb), ausgeführt und bestanden: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy (Linux, Linux + `e2e`, Windows-Ziel), alle Rust-Tests, erzeugte Typen, Lizenzliste, E2E-Gesamtlauf mit 19 Dateien.
 
