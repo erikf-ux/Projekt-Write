@@ -56,3 +56,82 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Printing and PDF (section 21, ADR 0021): the app copies the writing
+ * surface of the active document into #pw-print; only that is printed,
+ * in black on white, with page margins.
+ */
+#pw-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 2cm;
+  }
+
+  html[data-printing] body > :not(#pw-print) {
+    display: none !important;
+  }
+
+  html[data-printing],
+  html[data-printing] body {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    color: #000;
+  }
+
+  html[data-printing] #pw-print {
+    display: block;
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #000;
+  }
+
+  #pw-print .pw-print-title {
+    font-size: 18pt;
+    font-weight: 600;
+    margin: 0 0 1em;
+  }
+
+  #pw-print h1,
+  #pw-print h2,
+  #pw-print h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  #pw-print p,
+  #pw-print li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  #pw-print img {
+    max-width: 100%;
+    break-inside: avoid;
+  }
+
+  #pw-print pre,
+  #pw-print blockquote,
+  #pw-print table {
+    break-inside: avoid;
+  }
+
+  #pw-print pre {
+    white-space: pre-wrap;
+  }
+
+  /* Web addresses printed after their link text. */
+  #pw-print a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.9em;
+  }
+
+  #pw-print [contenteditable] {
+    outline: none;
+  }
+}

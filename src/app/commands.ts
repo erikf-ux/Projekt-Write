@@ -24,6 +24,14 @@ import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
 import { rebuildSearchIndex } from '@/modules/search/rebuild';
+import { useBackup } from '@/modules/backup/backupStore';
+import {
+  exportActive,
+  exportLibrary,
+  exportPackActive,
+  importPack,
+  printActive,
+} from '@/modules/export/exportActions';
 import { useSearch } from '@/modules/search/searchStore';
 import type { TextFormat } from '@/types/generated/TextFormat';
 import type { UiSettings } from '@/types/generated/UiSettings';
@@ -180,6 +188,96 @@ export function createAppCommands(): CommandDefinition[] {
         if (document) {
           await workspace().takeIntoLibrary(document.id);
         }
+      },
+    },
+    {
+      id: 'document.print',
+      category: 'document',
+      titleKey: 'command.document.print',
+      isAvailable: () => activeDocument(workspace())?.loaded === true,
+      run: async () => {
+        await printActive(false);
+      },
+    },
+    {
+      id: 'export.pdf',
+      category: 'document',
+      titleKey: 'command.export.pdf',
+      isAvailable: () => activeDocument(workspace())?.loaded === true,
+      run: async () => {
+        await printActive(true);
+      },
+    },
+    {
+      id: 'export.txt',
+      category: 'document',
+      titleKey: 'command.export.txt',
+      isAvailable: () => activeLibraryDocument()?.loaded === true,
+      run: async () => {
+        await exportActive('txt');
+      },
+    },
+    {
+      id: 'export.markdown',
+      category: 'document',
+      titleKey: 'command.export.markdown',
+      isAvailable: () => activeLibraryDocument()?.loaded === true,
+      run: async () => {
+        await exportActive('markdown');
+      },
+    },
+    {
+      id: 'export.pack',
+      category: 'document',
+      titleKey: 'command.export.pack',
+      isAvailable: () => activeLibraryDocument()?.loaded === true,
+      run: async () => {
+        await exportPackActive();
+      },
+    },
+    {
+      id: 'import.pack',
+      category: 'document',
+      titleKey: 'command.import.pack',
+      isAvailable: libraryOpen,
+      run: async () => {
+        await importPack();
+      },
+    },
+    {
+      id: 'export.library',
+      category: 'app',
+      titleKey: 'command.export.library',
+      isAvailable: libraryOpen,
+      run: async () => {
+        await exportLibrary();
+      },
+    },
+    {
+      id: 'backup.create',
+      category: 'app',
+      titleKey: 'command.backup.create',
+      isAvailable: () => libraryOpen() && !useBackup.getState().busy,
+      run: async () => {
+        await useBackup.getState().create();
+      },
+    },
+    {
+      id: 'backup.check',
+      category: 'app',
+      titleKey: 'command.backup.check',
+      isAvailable: () => !useBackup.getState().busy,
+      run: async () => {
+        await useBackup.getState().check();
+      },
+    },
+    {
+      id: 'backup.restore',
+      category: 'app',
+      titleKey: 'command.backup.restore',
+      isAvailable: () => !useBackup.getState().busy,
+      run: async () => {
+        await useBackup.getState().restore();
       },
     },
     {

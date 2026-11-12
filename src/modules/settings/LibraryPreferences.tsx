@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { errorText } from '@/components/errorText';
 import { useT, type MessageKey } from '@/i18n';
 import { useLibrary } from '@/modules/library/libraryStore';
+import { BackupPreferences } from '@/modules/backup/BackupPreferences';
 import { rebuildSearchIndex } from '@/modules/search/rebuild';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
@@ -122,6 +123,7 @@ export function LibraryPreferences() {
         {input('weeklyDays')}
         <p className="text-ui mt-1 text-muted">{t('settings.library.historyHint')}</p>
       </fieldset>
+      <BackupPreferences />
       <fieldset className={FIELDSET} data-testid="search-index-preferences">
         <legend className="text-ui font-semibold tracking-wide text-muted uppercase">
           {t('settings.searchIndex')}

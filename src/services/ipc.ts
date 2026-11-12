@@ -90,6 +90,20 @@ import type { TagRequest } from '@/types/generated/TagRequest';
 import type { UndoHistory } from '@/types/generated/UndoHistory';
 import type { RebuildReport } from '@/types/generated/RebuildReport';
 import type { SearchHit } from '@/types/generated/SearchHit';
+import type { BackupOptionsRequest } from '@/types/generated/BackupOptionsRequest';
+import type { BackupOverview } from '@/types/generated/BackupOverview';
+import type { BackupProgress } from '@/types/generated/BackupProgress';
+import type { BackupSummary } from '@/types/generated/BackupSummary';
+import type { DialogTitleRequest } from '@/types/generated/DialogTitleRequest';
+import type { RestoreRequest } from '@/types/generated/RestoreRequest';
+import type { ExportDocumentRequest } from '@/types/generated/ExportDocumentRequest';
+import type { ExportOutcome } from '@/types/generated/ExportOutcome';
+import type { ExportLibraryRequest } from '@/types/generated/ExportLibraryRequest';
+import type { ExportPlan } from '@/types/generated/ExportPlan';
+import type { ExportLibraryAddRequest } from '@/types/generated/ExportLibraryAddRequest';
+import type { ExportIdRequest } from '@/types/generated/ExportIdRequest';
+import type { ExportPackRequest } from '@/types/generated/ExportPackRequest';
+import type { PackImport } from '@/types/generated/PackImport';
 import type { SearchRequest } from '@/types/generated/SearchRequest';
 import type { UpdateSubnetRequest } from '@/types/generated/UpdateSubnetRequest';
 import type { VersionRequest } from '@/types/generated/VersionRequest';
@@ -150,6 +164,21 @@ export interface Commands {
   structure_history: { request: EmptyRequest; response: UndoHistory };
   search_query: { request: SearchRequest; response: SearchHit[] };
   search_rebuild: { request: EmptyRequest; response: RebuildReport };
+  backup_overview: { request: EmptyRequest; response: BackupOverview };
+  backup_choose_target: { request: DialogTitleRequest; response: BackupOverview | null };
+  backup_reset_target: { request: EmptyRequest; response: BackupOverview };
+  backup_set_options: { request: BackupOptionsRequest; response: BackupOverview };
+  backup_create: { request: EmptyRequest; response: BackupSummary };
+  backup_cancel: { request: EmptyRequest; response: boolean };
+  backup_check: { request: DialogTitleRequest; response: BackupSummary | null };
+  backup_restore: { request: RestoreRequest; response: LibraryStatus | null };
+  export_document: { request: ExportDocumentRequest; response: ExportOutcome | null };
+  export_library_begin: { request: ExportLibraryRequest; response: ExportPlan | null };
+  export_library_add: { request: ExportLibraryAddRequest; response: null };
+  export_library_finish: { request: ExportIdRequest; response: ExportOutcome };
+  export_library_cancel: { request: ExportIdRequest; response: boolean };
+  export_pack: { request: ExportPackRequest; response: number | null };
+  import_pack: { request: ExportLibraryRequest; response: PackImport | null };
   structure_undo: { request: EmptyRequest; response: StructureUpdate | null };
   structure_redo: { request: EmptyRequest; response: StructureUpdate | null };
   subnet_create: { request: CreateSubnetRequest; response: StructureUpdate };
@@ -210,6 +239,9 @@ export interface ProgressCommands {
   library_move: MoveProgress;
   media_import_files: ImportProgress;
   media_import_folder: ImportProgress;
+  backup_create: BackupProgress;
+  backup_check: BackupProgress;
+  backup_restore: BackupProgress;
 }
 
 export type CommandName = keyof Commands;
@@ -278,6 +310,11 @@ const errorCodes: Record<ErrorCode, true> = {
   MEDIA_IN_USE: true,
   IMPORT_NOT_FOUND: true,
   MEDIA_OPEN_FAILED: true,
+  BACKUP_REFUSED: true,
+  BACKUP_NEWER: true,
+  BACKUP_RUNNING: true,
+  BACKUP_TARGET_INSIDE_LIBRARY: true,
+  BACKUP_CANCELLED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

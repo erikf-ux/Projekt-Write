@@ -37,6 +37,12 @@ pub enum MenuCommand {
     DocumentOpenFile,
     #[serde(rename = "document.saveAs")]
     DocumentSaveAs,
+    #[serde(rename = "document.print")]
+    DocumentPrint,
+    #[serde(rename = "export.pdf")]
+    ExportPdf,
+    #[serde(rename = "backup.create")]
+    BackupCreate,
     #[serde(rename = "tab.close")]
     TabClose,
     #[serde(rename = "settings.open")]
@@ -110,11 +116,14 @@ pub enum MenuCommand {
 }
 
 impl MenuCommand {
-    pub const ALL: [MenuCommand; 39] = [
+    pub const ALL: [MenuCommand; 42] = [
         MenuCommand::DocumentNew,
         MenuCommand::DocumentSave,
         MenuCommand::DocumentOpenFile,
         MenuCommand::DocumentSaveAs,
+        MenuCommand::DocumentPrint,
+        MenuCommand::ExportPdf,
+        MenuCommand::BackupCreate,
         MenuCommand::TabClose,
         MenuCommand::SettingsOpen,
         MenuCommand::AppQuit,
@@ -159,6 +168,9 @@ impl MenuCommand {
             MenuCommand::DocumentSave => "document.save",
             MenuCommand::DocumentOpenFile => "document.openFile",
             MenuCommand::DocumentSaveAs => "document.saveAs",
+            MenuCommand::DocumentPrint => "document.print",
+            MenuCommand::ExportPdf => "export.pdf",
+            MenuCommand::BackupCreate => "backup.create",
             MenuCommand::TabClose => "tab.close",
             MenuCommand::SettingsOpen => "settings.open",
             MenuCommand::AppQuit => "app.quit",
@@ -285,6 +297,11 @@ const LAYOUT: [(&str, &[Option<MenuCommand>]); 4] = [
             Some(MenuCommand::DocumentSave),
             Some(MenuCommand::DocumentSaveAs),
             Some(MenuCommand::TabClose),
+            None,
+            Some(MenuCommand::DocumentPrint),
+            Some(MenuCommand::ExportPdf),
+            None,
+            Some(MenuCommand::BackupCreate),
             None,
             Some(MenuCommand::SettingsOpen),
             None,

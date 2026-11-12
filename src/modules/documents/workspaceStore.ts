@@ -341,7 +341,7 @@ const FORMAT_KEYS: Record<DocumentFormat, MessageKey> = {
 };
 
 /** What a conversion loses, as one line of text. */
-function conversionDetails(conversion: Conversion): string {
+export function conversionDetails(conversion: Conversion): string {
   const text = (key: MessageKey) => translate(useLocale.getState().locale, key);
   const parts = [...new Set(conversion.losses.map((loss) => text(LOSS_KEYS[loss.kind])))];
   if (conversion.formattingLost) {
