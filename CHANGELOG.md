@@ -4,6 +4,22 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 11 – Mesh
+
+#### Hinzugefügt
+
+- Das Mesh als eigener Tab (`Strg + Umschalt + M`, Aktivitätsleiste): Dokumente, Medien und Subnetze als Knoten, Subnetze als farbige Hüllen, Medien orange, Archiviertes grau, Symbole je Art.
+- Ansichten: Gesamtnetz mit eingeklappten Clustern (auch „Nicht zugeordnet“), Subnetzansicht, Fokusansicht (eine oder zwei Stufen); Breadcrumb und Minimap; höchstens 1.000 Knoten auf einmal, der Rest wird gemeldet.
+- Verbindungen: von Hand ziehen (Griff oder `C`), entfernen mit `Entf`, rückgängig mit `Strg + Z`; Verweise (Links, Medien im Text) und weitere Subnetze werden abgeleitet angezeigt und führen über das Kontextmenü zu ihrer Quelle; Tags heben hervor, statt Kanten zu bilden.
+- Ziehen verschiebt und fixiert einen Knoten; Ablegen auf einem Subnetz (auch aus dem Explorer) ordnet zu, mit Rückgängig; Kontextmenü für Knoten und Kanten (`Shift + F10`).
+- „Automatisch anordnen“ (`L`) mit ELK.js im Hintergrund, fixierte Knoten bleiben stehen; „Alles neu anordnen“ (`Shift + L`); Positionen je Ansicht.
+- Vorschläge: Die Analyse vergleicht Tags, Titel, Inhalte, Links, Importordner und Subnetze, nennt ihre Gründe und übernimmt nichts von selbst; Annehmen, Ablehnen (kommt nicht wieder), Später; Schwellenwert einstellbar.
+- Bedienung vollständig per Tastatur (Pfeiltasten, Enter, Leertaste, `F`, `C`, `E`, `Entf`, Escape, `+`/`-`/`0`).
+
+#### Behoben
+
+- F-54: Der Rekorder für Tastenkürzel nahm den Fokus nicht immer.
+
 ### Phase 10 – Export und Backup
 
 #### Hinzugefügt

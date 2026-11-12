@@ -2,7 +2,7 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 10 – Export und Backup** (in Arbeit). Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 11 – Mesh** (in Arbeit). Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
 
 ## Voraussetzungen
 
@@ -55,6 +55,8 @@ Ordnung ist freiwillig: **Subnetze** gliedern die Bibliothek als Baum (Explorer 
 **Suche** – `Strg + Umschalt + F` öffnet die Suche in der Seitenleiste. Sie durchsucht Titel, Inhalte, Tags, Medien und Subnetze; `Mueller` findet auch `Müller`, `Strasse` auch `Straße`, `haus` auch `Krankenhaus`. Filter grenzen nach Typ, Tags, Subnetz, Datum und Favoriten ein und nehmen Archiv und Papierkorb dazu. Enter oder ein Klick öffnet den Treffer an der Fundstelle. Fehlen Treffer, baut „Suchindex neu aufbauen“ (Einstellungen › Bibliothek) den Index neu auf.
 
 **Export und Backup** – Ein Dokument exportieren Sie als TXT oder Markdown (mit seinen Medien im Ordner daneben) oder als Paket `.pwritepack`, das Sie in eine andere Bibliothek importieren können; „Bibliothek exportieren …“ legt alles als Markdown-Ordner ab, der auch ohne die App lesbar ist. `Strg + P` druckt, „Als PDF exportieren …“ öffnet den Druckdialog für ein PDF. Einstellungen › Bibliothek › Backup: Ziel wählen (die App warnt, wenn es auf demselben Datenträger liegt), tägliches Backup beim Start, Anzahl, „Backup erstellen“, „Backup prüfen …“ und „Aus Backup wiederherstellen (Stufe 5) …“ – die Wiederherstellung entsteht in einem neuen Ordner, die bisherige Bibliothek bleibt.
+
+**Mesh** – `Strg + Umschalt + M` zeigt das Wissensnetz: Subnetze als farbige Cluster, darin Dokumente und Medien, dazwischen Verweise und Ihre eigenen Verbindungen. Ein Klick auf ein Subnetz öffnet es, `F` zeigt einen Knoten mit seinen Nachbarn, ein Griff am Knoten (oder `C`) verbindet zwei Elemente. „Vorschläge“ sucht nach Ähnlichem und schlägt nur vor – Sie entscheiden. Alles geht auch mit der Tastatur.
 
 Nichts geht verloren, ohne dass Sie es wollen (vier Stufen): Beim nächsten Start sind die Tabs der letzten Sitzung wieder offen, mit Ansicht und Auswahl. Nach einem Absturz bietet die App an, was seit dem letzten Speichern getippt wurde (es fehlen höchstens die letzten ein bis zwei Sekunden). Gelöschte Dokumente liegen im Papierkorb des Explorers, bis Sie ihn leeren oder 30 Tage um sind; „Wiederherstellen“ bringt sie mit allen Verbindungen zurück. Ältere Stände eines Dokuments zeigt „Versionen …“ in der Befehlspalette, neben dem aktuellen Stand; „Version speichern …“ legt einen benannten Stand an, der bleibt. Vor jeder Wiederherstellung sichert die App den aktuellen Stand als Version. Dokumente, die Sie gerade nicht brauchen, legen Sie ins Archiv. Wie lange Papierkorb und Versionen aufbewahrt werden, stellen Sie unter Einstellungen › Bibliothek ein.
 

@@ -77,11 +77,11 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `document_media`               | Medien, die ein Dokument einbindet oder verweist | vorhanden (v8)     |
 | `search_entries`               | Zuordnung FTS-Zeile → Element                    | vorhanden (v9)     |
 | `search_words`, `search_parts` | FTS5-Index (Abschnitt 19)                        | vorhanden (v9)     |
-| `mesh_nodes`                   | Knoten des Mesh (ein Eintrag je Element/Subnetz) | geplant (Phase 11) |
-| `mesh_connections`             | Bestätigte Verbindungen                          | geplant (Phase 11) |
-| `mesh_suggestions`             | Vorschläge mit Wert, Begründung und Status       | geplant (Phase 11) |
-| `mesh_layouts`                 | Layout je Ansicht                                | geplant (Phase 11) |
-| `mesh_positions`               | Knotenpositionen je Layout                       | geplant (Phase 11) |
+| `mesh_nodes`                   | Knoten des Mesh (ein Eintrag je Element/Subnetz) | Migration 0010     |
+| `mesh_connections`             | Bestätigte Verbindungen                          | Migration 0010     |
+| `mesh_suggestions`             | Vorschläge mit Wert, Begründung und Status       | Migration 0010     |
+| `mesh_layouts`                 | Layout je Ansicht                                | Migration 0010     |
+| `mesh_positions`               | Knotenpositionen je Layout                       | Migration 0010     |
 | `dictionaries`                 | Eigene und Hunspell-Wörterbücher                 | geplant (Phase 12) |
 | `dictionary_words`             | Einträge eigener Wörterbücher                    | geplant (Phase 12) |
 | `document_dictionaries`        | Wörterbücher eines Dokuments                     | geplant (Phase 12) |
@@ -262,7 +262,7 @@ Datei: `media/images/<id>.<ext>`, `media/pdf/<id>.pdf`, `media/attachments/<id>.
 
 Die Ansichten `search_document_fields`, `search_media_fields` und `search_subnet_fields` beschreiben, was der Index je Element hält (ADR 0020, Punkt 2). Trigger halten es in der Transaktion jeder Änderung aktuell: Anlegen und Ändern von Dokumenten, Medien und Subnetzen, Tags und Zuordnungen; das Löschen eines Eintrags (auch über `ON DELETE CASCADE`) entfernt beide FTS-Zeilen. Den Text eines Dokuments schreibt Rust in der Transaktion, die den Inhalt festhält, und setzt `indexed_sha256`; weicht sie von `documents.content_sha256` ab, trägt das Öffnen der Bibliothek den Text aus der Datei nach. Archiv und Papierkorb ändern den Index nicht; die Suche liest den Zustand aus `documents` und `media`. „Suchindex neu aufbauen“ leert alle drei Tabellen und füllt sie aus den Tabellen und Dateien neu.
 
-### `mesh_nodes` – geplant (Phase 11)
+### `mesh_nodes` – Migration 0010 (ADR 0022)
 
 | Spalte        | Typ                   | Regeln                                    |
 | ------------- | --------------------- | ----------------------------------------- |
@@ -274,19 +274,21 @@ Die Ansichten `search_document_fields`, `search_media_fields` und `search_subnet
 
 `CHECK`: genau eine der drei Spalten ist gesetzt, passend zu `kind`, und gleich `id`. Trigger legen den Knoten beim Anlegen eines Elements an; die Migration trägt Knoten für bestehende Elemente nach.
 
-### `mesh_connections` – geplant (Phase 11)
+### `mesh_connections` – Migration 0010
 
 `id` (UUID), `node_a`, `node_b` (→ `mesh_nodes`, CASCADE), `kind` (`manual` oder `similarity` – angenommener Vorschlag), `note` TEXT NULL, `created_at`. Regeln aus Abschnitt 18: `CHECK (node_a < node_b)` (keine Selbstverbindung, Endpunkte sortiert), `UNIQUE (node_a, node_b, kind)`, Index auf `node_b`. Enthält nur Bestätigtes.
 
-### `mesh_suggestions` – geplant (Phase 11)
+### `mesh_suggestions` – Migration 0010
 
 `id`, `node_a`, `node_b` (sortiert, `CHECK (node_a < node_b)`), `score` REAL (`0 … 1`), `reason` TEXT (JSON mit den Anteilen, z. B. gemeinsame Tags, Inhaltsähnlichkeit), `status` (`open`, `accepted`, `rejected`), `created_at`, `decided_at` NULL. `UNIQUE (node_a, node_b)`: Abgelehnte Vorschläge bleiben als Zeile stehen und kommen deshalb nicht wieder; „Später“ lässt den Status `open`. Getrennt von `mesh_connections` (Abschnitt 15).
 
-### `mesh_layouts`, `mesh_positions` – geplant (Phase 11)
+### `mesh_layouts`, `mesh_positions` – Migration 0010
 
 `mesh_layouts`: `id`, `view` (`global`, `subnet`, `focus`), `scope_id` TEXT NOT NULL DEFAULT `''` (Subnetz bzw. Knoten; leer für die Global View), `algorithm`, `options` (JSON), `updated_at`; `UNIQUE (view, scope_id)`.
 
 `mesh_positions`: `layout_id` → `mesh_layouts` (CASCADE), `node_id` → `mesh_nodes` (CASCADE), `x`, `y` REAL, `pinned` INTEGER (0/1; manuell verschobene Knoten bleiben fixiert), Primärschlüssel `(layout_id, node_id)`.
+
+Umgesetzt wie geplant, mit diesen Ergänzungen: `mesh_suggestions` prüft, dass `decided_at` genau bei entschiedenen Vorschlägen gesetzt ist, und hat einen Index auf offene Vorschläge nach Wert; `mesh_layouts.scope_id` ist genau in der Global View leer; Positionen sind auf ±10⁷ begrenzt. Abgeleitete Verbindungen (Links, Medien im Text, weitere Subnetze, Tags) stehen in keiner Mesh-Tabelle; das Mesh berechnet sie bei jeder Ansicht (ADR 0022, Punkt 3). Der Cluster „Nicht zugeordnet“ ist kein Knoten; seine Position wird nicht gespeichert.
 
 ### Sprachprüfung – geplant (Phase 12)
 

@@ -4,15 +4,26 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 ## Aktuelle Phase
 
-**Phase 9 – Suche** (Abschnitt 19): abgeschlossen, lokal und in CI geprüft (Lauf 109 grün); Bericht in `docs/bericht-phase-9.md`.
+**Phase 10 – Export und Backup** (Abschnitt 21): abgeschlossen, Drucken nachgetestet (CI-Lauf 112 grün); Bericht in `docs/bericht-phase-10.md`.
 
-**Phase 10 – Export und Backup** (Abschnitt 21): freigegeben („Starte“), umgesetzt und lokal geprüft; CI-Lauf und Bericht siehe `docs/bericht-phase-10.md`. Wartet danach auf die Freigabe von Phase 11.
+**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; CI und Bericht siehe `docs/bericht-phase-11.md`. Wartet danach auf die Freigabe von Phase 12.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46), ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5).
+Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout, Vorschläge).
 
 CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Windows an F-51). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+
+## Stand Phase 11
+
+| Schritt | Inhalt                                                                                                                                                                                            | Stand                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| 1       | Lasttest mit der Referenzbibliothek (1.000 Knoten, Zoom und Verschieben), ADR 0022 zum Renderer                                                                                                   | erledigt; Werte in ADR 0022 |
+| 2       | Migration 0010 (`mesh_nodes` mit Triggern und Nachtrag, `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions`), Ansichten in Rust, Verbindungen und Positionen, Befehle; Tests | erledigt                    |
+| 3       | Mesh-Tab mit React Flow: Knoten, Hüllen, Kanten, Global/Subnet/Focus View, Breadcrumb, Minimap, Kontextmenü, Ablegen, Tastatur, Tag-Hervorhebung                                                  | erledigt                    |
+| 4       | ELK.js im Web Worker, Positionen je Ansicht, fixierte Knoten, Rückgängig                                                                                                                          | erledigt                    |
+| 5       | Vorschläge: Analyse im Hintergrund, Schwelle, Annehmen/Ablehnen/Später, Datenvergleich                                                                                                            | erledigt                    |
+| 6       | E2E, Doku, CI, Bericht                                                                                                                                                                            | erledigt; CI siehe Bericht  |
 
 ## Stand Phase 10
 
@@ -196,6 +207,7 @@ CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Win
 | F-51 | CI-Lauf 110 (Windows): Nach der Prüfung eines Backups mit beschädigter Datenbank blieb die Prüfkopie liegen; die Integritätsprüfung brach mit einem Fehler ab, ohne die Verbindung zu schließen, und Windows löscht keine offene Datei                                                                                                | Verbindung wird in jedem Fall geschlossen, bevor der Fehler zurückkommt (auch beim Vergleich der Kopie beim Verschieben einer Bibliothek)                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | F-52 | Druckprobe (Phase 10): Ein aus einem Suchtreffer geöffnetes Dokument druckte die Markierung des Treffers mit                                                                                                                                                                                                                          | Die Druckkopie entfernt Markierungen von Suchen und Ersetzen, das ausgewählte Bild und den Lückencursor; E2E prüft die PDF                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | F-53 | Druckprobe mit dem echten GTK-Dialog: Nach „Abbrechen“ blieben Druckkopie, Druckattribut und Fenstertitel stehen; WebKitGTK sendet kein `afterprint`                                                                                                                                                                                  | Die nächste Taste oder der nächste Klick nach `print()` räumt auf                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| F-54 | CI-Lauf 113 (Linux): Im Test der Tastenkürzel bekam der Rekorder den Fokus nicht; danach blieb der Einstellungsdialog offen, und 13 Spec-Dateien scheiterten als Folge                                                                                                                                                                | Der Rekorder nimmt den Fokus auch beim Einhängen (die Liste ist mit den Mesh-Kürzeln länger)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Offene Aufgaben
 
@@ -245,4 +257,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 11 (Mesh; Abschnitt 25).
+Nach Freigabe: Phase 12 (Sprachprüfung; Abschnitt 25).

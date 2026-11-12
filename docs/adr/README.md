@@ -26,3 +26,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0019](0019-medien.md)                            | Medien: Import, Typprüfung, Medien-Handler, Vorschaubilder, PDF und Verweise | angenommen                                    |
 | [0020](0020-suche.md)                             | Suche: Index, Anfragen, Filter und Aktualität                                | angenommen                                    |
 | [0021](0021-export-und-backup.md)                 | Export, Drucken, Backup und Wiederherstellung (Stufe 5)                      | angenommen                                    |
+| [0022](0022-mesh.md)                              | Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout und Vorschläge | angenommen                                    |
