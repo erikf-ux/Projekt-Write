@@ -411,6 +411,23 @@ impl LibrarySession {
         result
     }
 
+    /// Runs `operation` with the Mesh and the structure of the open library.
+    pub async fn with_mesh<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(crate::services::mesh::Mesh, Structure) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let (mesh, structure) = match &*slot {
+            Slot::Open { library, .. } => (library.mesh(), library.structure()),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(mesh, structure).await;
+        drop(slot);
+        result
+    }
+
     /// Runs `operation` with the search index of the open library.
     pub async fn with_search<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
     where

@@ -12,6 +12,7 @@ pub mod library;
 pub mod links;
 pub mod locale;
 pub mod media;
+pub mod mesh;
 pub mod opening;
 pub mod pwrite;
 pub mod recovery;

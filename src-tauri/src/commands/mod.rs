@@ -14,6 +14,7 @@ pub mod input;
 pub mod library;
 pub mod links;
 pub mod media;
+pub mod mesh;
 pub mod recovery;
 pub mod search;
 pub mod structure;
@@ -128,6 +129,11 @@ pub const COMMAND_NAMES: &[&str] = &[
     "export_library_cancel",
     "export_pack",
     "import_pack",
+    "mesh_graph",
+    "mesh_connect",
+    "mesh_disconnect",
+    "mesh_restore_connection",
+    "mesh_save_positions",
     "external_open",
     "external_read",
     "external_check",
@@ -250,6 +256,11 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         export::export_library_cancel,
         export::export_pack,
         export::import_pack,
+        mesh::mesh_graph,
+        mesh::mesh_connect,
+        mesh::mesh_disconnect,
+        mesh::mesh_restore_connection,
+        mesh::mesh_save_positions,
         external::external_open,
         external::external_read,
         external::external_check,

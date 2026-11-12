@@ -479,6 +479,15 @@ impl Library {
         )
     }
 
+    /// The Mesh of this library (section 15, ADR 0022).
+    pub fn mesh(&self) -> crate::services::mesh::Mesh {
+        crate::services::mesh::Mesh::new(
+            self.database.clone(),
+            self.generators.clone(),
+            self.write_lock.clone(),
+        )
+    }
+
     /// Exports of this library (section 21, ADR 0021).
     pub fn exports(&self) -> crate::services::export::Exports {
         crate::services::export::Exports::new(

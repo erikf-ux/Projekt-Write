@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mesh-disconnect"
+description = "Enables the mesh_disconnect command without any pre-configured scope."
+commands.allow = ["mesh_disconnect"]
+
+[[permission]]
+identifier = "deny-mesh-disconnect"
+description = "Denies the mesh_disconnect command without any pre-configured scope."
+commands.deny = ["mesh_disconnect"]

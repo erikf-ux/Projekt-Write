@@ -153,11 +153,23 @@ pub enum ErrorCode {
     BackupTargetInsideLibrary,
     /// The backup was cancelled; nothing of it stays.
     BackupCancelled,
+    /// A node of the Mesh does not exist (any more).
+    MeshNodeNotFound,
+    /// A connection of the Mesh does not exist (any more).
+    MeshConnectionNotFound,
+    /// The two nodes are already connected.
+    MeshConnectionExists,
+    /// A suggestion of the Mesh does not exist (any more).
+    MeshSuggestionNotFound,
+    /// The grouping analysis is already running.
+    MeshAnalysisRunning,
+    /// The grouping analysis was cancelled; what it found so far stays.
+    MeshAnalysisCancelled,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 66] = [
+    pub const ALL: [ErrorCode; 72] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -224,6 +236,12 @@ impl ErrorCode {
         ErrorCode::BackupRunning,
         ErrorCode::BackupTargetInsideLibrary,
         ErrorCode::BackupCancelled,
+        ErrorCode::MeshNodeNotFound,
+        ErrorCode::MeshConnectionNotFound,
+        ErrorCode::MeshConnectionExists,
+        ErrorCode::MeshSuggestionNotFound,
+        ErrorCode::MeshAnalysisRunning,
+        ErrorCode::MeshAnalysisCancelled,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -295,6 +313,12 @@ impl ErrorCode {
             ErrorCode::BackupRunning => "error.backupRunning",
             ErrorCode::BackupTargetInsideLibrary => "error.backupTargetInsideLibrary",
             ErrorCode::BackupCancelled => "error.backupCancelled",
+            ErrorCode::MeshNodeNotFound => "error.meshNodeNotFound",
+            ErrorCode::MeshConnectionNotFound => "error.meshConnectionNotFound",
+            ErrorCode::MeshConnectionExists => "error.meshConnectionExists",
+            ErrorCode::MeshSuggestionNotFound => "error.meshSuggestionNotFound",
+            ErrorCode::MeshAnalysisRunning => "error.meshAnalysisRunning",
+            ErrorCode::MeshAnalysisCancelled => "error.meshAnalysisCancelled",
         }
     }
 }

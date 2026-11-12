@@ -315,6 +315,12 @@ const errorCodes: Record<ErrorCode, true> = {
   BACKUP_RUNNING: true,
   BACKUP_TARGET_INSIDE_LIBRARY: true,
   BACKUP_CANCELLED: true,
+  MESH_NODE_NOT_FOUND: true,
+  MESH_CONNECTION_NOT_FOUND: true,
+  MESH_CONNECTION_EXISTS: true,
+  MESH_SUGGESTION_NOT_FOUND: true,
+  MESH_ANALYSIS_RUNNING: true,
+  MESH_ANALYSIS_CANCELLED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };
