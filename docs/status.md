@@ -12,7 +12,7 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur 
 
 Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46), ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5).
 
-CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 111 grün (Abschluss Phase 10; Lauf 110 rot unter Windows an F-51). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 10
 
