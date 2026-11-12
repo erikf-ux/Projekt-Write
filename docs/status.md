@@ -8,7 +8,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; CI und Bericht siehe `docs/bericht-phase-11.md`.
 
-**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): ein erster Teil vorgezogen („Setze schon einmal teilweise fort“), ohne neue Abhängigkeit in der App. Der Rest wartet auf die Freigabe.
+**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): angehalten („Fange noch nicht mit Phase 12 an“). Vorgezogen und behalten ist nur der Vergleich der Prüfwerke (ADR 0023, Korpus, `tools/spell-compare`). Ein Entwurf von Satzsegmentierung und Autokorrektur-Regel wurde wieder herausgenommen, ungeprüft; er liegt in Commit `9d47f7c`.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
@@ -18,16 +18,16 @@ CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Win
 
 ## Stand Phase 12
 
-| Schritt | Inhalt                                                                                                     | Stand                                               |
-| ------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1       | Vergleich `spellbook` und Hunspell mit Korpus (1.198 richtige Wörter, 212 Fehler), ADR 0023                | erledigt; `spellbook` gewählt                       |
-| 2       | Satzsegmentierung mit Ausnahmelisten je Sprache, Testdaten Satzende                                        | erledigt (Rust, `services/language/sentences.rs`)   |
-| 3       | Eindeutigkeitsregel der Autokorrektur, je Bedingung ein Test                                               | erledigt (Rust, `services/language/autocorrect.rs`) |
-| 4       | `LanguageEngine` mit `spellbook`, Wörterbücher (Bezug und Auslieferung per ADR), neu sortierte Vorschläge  | offen, nach Freigabe                                |
-| 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Autokorrektur mit Undo, Tippverzögerung            | offen                                               |
-| 6       | Eigene Wörterbücher, Zuweisung, Import und Export; Sprachprofile, Spracherkennung, mehrsprachige Dokumente | offen                                               |
-| 7       | LanguageTool als Zusatzpaket (Sidecar, nur `127.0.0.1`)                                                    | offen                                               |
-| 8       | E2E, Doku, CI, Bericht                                                                                     | offen                                               |
+| Schritt | Inhalt                                                                                                     | Stand                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1       | Vergleich `spellbook` und Hunspell mit Korpus (1.198 richtige Wörter, 212 Fehler), ADR 0023                | erledigt; `spellbook` gewählt                  |
+| 2       | Satzsegmentierung mit Ausnahmelisten je Sprache, Testdaten Satzende                                        | offen (Entwurf in Commit `9d47f7c`, ungeprüft) |
+| 3       | Eindeutigkeitsregel der Autokorrektur, je Bedingung ein Test                                               | offen (Entwurf in Commit `9d47f7c`, ungeprüft) |
+| 4       | `LanguageEngine` mit `spellbook`, Wörterbücher (Bezug und Auslieferung per ADR), neu sortierte Vorschläge  | offen, nach Freigabe                           |
+| 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Autokorrektur mit Undo, Tippverzögerung            | offen                                          |
+| 6       | Eigene Wörterbücher, Zuweisung, Import und Export; Sprachprofile, Spracherkennung, mehrsprachige Dokumente | offen                                          |
+| 7       | LanguageTool als Zusatzpaket (Sidecar, nur `127.0.0.1`)                                                    | offen                                          |
+| 8       | E2E, Doku, CI, Bericht                                                                                     | offen                                          |
 
 ## Stand Phase 11
 
