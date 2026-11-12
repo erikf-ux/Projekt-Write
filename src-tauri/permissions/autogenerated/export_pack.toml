@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-export-pack"
+description = "Enables the export_pack command without any pre-configured scope."
+commands.allow = ["export_pack"]
+
+[[permission]]
+identifier = "deny-export-pack"
+description = "Denies the export_pack command without any pre-configured scope."
+commands.deny = ["export_pack"]

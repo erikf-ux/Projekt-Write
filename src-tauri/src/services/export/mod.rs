@@ -8,6 +8,7 @@
 //! the target and is renamed only at the end.
 
 pub mod names;
+pub mod pack;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -545,6 +546,16 @@ impl Exports {
             documents,
             media: media_count,
         })
+    }
+
+    /// Writes a `.pwritepack` of the `.pwrite` file `document` to `file`;
+    /// returns the number of media in it.
+    pub async fn export_pack(&self, document: &[u8], file: &Path) -> Result<u32, pack::PackError> {
+        if let Some(folder) = file.parent() {
+            self.check_outside(folder)
+                .map_err(|_| pack::PackError::Refused("target inside the library".into()))?;
+        }
+        pack::export_pack(&self.root, &self.database, document, file).await
     }
 
     /// Stops a library export and removes what it wrote.

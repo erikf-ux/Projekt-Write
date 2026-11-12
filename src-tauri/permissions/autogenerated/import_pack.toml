@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-import-pack"
+description = "Enables the import_pack command without any pre-configured scope."
+commands.allow = ["import_pack"]
+
+[[permission]]
+identifier = "deny-import-pack"
+description = "Denies the import_pack command without any pre-configured scope."
+commands.deny = ["import_pack"]

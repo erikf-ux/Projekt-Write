@@ -294,3 +294,181 @@ async fn the_library_exports_as_a_usable_folder() {
     ));
     library.close().await;
 }
+
+/// A change to the entries of a ZIP (name and bytes).
+type Change = dyn Fn(&mut Vec<(String, Vec<u8>)>);
+
+fn rezip(path: &Path, out: &Path, change: impl Fn(&mut Vec<(String, Vec<u8>)>)) {
+    use std::io::{Read, Write};
+    let mut archive = zip::ZipArchive::new(fs::File::open(path).unwrap()).unwrap();
+    let mut entries: Vec<(String, Vec<u8>)> = (0..archive.len())
+        .map(|index| {
+            let mut entry = archive.by_index(index).unwrap();
+            let mut data = Vec::new();
+            entry.read_to_end(&mut data).unwrap();
+            (entry.name().unwrap().into_owned(), data)
+        })
+        .collect();
+    change(&mut entries);
+    let mut writer = zip::ZipWriter::new(fs::File::create(out).unwrap());
+    for (name, data) in &entries {
+        writer
+            .start_file(name.as_str(), zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(data).unwrap();
+    }
+    writer.finish().unwrap();
+}
+
+async fn counts(library: &Library) -> (i64, i64) {
+    let pool = library.database().reader();
+    let documents: i64 = sqlx::query_scalar("SELECT count(*) FROM documents")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let media: i64 = sqlx::query_scalar("SELECT count(*) FROM media")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    (documents, media)
+}
+
+#[tokio::test]
+async fn a_package_travels_with_its_media_and_a_changed_one_is_refused() {
+    use project_write_lib::services::export::pack;
+
+    let dir = common::temp_dir("pw-export-");
+    let source = create(&dir.path().join("quelle")).await;
+    let image = import_svg(&source, "karte.svg").await;
+    let file = pwrite::new_file(
+        &Uuid::nil().to_string(),
+        "Reisebericht",
+        "2026-11-11T10:00:00.000Z",
+        "de",
+        serde_json::json!({"type": "doc", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Mit Karte"}]},
+            {"type": "image", "attrs": {"src": format!("pwmedia://{image}"), "alt": "Karte"}}
+        ]}),
+    );
+    let bytes = pwrite::to_bytes(&file);
+    let out = dir.path().join("pakete");
+    fs::create_dir_all(&out).unwrap();
+    let package = out.join("Reisebericht.pwritepack");
+    assert_eq!(
+        source
+            .exports()
+            .export_pack(&bytes, &package)
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(!out.join("Reisebericht.pwritepack.part").exists());
+    source.close().await;
+
+    let target = create(&dir.path().join("ziel")).await;
+    let imported = pack::import_pack(&package, &target.media(), &target.documents())
+        .await
+        .unwrap();
+    assert_eq!((imported.imported, imported.reused), (1, 0));
+    assert_eq!(imported.title, "Reisebericht");
+    let new_id = Uuid::try_parse(&imported.document_id).unwrap();
+    let media = target.media().list().await.unwrap();
+    assert_eq!(media.len(), 1);
+    let (_, content) = target.documents().read(new_id).await.unwrap();
+    let text = String::from_utf8(content).unwrap();
+    assert!(
+        text.contains(&format!("pwmedia://{}", media[0].id)),
+        "{text}"
+    );
+    assert!(!text.contains(&image.to_string()));
+    // Again: the medium is used, a second document comes.
+    let again = pack::import_pack(&package, &target.media(), &target.documents())
+        .await
+        .unwrap();
+    assert_eq!((again.imported, again.reused), (0, 1));
+    assert_eq!(counts(&target).await, (2, 1));
+
+    let medium_entry = format!("media/{image}.svg");
+    let cases: Vec<(&str, Box<Change>)> = vec![
+        (
+            "changed medium",
+            Box::new(|entries: &mut Vec<(String, Vec<u8>)>| {
+                entries
+                    .iter_mut()
+                    .find(|(name, _)| name.starts_with("media/"))
+                    .unwrap()
+                    .1
+                    .push(b' ');
+            }),
+        ),
+        (
+            "changed document",
+            Box::new(|entries: &mut Vec<(String, Vec<u8>)>| {
+                entries
+                    .iter_mut()
+                    .find(|(name, _)| name == "document.pwrite")
+                    .unwrap()
+                    .1
+                    .push(b' ');
+            }),
+        ),
+        (
+            "extra entry",
+            Box::new(|entries: &mut Vec<(String, Vec<u8>)>| {
+                entries.push((format!("media/{}.png", Uuid::new_v4()), b"x".to_vec()));
+            }),
+        ),
+        (
+            "path out",
+            Box::new(|entries: &mut Vec<(String, Vec<u8>)>| {
+                entries.push(("../boese.pwrite".to_owned(), b"x".to_vec()));
+            }),
+        ),
+        (
+            "no manifest",
+            Box::new(|entries: &mut Vec<(String, Vec<u8>)>| {
+                entries.retain(|(name, _)| name != "manifest.json");
+            }),
+        ),
+    ];
+    for (index, (what, change)) in cases.iter().enumerate() {
+        let changed = out.join(format!("fall-{index}.pwritepack"));
+        rezip(&package, &changed, change);
+        let result = pack::import_pack(&changed, &target.media(), &target.documents()).await;
+        assert!(result.is_err(), "{what} was imported");
+        assert_eq!(counts(&target).await, (2, 1), "{what} left something");
+    }
+    // A program disguised as a picture, checksums matching: the type check
+    // refuses it and nothing stays.
+    let disguised = out.join("getarnt.pwritepack");
+    rezip(&package, &disguised, |entries| {
+        let program = b"MZ\x90\x00 kein Bild".to_vec();
+        let sha = project_write_lib::services::documents::sha256_hex(&program);
+        let size = program.len();
+        entries
+            .iter_mut()
+            .find(|(name, _)| name.starts_with("media/"))
+            .unwrap()
+            .1 = program;
+        let manifest = entries
+            .iter_mut()
+            .find(|(name, _)| name == "manifest.json")
+            .unwrap();
+        let mut json: serde_json::Value = serde_json::from_slice(&manifest.1).unwrap();
+        json["media"][0]["sha256"] = serde_json::Value::from(sha);
+        json["media"][0]["size"] = serde_json::Value::from(size);
+        manifest.1 = serde_json::to_vec(&json).unwrap();
+    });
+    assert!(
+        pack::import_pack(&disguised, &target.media(), &target.documents())
+            .await
+            .is_err()
+    );
+    assert_eq!(counts(&target).await, (2, 1));
+    let _ = medium_entry;
+    let tmp_left: Vec<_> = fs::read_dir(dir.path().join("ziel/tmp"))
+        .map(|entries| entries.filter_map(Result::ok).collect())
+        .unwrap_or_default();
+    assert!(tmp_left.is_empty(), "{tmp_left:?}");
+    target.close().await;
+}

@@ -103,6 +103,8 @@ fn main() {
         "export_library_add",
         "export_library_finish",
         "export_library_cancel",
+        "export_pack",
+        "import_pack",
         "external_open",
         "external_read",
         "external_check",

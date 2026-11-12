@@ -247,3 +247,124 @@ pub async fn export_library_cancel(
         .await?
         .cancel_library_export(export_id))
 }
+
+pub(crate) fn pack_error(error: crate::services::export::pack::PackError) -> CommandError {
+    use crate::services::export::pack::PackError;
+    match error {
+        PackError::Refused(reason) => {
+            log::warn!("package refused: {reason}");
+            CommandError::new(ErrorCode::BackupRefused).with_detail("reason", reason)
+        }
+        PackError::Newer(what) => {
+            CommandError::new(ErrorCode::BackupNewer).with_detail("reason", what)
+        }
+        PackError::NotPwrite => CommandError::invalid_input("document", "not a .pwrite document"),
+        PackError::MediumRefused(reason) => {
+            CommandError::new(ErrorCode::MediaTypeRefused).with_detail("reason", reason)
+        }
+        PackError::Document(error) => {
+            log::error!("package document not created: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        }
+        PackError::Database(error) => {
+            log::error!("package database error: {error}");
+            CommandError::new(ErrorCode::Database)
+        }
+        PackError::Io(error) => {
+            log::error!("package file error: {error}");
+            CommandError::new(ErrorCode::FileSystem)
+        }
+    }
+}
+
+/// Request of `export_pack`: the `.pwrite` file the frontend produced.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ExportPackRequest {
+    pub id: String,
+    pub document: String,
+    pub title: String,
+}
+
+impl Validate for ExportPackRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        parse_uuid("id", &self.id)?;
+        check_title("title", &self.title)?;
+        check_text(&self.document)
+    }
+}
+
+/// "Als Paket exportieren": a `.pwritepack` to the file of the save
+/// dialog; returns the number of media, `None` if cancelled.
+#[tauri::command]
+pub async fn export_pack(
+    state: State<'_, AppState>,
+    request: Input<ExportPackRequest>,
+) -> Result<Option<u32>, CommandError> {
+    let request = request.into_inner();
+    let id = parse_uuid("id", &request.id)?;
+    let exports = state.session.exports().await?;
+    let suggested = exports
+        .suggested_name(id, TextKind::Markdown)
+        .await
+        .map_err(export_error)?;
+    let stem = suggested.trim_end_matches(".md").to_owned();
+    let answer = state.files.pick_file(
+        FileDialog::Save,
+        FilePickRequest {
+            title: request.title,
+            start_in: None,
+            file_name: Some(format!(
+                "{stem}.{}",
+                crate::services::export::pack::EXTENSION
+            )),
+            filters: vec![FileFilter {
+                name: "Project Write Paket".to_owned(),
+                extensions: vec![crate::services::export::pack::EXTENSION.to_owned()],
+            }],
+        },
+    );
+    let Ok(Some(file)) = answer.await else {
+        return Ok(None);
+    };
+    exports
+        .export_pack(request.document.as_bytes(), &file)
+        .await
+        .map(Some)
+        .map_err(pack_error)
+}
+
+/// "Paket importieren": a `.pwritepack` from the file dialog; `None` if
+/// cancelled.
+#[tauri::command]
+pub async fn import_pack(
+    state: State<'_, AppState>,
+    request: Input<ExportLibraryRequest>,
+) -> Result<Option<crate::services::export::pack::PackImport>, CommandError> {
+    let request = request.into_inner();
+    let media = state.session.media().await?;
+    let documents = state
+        .session
+        .with_documents(|documents| async move { Ok(documents) })
+        .await?;
+    let answer = state.files.pick_file(
+        FileDialog::Open,
+        FilePickRequest {
+            title: request.title,
+            start_in: None,
+            file_name: None,
+            filters: vec![FileFilter {
+                name: "Project Write Paket".to_owned(),
+                extensions: vec![crate::services::export::pack::EXTENSION.to_owned()],
+            }],
+        },
+    );
+    let Ok(Some(file)) = answer.await else {
+        return Ok(None);
+    };
+    crate::services::export::pack::import_pack(&file, &media, &documents)
+        .await
+        .map(Some)
+        .map_err(pack_error)
+}

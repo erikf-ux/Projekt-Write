@@ -84,6 +84,8 @@
     "allow-export-library-add",
     "allow-export-library-finish",
     "allow-export-library-cancel",
+    "allow-export-pack",
+    "allow-import-pack",
     "allow-external-open",
     "allow-external-read",
     "allow-external-check",
