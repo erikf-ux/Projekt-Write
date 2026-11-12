@@ -1,0 +1,15 @@
+# Phase 12, ADR 0023: compares spellbook with the Hunspell library on the
+# German corpus (src-tauri/tests/data/language). Not part of the app; not
+# shipped. Run: cargo run --release -- /usr/share/hunspell/de_DE
+[package]
+name = "spell-compare"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+spellbook = "=0.4.2"
+hunspell-rs = "=0.4.0"
+
+[workspace]
