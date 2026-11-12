@@ -166,7 +166,15 @@ Keine bekannten. Eine Beobachtung, wie in Phase 10: Die Galerie-Messung aus Phas
 
 ## CI
 
-CI_ABSCHNITT
+| Lauf | Ergebnis      | Ursache                                                                                                      |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------ |
+| 113  | rot (Linux)   | F-54: Rekorder ohne Fokus, 13 Spec-Dateien als Folge                                                         |
+| 114  | rot (Windows) | erster Klick im Mesh-Test landete auf einem Knoten, der gerade ersetzt wurde; der Test klickt seitdem erneut |
+| 115  | rot (beide)   | F-55: Clippy der neuen Rust-Fassung 1.100                                                                    |
+| 116  | rot (beide)   | F-56 (Sitzung nahm den Tab weg), F-57 (Mesh-Test der Tags); Lasttest-Werte dieses Laufs oben                 |
+| 117  | LAUF117       |                                                                                                              |
+
+Audits und Release-Prüfung waren in allen Läufen grün.
 
 ## Nächster Schritt
 
