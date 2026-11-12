@@ -104,6 +104,27 @@ impl LibrarySetting for BackupKeep {
     }
 }
 
+/// Threshold of the grouping analysis (section 15: "einstellbaren
+/// Schwellenwert, Startwert 0,35").
+pub struct MeshSuggestionThreshold;
+
+impl LibrarySetting for MeshSuggestionThreshold {
+    const KEY: &'static str = "mesh.suggestionThreshold";
+    type Value = f64;
+
+    fn default_value() -> Self::Value {
+        crate::services::mesh::suggestions::DEFAULT_THRESHOLD
+    }
+
+    fn validate(value: &Self::Value) -> Result<(), &'static str> {
+        if value.is_finite() && (0.05..=0.95).contains(value) {
+            Ok(())
+        } else {
+            Err("between 0.05 and 0.95")
+        }
+    }
+}
+
 /// Largest image accepted, in megapixels (section 17: "Grenzwerte schützen
 /// vor Bildbomben, Startwert 100 Megapixel"; ADR 0019, decision 4).
 pub struct MediaMaxMegapixels;

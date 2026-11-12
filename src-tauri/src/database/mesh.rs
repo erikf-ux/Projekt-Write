@@ -323,3 +323,171 @@ pub async fn delete_position(
         .await?;
     Ok(())
 }
+
+/// Tags of documents and media, as (element, tag).
+pub async fn element_tags(pool: &SqlitePool) -> Result<Vec<(String, String)>, sqlx::Error> {
+    sqlx::query(
+        "SELECT document_id, tag_id FROM document_tags \
+         UNION ALL SELECT media_id, tag_id FROM media_tags ORDER BY 1, 2",
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(|row| Ok((row.try_get(0)?, row.try_get(1)?)))
+    .collect()
+}
+
+/// The indexed text of each document (search index, ADR 0020).
+pub async fn document_texts(pool: &SqlitePool) -> Result<Vec<(String, String)>, sqlx::Error> {
+    sqlx::query(
+        "SELECT e.document_id, w.body FROM search_entries AS e \
+         JOIN search_words AS w ON w.rowid = e.id \
+         WHERE e.document_id IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(|row| {
+        Ok((
+            row.try_get(0)?,
+            row.try_get::<Option<String>, _>(1)?.unwrap_or_default(),
+        ))
+    })
+    .collect()
+}
+
+/// Pairs that are connected or were suggested, whatever was decided.
+pub async fn known_pairs(pool: &SqlitePool) -> Result<Vec<(String, String)>, sqlx::Error> {
+    sqlx::query(
+        "SELECT node_a, node_b FROM mesh_connections \
+         UNION SELECT node_a, node_b FROM mesh_suggestions",
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(|row| Ok((row.try_get(0)?, row.try_get(1)?)))
+    .collect()
+}
+
+/// A row of `mesh_suggestions` with the titles of both ends.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SuggestionRow {
+    pub id: String,
+    pub node_a: String,
+    pub node_b: String,
+    pub score: f64,
+    pub reason: String,
+    pub status: String,
+    pub created_at: String,
+    pub decided_at: Option<String>,
+}
+
+pub async fn insert_suggestion(
+    connection: &mut SqliteConnection,
+    row: &SuggestionRow,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "INSERT INTO mesh_suggestions (id, node_a, node_b, score, reason, status, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, 'open', ?6) ON CONFLICT (node_a, node_b) DO NOTHING",
+    )
+    .bind(&row.id)
+    .bind(&row.node_a)
+    .bind(&row.node_b)
+    .bind(row.score)
+    .bind(&row.reason)
+    .bind(&row.created_at)
+    .execute(connection)
+    .await?
+    .rows_affected()
+        > 0)
+}
+
+fn suggestion_from(row: &sqlx::sqlite::SqliteRow) -> Result<SuggestionRow, sqlx::Error> {
+    Ok(SuggestionRow {
+        id: row.try_get(0)?,
+        node_a: row.try_get(1)?,
+        node_b: row.try_get(2)?,
+        score: row.try_get(3)?,
+        reason: row.try_get(4)?,
+        status: row.try_get(5)?,
+        created_at: row.try_get(6)?,
+        decided_at: row.try_get(7)?,
+    })
+}
+
+/// Open suggestions, the best first.
+pub async fn open_suggestions(
+    pool: &SqlitePool,
+    limit: i64,
+) -> Result<Vec<SuggestionRow>, sqlx::Error> {
+    sqlx::query(
+        "SELECT id, node_a, node_b, score, reason, status, created_at, decided_at \
+         FROM mesh_suggestions WHERE status = 'open' ORDER BY score DESC, node_a, node_b LIMIT ?1",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(suggestion_from)
+    .collect()
+}
+
+/// Every suggestion, for checks and tests.
+pub async fn all_suggestions(pool: &SqlitePool) -> Result<Vec<SuggestionRow>, sqlx::Error> {
+    sqlx::query(
+        "SELECT id, node_a, node_b, score, reason, status, created_at, decided_at \
+         FROM mesh_suggestions ORDER BY node_a, node_b",
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(suggestion_from)
+    .collect()
+}
+
+pub async fn suggestion(
+    connection: &mut SqliteConnection,
+    id: &str,
+) -> Result<Option<SuggestionRow>, sqlx::Error> {
+    sqlx::query(
+        "SELECT id, node_a, node_b, score, reason, status, created_at, decided_at \
+         FROM mesh_suggestions WHERE id = ?1",
+    )
+    .bind(id)
+    .fetch_optional(connection)
+    .await?
+    .as_ref()
+    .map(suggestion_from)
+    .transpose()
+}
+
+pub async fn decide_suggestion(
+    connection: &mut SqliteConnection,
+    id: &str,
+    status: &str,
+    now: &str,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE mesh_suggestions SET status = ?2, decided_at = ?3 WHERE id = ?1 AND status = 'open'",
+    )
+    .bind(id)
+    .bind(status)
+    .bind(now)
+    .execute(connection)
+    .await?
+    .rows_affected())
+}
+
+/// Titles of nodes (documents, media, subnets) by id.
+pub async fn node_titles(pool: &SqlitePool) -> Result<Vec<(String, String, String)>, sqlx::Error> {
+    sqlx::query(
+        "SELECT id, 'document', title FROM documents \
+         UNION ALL SELECT id, 'media', title FROM media \
+         UNION ALL SELECT id, 'subnet', name FROM subnets",
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(|row| Ok((row.try_get(0)?, row.try_get(1)?, row.try_get(2)?)))
+    .collect()
+}

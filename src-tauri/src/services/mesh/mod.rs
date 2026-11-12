@@ -5,7 +5,7 @@
 pub mod graph;
 pub mod suggestions;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,10 @@ use crate::database::mesh::{self as rows, ConnectionRow, PositionRow};
 pub use graph::{
     GraphQuery, MAX_DRAWN_NODES, MeshCrumb, MeshData, MeshEdge, MeshEdgeKind, MeshGraph, MeshNode,
     MeshNodeKind, MeshView, UNASSIGNED_ID,
+};
+use suggestions::{
+    AnalysisElement, AnalysisProgress, AnalysisRegistry, AnalysisReport, AnalysisStep,
+    SuggestionReason,
 };
 
 /// Positions one call may save.
@@ -84,12 +88,38 @@ pub struct MeshPosition {
     pub pinned: bool,
 }
 
+/// A suggestion with the titles of both ends.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MeshSuggestion {
+    pub id: String,
+    pub node_a: String,
+    pub node_b: String,
+    pub title_a: String,
+    pub title_b: String,
+    pub kind_a: MeshNodeKind,
+    pub kind_b: MeshNodeKind,
+    pub score: f64,
+    pub reason: SuggestionReason,
+}
+
+/// "Annehmen" or "Ablehnen"; "Später" leaves a suggestion open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SuggestionDecision {
+    Accept,
+    Reject,
+}
+
 /// The Mesh of one open library.
 #[derive(Debug, Clone)]
 pub struct Mesh {
     database: Database,
     generators: Generators,
     write_lock: Arc<tokio::sync::Mutex<()>>,
+    analyses: Arc<AnalysisRegistry>,
 }
 
 fn sorted(a: &str, b: &str) -> (String, String) {
@@ -105,12 +135,247 @@ impl Mesh {
         database: Database,
         generators: Generators,
         write_lock: Arc<tokio::sync::Mutex<()>>,
+        analyses: Arc<AnalysisRegistry>,
     ) -> Self {
         Self {
             database,
             generators,
             write_lock,
+            analyses,
         }
+    }
+
+    /// Documents and media outside the trash and the archive, with what
+    /// the analysis compares.
+    pub async fn analysis_input(&self) -> Result<Vec<AnalysisElement>, MeshError> {
+        let pool = self.database.reader();
+        let mut elements: Vec<AnalysisElement> = Vec::new();
+        let mut position: HashMap<String, usize> = HashMap::new();
+        for row in rows::elements(pool)
+            .await?
+            .into_iter()
+            .filter(|e| !e.archived)
+        {
+            position.insert(row.id.clone(), elements.len());
+            elements.push(AnalysisElement {
+                id: row.id,
+                title: row.title,
+                import_folder: row.import_folder.filter(|f| !f.is_empty()),
+                ..AnalysisElement::default()
+            });
+        }
+        for (element, tag) in rows::element_tags(pool).await? {
+            if let Some(&i) = position.get(&element) {
+                elements[i].tags.push(tag);
+            }
+        }
+        for member in rows::members(pool).await? {
+            if let Some(&i) = position.get(&member.element_id) {
+                elements[i].subnets.push(member.subnet_id);
+            }
+        }
+        for (from, to) in rows::references(pool).await? {
+            if let Some(&i) = position.get(&from) {
+                elements[i].links.push(to);
+            }
+        }
+        for (document, text) in rows::document_texts(pool).await? {
+            if let Some(&i) = position.get(&document) {
+                elements[i].text = text;
+            }
+        }
+        Ok(elements)
+    }
+
+    /// Runs the grouping analysis in the background (section 15) and stores
+    /// what it finds in `mesh_suggestions`; never touches confirmed
+    /// connections. Cancelled, it stores nothing.
+    pub async fn analyze(
+        &self,
+        threshold: f64,
+        progress: Arc<dyn Fn(AnalysisProgress) + Send + Sync>,
+    ) -> Result<AnalysisReport, MeshError> {
+        let cancel = self.analyses.start().ok_or(MeshError::AnalysisRunning)?;
+        let result = self.run_analysis(threshold, cancel, progress).await;
+        self.analyses.finish();
+        result
+    }
+
+    async fn run_analysis(
+        &self,
+        threshold: f64,
+        cancel: Arc<std::sync::atomic::AtomicBool>,
+        progress: Arc<dyn Fn(AnalysisProgress) + Send + Sync>,
+    ) -> Result<AnalysisReport, MeshError> {
+        progress(AnalysisProgress {
+            step: AnalysisStep::Reading,
+            done: 0,
+            total: 1,
+        });
+        let elements = self.analysis_input().await?;
+        let known: HashSet<(String, String)> = rows::known_pairs(self.database.reader())
+            .await?
+            .into_iter()
+            .collect();
+        let count = u32::try_from(elements.len()).unwrap_or(u32::MAX);
+        let flag = cancel.clone();
+        let report = progress.clone();
+        let found = tokio::task::spawn_blocking(move || {
+            suggestions::analyze(&elements, &known, threshold, &flag, &*report)
+        })
+        .await
+        .map_err(|_| MeshError::Cancelled)?;
+        let Some((found, compared)) = found else {
+            return Err(MeshError::Cancelled);
+        };
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(MeshError::Cancelled);
+        }
+        progress(AnalysisProgress {
+            step: AnalysisStep::Saving,
+            done: 0,
+            total: u32::try_from(found.len()).unwrap_or(u32::MAX),
+        });
+        let _guard = self.write_lock.lock().await;
+        let mut tx = self.database.writer().begin().await?;
+        let now = self.generators.now().to_iso();
+        let mut created = 0;
+        for candidate in &found {
+            let row = rows::SuggestionRow {
+                id: self.generators.new_id().hyphenated().to_string(),
+                node_a: candidate.node_a.clone(),
+                node_b: candidate.node_b.clone(),
+                score: candidate.score,
+                reason: serde_json::to_string(&candidate.reason)
+                    .unwrap_or_else(|_| "{}".to_owned()),
+                status: "open".to_owned(),
+                created_at: now.clone(),
+                decided_at: None,
+            };
+            if rows::insert_suggestion(&mut tx, &row).await? {
+                created += 1;
+            }
+        }
+        tx.commit().await?;
+        Ok(AnalysisReport {
+            elements: count,
+            pairs_compared: compared,
+            created,
+        })
+    }
+
+    fn settings(&self) -> crate::services::settings::library::LibrarySettings {
+        crate::services::settings::library::LibrarySettings::new(
+            self.database.clone(),
+            self.generators.clone(),
+        )
+    }
+
+    /// The threshold of the analysis (library setting).
+    pub async fn threshold(&self) -> f64 {
+        self.settings()
+            .get::<crate::services::settings::library::MeshSuggestionThreshold>()
+            .await
+            .unwrap_or(suggestions::DEFAULT_THRESHOLD)
+    }
+
+    /// Changes the threshold; `false` if the value is out of range.
+    pub async fn set_threshold(&self, value: f64) -> bool {
+        self.settings()
+            .set::<crate::services::settings::library::MeshSuggestionThreshold>(&value)
+            .await
+            .is_ok()
+    }
+
+    /// Cancels a running analysis; `false` if none runs.
+    pub fn cancel_analysis(&self) -> bool {
+        self.analyses.cancel()
+    }
+
+    /// Open suggestions, the best first.
+    pub async fn suggestions(&self, limit: u32) -> Result<Vec<MeshSuggestion>, MeshError> {
+        let pool = self.database.reader();
+        let open = rows::open_suggestions(pool, i64::from(limit)).await?;
+        if open.is_empty() {
+            return Ok(Vec::new());
+        }
+        let titles: HashMap<String, (String, String)> = rows::node_titles(pool)
+            .await?
+            .into_iter()
+            .map(|(id, kind, title)| (id, (kind, title)))
+            .collect();
+        let kind_of = |kind: &str| match kind {
+            "media" => MeshNodeKind::Media,
+            "subnet" => MeshNodeKind::Subnet,
+            _ => MeshNodeKind::Document,
+        };
+        Ok(open
+            .into_iter()
+            .map(|row| {
+                let (kind_a, title_a) = titles.get(&row.node_a).cloned().unwrap_or_default();
+                let (kind_b, title_b) = titles.get(&row.node_b).cloned().unwrap_or_default();
+                MeshSuggestion {
+                    reason: serde_json::from_str(&row.reason).unwrap_or_default(),
+                    id: row.id,
+                    node_a: row.node_a,
+                    node_b: row.node_b,
+                    title_a,
+                    title_b,
+                    kind_a: kind_of(&kind_a),
+                    kind_b: kind_of(&kind_b),
+                    score: row.score,
+                }
+            })
+            .collect())
+    }
+
+    /// Every suggestion with its status, for checks and tests.
+    pub async fn all_suggestions(&self) -> Result<Vec<(String, String, String)>, MeshError> {
+        Ok(rows::all_suggestions(self.database.reader())
+            .await?
+            .into_iter()
+            .map(|row| (row.node_a, row.node_b, row.status))
+            .collect())
+    }
+
+    /// Accepts (a connection of kind `similarity`) or rejects a suggestion;
+    /// a rejected pair keeps its row and is never suggested again.
+    pub async fn decide(
+        &self,
+        id: &str,
+        decision: SuggestionDecision,
+    ) -> Result<Option<MeshConnection>, MeshError> {
+        let _guard = self.write_lock.lock().await;
+        let mut tx = self.database.writer().begin().await?;
+        let row = rows::suggestion(&mut tx, id)
+            .await?
+            .filter(|row| row.status == "open")
+            .ok_or(MeshError::SuggestionNotFound)?;
+        let now = self.generators.now().to_iso();
+        let status = match decision {
+            SuggestionDecision::Accept => "accepted",
+            SuggestionDecision::Reject => "rejected",
+        };
+        rows::decide_suggestion(&mut tx, id, status, &now).await?;
+        let mut made = None;
+        if decision == SuggestionDecision::Accept
+            && rows::connection_between(&mut tx, &row.node_a, &row.node_b, "similarity")
+                .await?
+                .is_none()
+        {
+            let connection = ConnectionRow {
+                id: self.generators.new_id().hyphenated().to_string(),
+                node_a: row.node_a,
+                node_b: row.node_b,
+                kind: "similarity".to_owned(),
+                note: None,
+                created_at: now,
+            };
+            rows::insert_connection(&mut tx, &connection).await?;
+            made = Some(connection.into());
+        }
+        tx.commit().await?;
+        Ok(made)
     }
 
     /// Everything a view is built from.

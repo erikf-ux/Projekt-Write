@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mesh-suggestion-decide"
+description = "Enables the mesh_suggestion_decide command without any pre-configured scope."
+commands.allow = ["mesh_suggestion_decide"]
+
+[[permission]]
+identifier = "deny-mesh-suggestion-decide"
+description = "Denies the mesh_suggestion_decide command without any pre-configured scope."
+commands.deny = ["mesh_suggestion_decide"]

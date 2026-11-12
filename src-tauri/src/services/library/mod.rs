@@ -174,6 +174,7 @@ pub struct Library {
     imports: Arc<std::sync::Mutex<media::import::Batches>>,
     /// Library exports in progress (ADR 0021), for this opening only.
     exports: crate::services::export::ExportRegistry,
+    analyses: Arc<crate::services::mesh::suggestions::AnalysisRegistry>,
     /// Result of the check of the whole database (ADR 0020, decision 14).
     check: Arc<std::sync::Mutex<DatabaseCheck>>,
     /// The check running in the background; stopped when the library closes.
@@ -413,6 +414,7 @@ impl Library {
             journal: Arc::new(std::sync::Mutex::new(Journal::default())),
             imports: Arc::new(std::sync::Mutex::new(media::import::Batches::default())),
             exports: crate::services::export::Exports::new_registry(),
+            analyses: Arc::default(),
             check: Arc::new(std::sync::Mutex::new(DatabaseCheck::Pending)),
             check_task: std::sync::Mutex::new(None),
             _lock: lock,
@@ -485,6 +487,7 @@ impl Library {
             self.database.clone(),
             self.generators.clone(),
             self.write_lock.clone(),
+            self.analyses.clone(),
         )
     }
 

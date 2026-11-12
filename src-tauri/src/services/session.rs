@@ -445,6 +445,16 @@ impl LibrarySession {
         result
     }
 
+    /// The Mesh of the open library, without holding the session: the
+    /// grouping analysis runs in the background.
+    pub async fn mesh(&self) -> Result<crate::services::mesh::Mesh, CommandError> {
+        match &*self.slot.lock().await {
+            Slot::Open { library, .. } => Ok(library.mesh()),
+            Slot::Moving => Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        }
+    }
+
     /// The exports of the open library, without holding the session: a
     /// library export runs over many calls.
     pub async fn exports(&self) -> Result<crate::services::export::Exports, CommandError> {

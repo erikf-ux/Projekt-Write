@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mesh-set-threshold"
+description = "Enables the mesh_set_threshold command without any pre-configured scope."
+commands.allow = ["mesh_set_threshold"]
+
+[[permission]]
+identifier = "deny-mesh-set-threshold"
+description = "Denies the mesh_set_threshold command without any pre-configured scope."
+commands.deny = ["mesh_set_threshold"]

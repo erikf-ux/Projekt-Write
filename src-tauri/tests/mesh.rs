@@ -309,3 +309,143 @@ async fn positions_are_stored_per_view_and_can_be_dropped() {
     .unwrap();
     f.library.close().await;
 }
+
+/// Every row of the tables that hold confirmed or derived relations, in a
+/// fixed order: what a suggestion run must leave as it was.
+async fn relations(library: &Library) -> Vec<String> {
+    let mut all = Vec::new();
+    for sql in [
+        "SELECT id || '|' || node_a || '|' || node_b || '|' || kind || '|' || ifnull(note, '') || '|' || created_at FROM mesh_connections ORDER BY id",
+        "SELECT source_id || '|' || target_id FROM document_links ORDER BY 1",
+        "SELECT document_id || '|' || media_id || '|' || page FROM document_media ORDER BY 1",
+        "SELECT subnet_id || '|' || coalesce(document_id, media_id) || '|' || is_primary FROM subnet_memberships ORDER BY 1",
+        "SELECT document_id || '|' || tag_id FROM document_tags ORDER BY 1",
+    ] {
+        let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+            .fetch_all(library.database().reader())
+            .await
+            .unwrap();
+        all.push(format!("{sql}: {}", rows.join(", ")));
+    }
+    all
+}
+
+#[tokio::test]
+async fn a_suggestion_run_changes_no_confirmed_relation_and_rejected_ones_never_return() {
+    use project_write_lib::services::mesh::SuggestionDecision;
+    use std::sync::Arc;
+
+    let f = fixture().await;
+    let l = three(&f).await;
+    let documents = f.library.documents();
+    let structure = f.library.structure();
+    let text = "Stahlträger und Pfeiler tragen die Brücke über den Hafen. Die Pfeiler stehen im Wasser, die Stahlträger rosten.";
+    let mut similar = Vec::new();
+    for title in ["Brückenbau Hafen", "Brückenbau Fluss", "Brückenbau Kanal"] {
+        let id = documents
+            .create(title, DocumentFormat::Md, text.as_bytes())
+            .await
+            .unwrap()
+            .id;
+        structure
+            .tag_by_names(id, &["Bau".to_owned(), "Stahl".to_owned()])
+            .await
+            .unwrap();
+        similar.push(id.to_string());
+    }
+    let mesh = f.library.mesh();
+    mesh.connect(&l.hafen, &l.notiz, Some("von Hand"))
+        .await
+        .unwrap();
+    let before = relations(&f.library).await;
+
+    let report = mesh
+        .analyze(mesh.threshold().await, Arc::new(|_| {}))
+        .await
+        .unwrap();
+    assert!(report.created >= 3, "{report:?}");
+    // Data comparison: every confirmed and derived relation is as it was.
+    assert_eq!(relations(&f.library).await, before);
+    let open = mesh.suggestions(100).await.unwrap();
+    let pair = |a: &str, b: &str| {
+        if a < b {
+            (a.to_owned(), b.to_owned())
+        } else {
+            (b.to_owned(), a.to_owned())
+        }
+    };
+    let wanted = pair(&similar[0], &similar[1]);
+    let first = open
+        .iter()
+        .find(|s| (s.node_a.clone(), s.node_b.clone()) == wanted)
+        .expect("the two bridges are suggested");
+    assert!(first.reason.shared_tags == 2 && first.reason.content > 0.5);
+
+    // Rejected: never again. Accepted: a connection of kind similarity.
+    mesh.decide(&first.id, SuggestionDecision::Reject)
+        .await
+        .unwrap();
+    let second = open
+        .iter()
+        .find(|s| (s.node_a.clone(), s.node_b.clone()) == pair(&similar[0], &similar[2]))
+        .unwrap();
+    let made = mesh
+        .decide(&second.id, SuggestionDecision::Accept)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(made.kind, MeshEdgeKind::Similarity);
+    assert!(matches!(
+        mesh.decide(&first.id, SuggestionDecision::Accept).await,
+        Err(MeshError::SuggestionNotFound)
+    ));
+    let before = relations(&f.library).await;
+    let again = mesh
+        .analyze(mesh.threshold().await, Arc::new(|_| {}))
+        .await
+        .unwrap();
+    assert_eq!(again.created, 0, "{again:?}");
+    assert_eq!(relations(&f.library).await, before);
+    let statuses = mesh.all_suggestions().await.unwrap();
+    assert_eq!(
+        statuses
+            .iter()
+            .filter(|(a, b, _)| (a.clone(), b.clone()) == wanted)
+            .map(|(_, _, status)| status.as_str())
+            .collect::<Vec<_>>(),
+        vec!["rejected"]
+    );
+    // Suggestions only in mesh_suggestions: one accepted connection besides
+    // the manual one, nothing else.
+    let connections = mesh.connections().await.unwrap();
+    assert_eq!(connections.len(), 2);
+    f.library.close().await;
+}
+
+#[tokio::test]
+async fn only_one_analysis_runs_and_a_cancelled_one_stores_nothing() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let f = fixture().await;
+    let _ = three(&f).await;
+    let mesh = f.library.mesh();
+    // Cancelled from its first progress report.
+    let other = mesh.clone();
+    let asked = Arc::new(AtomicBool::new(false));
+    let flag = asked.clone();
+    let result = mesh
+        .analyze(
+            0.05,
+            Arc::new(move |_| {
+                if !flag.swap(true, Ordering::Relaxed) {
+                    assert!(other.cancel_analysis());
+                }
+            }),
+        )
+        .await;
+    assert!(matches!(result, Err(MeshError::Cancelled)), "{result:?}");
+    assert!(mesh.all_suggestions().await.unwrap().is_empty());
+    assert!(!mesh.cancel_analysis());
+    f.library.close().await;
+}
