@@ -8,6 +8,7 @@
 
 pub mod backup;
 pub mod documents;
+pub mod export;
 pub mod external;
 pub mod input;
 pub mod library;
@@ -120,6 +121,11 @@ pub const COMMAND_NAMES: &[&str] = &[
     "backup_cancel",
     "backup_check",
     "backup_restore",
+    "export_document",
+    "export_library_begin",
+    "export_library_add",
+    "export_library_finish",
+    "export_library_cancel",
     "external_open",
     "external_read",
     "external_check",
@@ -235,6 +241,11 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         backup::backup_cancel,
         backup::backup_check,
         backup::backup_restore,
+        export::export_document,
+        export::export_library_begin,
+        export::export_library_add,
+        export::export_library_finish,
+        export::export_library_cancel,
         external::external_open,
         external::external_read,
         external::external_check,

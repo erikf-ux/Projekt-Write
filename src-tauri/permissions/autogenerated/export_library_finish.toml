@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-export-library-finish"
+description = "Enables the export_library_finish command without any pre-configured scope."
+commands.allow = ["export_library_finish"]
+
+[[permission]]
+identifier = "deny-export-library-finish"
+description = "Denies the export_library_finish command without any pre-configured scope."
+commands.deny = ["export_library_finish"]

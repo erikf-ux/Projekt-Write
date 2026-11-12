@@ -428,6 +428,16 @@ impl LibrarySession {
         result
     }
 
+    /// The exports of the open library, without holding the session: a
+    /// library export runs over many calls.
+    pub async fn exports(&self) -> Result<crate::services::export::Exports, CommandError> {
+        match &*self.slot.lock().await {
+            Slot::Open { library, .. } => Ok(library.exports()),
+            Slot::Moving => Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        }
+    }
+
     /// The media of the open library, without holding the session: for long
     /// work (copying a folder for import) and for the media handler, which
     /// must not wait for other commands. If the library closes meanwhile,
