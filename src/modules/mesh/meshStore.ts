@@ -59,6 +59,9 @@ interface MeshStore {
     before: readonly MeshPosition[],
     remove?: readonly string[],
   ) => Promise<void>;
+  /** Automatic layout (ELK); `all` also moves pinned nodes. */
+  autoLayout: (all: boolean) => Promise<boolean>;
+  layouting: boolean;
   undo: () => Promise<boolean>;
   canUndo: () => boolean;
   invalidate: () => void;
@@ -241,6 +244,38 @@ export const useMesh = create<MeshStore>((set, get) => {
           return back.ok;
         },
       });
+    },
+
+    layouting: false,
+
+    autoLayout: async (all) => {
+      const graph = get().graph;
+      if (!graph || get().layouting) {
+        return false;
+      }
+      set({ layouting: true });
+      try {
+        const { elkPositions, layoutChanges } = await import('./autoLayout');
+        const positions = await elkPositions(graph);
+        const changes = layoutChanges(graph, positions, all);
+        if (changes.positions.length > 0) {
+          await get().savePositions(changes.positions, changes.before);
+          // The undo step of savePositions is the layout's.
+          set((state) => {
+            const steps = [...state.undoSteps];
+            const last = steps.pop();
+            return last ? { undoSteps: [...steps, { ...last, key: 'mesh.undo.layout' }] } : {};
+          });
+        }
+        useUi.getState().showNotice({ tone: 'info', key: all ? 'mesh.layoutAllDone' : 'mesh.layoutDone' });
+        await get().load();
+        return true;
+      } catch {
+        useUi.getState().showNotice({ tone: 'error', key: 'mesh.layoutFailed' });
+        return false;
+      } finally {
+        set({ layouting: false });
+      }
     },
 
     undo: async () => {

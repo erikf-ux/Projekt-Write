@@ -110,7 +110,13 @@ import type { VersionRequest } from '@/types/generated/VersionRequest';
 import type { VersionSummary } from '@/types/generated/VersionSummary';
 import type { VersionText } from '@/types/generated/VersionText';
 import type { SystemCheckResponse } from '@/types/generated/SystemCheckResponse';
+import type { AnalysisProgress } from '@/types/generated/AnalysisProgress';
+import type { AnalysisReport } from '@/types/generated/AnalysisReport';
 import type { MeshConnection } from '@/types/generated/MeshConnection';
+import type { MeshDecisionRequest } from '@/types/generated/MeshDecisionRequest';
+import type { MeshSuggestionList } from '@/types/generated/MeshSuggestionList';
+import type { MeshSuggestionsRequest } from '@/types/generated/MeshSuggestionsRequest';
+import type { MeshThresholdRequest } from '@/types/generated/MeshThresholdRequest';
 import type { MeshConnectionRequest } from '@/types/generated/MeshConnectionRequest';
 import type { MeshConnectRequest } from '@/types/generated/MeshConnectRequest';
 import type { MeshGraph } from '@/types/generated/MeshGraph';
@@ -191,6 +197,11 @@ export interface Commands {
   mesh_disconnect: { request: MeshConnectionRequest; response: MeshConnection };
   mesh_restore_connection: { request: MeshRestoreRequest; response: MeshConnection };
   mesh_save_positions: { request: MeshPositionsRequest; response: null };
+  mesh_suggestions: { request: MeshSuggestionsRequest; response: MeshSuggestionList };
+  mesh_analyze: { request: EmptyRequest; response: AnalysisReport };
+  mesh_analysis_cancel: { request: EmptyRequest; response: boolean };
+  mesh_suggestion_decide: { request: MeshDecisionRequest; response: MeshConnection | null };
+  mesh_set_threshold: { request: MeshThresholdRequest; response: number };
   structure_undo: { request: EmptyRequest; response: StructureUpdate | null };
   structure_redo: { request: EmptyRequest; response: StructureUpdate | null };
   subnet_create: { request: CreateSubnetRequest; response: StructureUpdate };
@@ -254,6 +265,7 @@ export interface ProgressCommands {
   backup_create: BackupProgress;
   backup_check: BackupProgress;
   backup_restore: BackupProgress;
+  mesh_analyze: AnalysisProgress;
 }
 
 export type CommandName = keyof Commands;

@@ -12,6 +12,7 @@ import {
   activeDocument,
   freeTitle,
   hasUnsavedChanges,
+  MESH_TAB,
   useWorkspace,
 } from '@/modules/documents/workspaceStore';
 import { useFind } from '@/modules/editor/find/findStore';
@@ -20,6 +21,7 @@ import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useMedia } from '@/modules/media/mediaStore';
+import { useMesh } from '@/modules/mesh/meshStore';
 import { nextZoom, useUi } from '@/modules/settings/uiStore';
 import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
@@ -468,6 +470,24 @@ export function createAppCommands(): CommandDefinition[] {
       isAvailable: libraryOpen,
       run: () => {
         workspace().openGallery();
+      },
+    },
+    {
+      id: 'mesh.layout',
+      category: 'view',
+      titleKey: 'command.mesh.layout',
+      isAvailable: () => libraryOpen() && workspace().active === MESH_TAB,
+      run: async () => {
+        await useMesh.getState().autoLayout(false);
+      },
+    },
+    {
+      id: 'mesh.layoutAll',
+      category: 'view',
+      titleKey: 'command.mesh.layoutAll',
+      isAvailable: () => libraryOpen() && workspace().active === MESH_TAB,
+      run: async () => {
+        await useMesh.getState().autoLayout(true);
       },
     },
     {

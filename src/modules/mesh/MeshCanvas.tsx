@@ -37,6 +37,7 @@ import {
   Shapes,
 } from 'lucide-react';
 import { type MessageKey, useT } from '@/i18n';
+import { EXPLORER_DRAG_TYPE } from '@/modules/documents/Explorer';
 import { colorValue } from '@/modules/structure/tree';
 import type { MeshEdge } from '@/types/generated/MeshEdge';
 import type { MeshNode } from '@/types/generated/MeshNode';
@@ -259,6 +260,8 @@ function Canvas({
   onToggle,
   onMoved,
   onConnect,
+  onDropOnSubnet,
+  onDropElement,
   onReady,
 }: MeshRendererProps) {
   const t = useT();
@@ -277,7 +280,7 @@ function Canvas({
           id: node.id,
           type: isElement ? 'element' : node.open ? 'hull' : 'cluster',
           position: { x: spot?.x ?? 0, y: spot?.y ?? 0 },
-          ...(node.parentId ? { parentId: node.parentId, extent: 'parent' as const } : {}),
+          ...(node.parentId ? { parentId: node.parentId } : {}),
           width,
           height,
           style: { width, height },
@@ -378,8 +381,40 @@ function Canvas({
       pinned: node.data.node.pinned,
     }));
   }, []);
+  /** The innermost subnet under a rectangle (smallest area first). */
+  const subnetAt = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }, except: string | null) => {
+      const hits = flow
+        .getIntersectingNodes(rect, true)
+        .filter((node) => node.data.node.kind === 'subnet' && node.id !== except);
+      hits.sort(
+        (a, b) =>
+          (a.measured?.width ?? 0) * (a.measured?.height ?? 0) -
+          (b.measured?.width ?? 0) * (b.measured?.height ?? 0),
+      );
+      return hits[0] ?? null;
+    },
+    [flow],
+  );
+
   const onNodeDragStop: OnNodeDrag<MeshFlowNode> = useCallback(
     (_, __, dragged) => {
+      // One element dropped on a subnet other than its own hull: assigned.
+      const only = dragged.length === 1 ? dragged[0] : undefined;
+      if (only && (only.data.node.kind === 'document' || only.data.node.kind === 'media')) {
+        const internal = flow.getInternalNode(only.id);
+        const center = internal
+          ? {
+              x: internal.internals.positionAbsolute.x + (internal.measured.width ?? 0) / 2,
+              y: internal.internals.positionAbsolute.y + (internal.measured.height ?? 0) / 2,
+            }
+          : null;
+        const target = center ? subnetAt({ ...center, width: 1, height: 1 }, only.id) : null;
+        if (target && target.id !== only.data.node.parentId) {
+          onDropOnSubnet(only.id, target.id);
+          return;
+        }
+      }
       const before = dragStart.current.filter((position) =>
         graph.nodes.some((node) => node.id === position.nodeId && node.x !== null),
       );
@@ -388,64 +423,102 @@ function Canvas({
         before,
       );
     },
-    [graph.nodes, onMoved],
+    [flow, graph.nodes, onDropOnSubnet, onMoved, subnetAt],
+  );
+
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const data = event.dataTransfer.getData(EXPLORER_DRAG_TYPE);
+      if (!data) {
+        return;
+      }
+      event.preventDefault();
+      let item: { kind?: string; id?: string };
+      try {
+        item = JSON.parse(data) as { kind?: string; id?: string };
+      } catch {
+        return;
+      }
+      if (!item.id || (item.kind !== 'document' && item.kind !== 'media')) {
+        return;
+      }
+      const point = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const target = subnetAt({ ...point, width: 1, height: 1 }, null);
+      if (target) {
+        onDropOnSubnet(item.id, target.id);
+      } else {
+        onDropElement(item.id);
+      }
+    },
+    [flow, onDropElement, onDropOnSubnet, subnetAt],
   );
 
   const many = graph.nodes.length > 300;
 
   return (
-    <ReactFlow<MeshFlowNode>
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onNodeClick={(event, node) => {
-        if (event.shiftKey) {
-          onSelect(
-            selectedSet.has(node.id) ? selected.filter((id) => id !== node.id) : [...selected, node.id],
-          );
-          return;
-        }
-        const kind = node.data.node.kind;
-        if (kind === 'subnet' && !node.data.node.open) {
-          onOpen(node.data.node);
-          return;
-        }
-        onSelect([node.id]);
-      }}
-      onNodeDoubleClick={(_, node) => {
-        onOpen(node.data.node);
-      }}
-      onEdgeClick={(_, edge) => {
-        onSelectEdge(edge.id);
-      }}
-      onPaneClick={() => {
-        onSelect([]);
-      }}
-      onConnect={(connection: Connection) => {
-        if (connection.source && connection.target) {
-          onConnect(connection.source, connection.target);
+    <div
+      className="h-full w-full"
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'link';
         }
       }}
-      onNodeDragStart={onNodeDragStart}
-      onNodeDragStop={onNodeDragStop}
-      onlyRenderVisibleElements={false}
-      minZoom={0.05}
-      maxZoom={2.5}
-      nodesFocusable={false}
-      edgesFocusable={false}
-      deleteKeyCode={null}
-      selectionKeyCode={null}
-      multiSelectionKeyCode={null}
-      zoomOnDoubleClick={false}
-      proOptions={{ hideAttribution: true }}
-      colorMode="system"
-      aria-label={t('mesh.canvas')}
+      onDrop={onDrop}
     >
-      <Background gap={24} size={1} />
-      <Controls showInteractive={false} position="bottom-right" />
-      <MiniMap pannable zoomable position="bottom-left" nodeStrokeWidth={many ? 0 : 2} />
-    </ReactFlow>
+      <ReactFlow<MeshFlowNode>
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onNodeClick={(event, node) => {
+          if (event.shiftKey) {
+            onSelect(
+              selectedSet.has(node.id) ? selected.filter((id) => id !== node.id) : [...selected, node.id],
+            );
+            return;
+          }
+          const kind = node.data.node.kind;
+          if (kind === 'subnet' && !node.data.node.open) {
+            onOpen(node.data.node);
+            return;
+          }
+          onSelect([node.id]);
+        }}
+        onNodeDoubleClick={(_, node) => {
+          onOpen(node.data.node);
+        }}
+        onEdgeClick={(_, edge) => {
+          onSelectEdge(edge.id);
+        }}
+        onPaneClick={() => {
+          onSelect([]);
+        }}
+        onConnect={(connection: Connection) => {
+          if (connection.source && connection.target) {
+            onConnect(connection.source, connection.target);
+          }
+        }}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
+        onlyRenderVisibleElements={false}
+        minZoom={0.05}
+        maxZoom={2.5}
+        nodesFocusable={false}
+        edgesFocusable={false}
+        deleteKeyCode={null}
+        selectionKeyCode={null}
+        multiSelectionKeyCode={null}
+        zoomOnDoubleClick={false}
+        proOptions={{ hideAttribution: true }}
+        colorMode="system"
+        aria-label={t('mesh.canvas')}
+      >
+        <Background gap={24} size={1} />
+        <Controls showInteractive={false} position="bottom-right" />
+        <MiniMap pannable zoomable position="bottom-left" nodeStrokeWidth={many ? 0 : 2} />
+      </ReactFlow>
+    </div>
   );
 }
 

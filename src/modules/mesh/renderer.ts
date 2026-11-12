@@ -39,5 +39,9 @@ export interface MeshRendererProps {
   onMoved: (positions: MeshPosition[], before: MeshPosition[]) => void;
   /** A connection drawn from a handle. */
   onConnect: (a: string, b: string) => void;
+  /** A node, or an element from the Explorer, dropped on a subnet. */
+  onDropOnSubnet: (elementId: string, subnetId: string) => void;
+  /** An element from the Explorer dropped beside every subnet. */
+  onDropElement: (elementId: string) => void;
   onReady: (control: MeshCanvasControl) => void;
 }

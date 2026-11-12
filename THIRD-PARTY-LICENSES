@@ -38,13 +38,14 @@ Licence summary:
      1  BSD-3-Clause/MIT
      1  Zlib
 
-npm packages (production dependencies): 85
+npm packages (production dependencies): 86
 Licence summary:
     73  MIT
      9  ISC
      1  Apache-2.0
      1  Apache-2.0 OR MIT
      1  BSD-3-Clause
+     1  EPL-2.0 OR GPL-3.0-or-later
 
 
 Rust crates
@@ -547,6 +548,7 @@ d3-selection 3.0.1                         ISC
 d3-timer 3.0.2                             ISC
 d3-transition 3.0.2                        ISC
 d3-zoom 3.0.1                              ISC
+elkjs 0.12.1                               EPL-2.0 OR GPL-3.0-or-later
 fast-equals 5.4.5                          MIT
 linkifyjs 4.4.0                            MIT
 lucide-react 1.66.0                        ISC

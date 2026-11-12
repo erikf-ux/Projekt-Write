@@ -12,9 +12,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type MessageKey, useT } from '@/i18n';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
+import { useStructure } from '@/modules/structure/structureStore';
 import type { MeshNode } from '@/types/generated/MeshNode';
 import type { MeshPosition } from '@/types/generated/MeshPosition';
 import { UNASSIGNED, useMesh } from './meshStore';
+import { SuggestionsPanel } from './SuggestionsPanel';
+import { useSuggestions } from './suggestionStore';
 import type { MeshCanvasControl } from './renderer';
 
 const MeshCanvas = lazy(() => import('./MeshCanvas'));
@@ -77,12 +80,17 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
   const control = useRef<MeshCanvasControl | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const suggestionsOpen = useSuggestions((state) => state.open);
+  const toggleSuggestions = useSuggestions((state) => state.toggle);
 
+  // Shown again, or the structure changed (Explorer, undo): drawn anew.
+  const structureSubnets = useStructure((state) => state.subnets);
+  const structureElements = useStructure((state) => state.byElement);
   useEffect(() => {
     if (!hidden) {
       void useMesh.getState().load();
     }
-  }, [hidden, mesh.generation]);
+  }, [hidden, mesh.generation, structureSubnets, structureElements]);
 
   const titleOf = useCallback(
     (node: MeshNode) =>
@@ -256,6 +264,11 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
       case 'Backspace':
         void mesh.back();
         return;
+      case 'l':
+      case 'L':
+        event.preventDefault();
+        void mesh.autoLayout(event.shiftKey);
+        return;
       case '+':
         control.current?.zoomBy(1.25);
         return;
@@ -318,47 +331,75 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
             {t('mesh.depth2')}
           </label>
         ) : null}
+        <button
+          type="button"
+          className="rounded px-1.5 py-0.5 hover:bg-muted/30"
+          data-testid="mesh-suggestions-toggle"
+          aria-pressed={suggestionsOpen}
+          onClick={toggleSuggestions}
+        >
+          {t('mesh.suggestions')}
+        </button>
+        <button
+          type="button"
+          className="rounded px-1.5 py-0.5 hover:bg-muted/30 disabled:opacity-50"
+          data-testid="mesh-layout"
+          disabled={mesh.layouting || !graph}
+          onClick={() => void mesh.autoLayout(false)}
+        >
+          {t('mesh.layout')}
+        </button>
         {graph && graph.hidden > 0 ? (
           <span className="text-warning" data-testid="mesh-hidden" role="status">
             {t('mesh.hidden', { count: graph.hidden })}
           </span>
         ) : null}
       </div>
-      <div
-        className="relative min-h-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        tabIndex={0}
-        role="application"
-        aria-label={t('mesh.canvas')}
-        aria-describedby="pw-mesh-help"
-        data-testid="mesh-canvas"
-        onKeyDown={onKeyDown}
-      >
-        {graph ? (
-          <Suspense fallback={<p className="p-4 text-sm text-muted">{t('mesh.loading')}</p>}>
-            <MeshCanvas
-              graph={graph}
-              selected={selected}
-              selectedEdge={selectedEdge}
-              titleOf={titleOf}
-              onSelect={(ids) => {
-                mesh.select(ids);
-                announce(ids[0] ?? null);
-              }}
-              onSelectEdge={mesh.selectEdge}
-              onOpen={open}
-              onToggle={(id) => void mesh.toggle(id)}
-              onMoved={onMoved}
-              onConnect={onConnect}
-              onReady={(next) => {
-                control.current = next;
-              }}
-            />
-          </Suspense>
-        ) : (
-          <p className="p-4 text-sm text-muted">
-            {mesh.error ? t(mesh.error.messageKey as MessageKey) : t('mesh.loading')}
-          </p>
-        )}
+      <div className="flex min-h-0 flex-1">
+        <div
+          className="relative min-h-0 min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          tabIndex={0}
+          role="application"
+          aria-label={t('mesh.canvas')}
+          aria-describedby="pw-mesh-help"
+          data-testid="mesh-canvas"
+          onKeyDown={onKeyDown}
+        >
+          {graph ? (
+            <Suspense fallback={<p className="p-4 text-sm text-muted">{t('mesh.loading')}</p>}>
+              <MeshCanvas
+                graph={graph}
+                selected={selected}
+                selectedEdge={selectedEdge}
+                titleOf={titleOf}
+                onSelect={(ids) => {
+                  mesh.select(ids);
+                  announce(ids[0] ?? null);
+                }}
+                onSelectEdge={mesh.selectEdge}
+                onOpen={open}
+                onToggle={(id) => void mesh.toggle(id)}
+                onMoved={onMoved}
+                onConnect={onConnect}
+                onDropOnSubnet={(elementId, subnetId) => {
+                  void useStructure
+                    .getState()
+                    .assign(elementId, subnetId)
+                    .then(() => useMesh.getState().load());
+                }}
+                onDropElement={(elementId) => void mesh.show({ view: 'focus', scopeId: elementId })}
+                onReady={(next) => {
+                  control.current = next;
+                }}
+              />
+            </Suspense>
+          ) : (
+            <p className="p-4 text-sm text-muted">
+              {mesh.error ? t(mesh.error.messageKey as MessageKey) : t('mesh.loading')}
+            </p>
+          )}
+        </div>
+        {suggestionsOpen ? <SuggestionsPanel /> : null}
       </div>
       <p id="pw-mesh-help" className="sr-only">
         {t('mesh.help')}
