@@ -121,6 +121,7 @@ Während der Arbeit fanden die Tests außerdem: einen Typfehler in einer Meldung
 
 - **Lauf 110** (Commit `d6f1e70`, Bericht): Linux vollständig grün (E2E 18 von 18). Windows rot in den Rust-Tests: F-51 (Prüfkopie einer beschädigten Datenbank blieb liegen). Die übrigen Windows-Schritte liefen danach nicht mehr.
 - **Lauf 111** (Commit `3ee149d`, Behebung F-51): **grün** auf Windows und Linux – Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy, Rust-Tests, reproduzierbare Referenzbibliothek, erzeugte Typen, Lizenzliste, E2E 18 von 18 je System; außerdem Abhängigkeitsprüfung und „Release enthält keine Test-Plugins“.
+- **Lauf 112** (Commit `76313ea`, Drucken nachgetestet, F-52 und F-53): **grün** auf Windows und Linux, mit dem neuen PDF-Test; unter Windows auch mit der Linkfläche in der PDF von WebView2.
 - Messwerte Windows (Lauf 111): Galerie zweiter Durchgang 95 % 16,7 ms (Grenze 50 ms), erster Durchgang 17,3 ms; Suche mit der Referenzbibliothek 96–143 ms (Ziel 300 ms); Explorer bereit nach 749–782 ms; Öffnen von 50.000 Wörtern 166–181 ms. Export und Backup im Programm in 2,7 s (6 Tests).
 
 ## Nächster Schritt
