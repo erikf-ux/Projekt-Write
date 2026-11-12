@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 10 – Export und Backup
+
+#### Hinzugefügt
+
+- Export eines Dokuments als TXT (mit Warnung, wenn Formatierung verloren geht) und als Markdown; die Medien landen bitgleich in einem Ordner daneben, Links zeigen relativ darauf.
+- „Bibliothek exportieren …“: ein Ordner mit allen Dokumenten als Markdown bzw. TXT in der Ordnerstruktur der Subnetze, Archiv in `Archiv/`, Medien in `Medien/`, interne Links als relative Pfade und `index.md` – nutzbar ohne die App. Ein Abbruch hinterlässt nichts.
+- Pakete `.pwritepack` (Dokument mit seinen Medien): exportieren und importieren. Der Import prüft das Archiv, die Prüfsummen und jedes Medium wie der Medienimport; vorhandene Medien werden verwendet.
+- Drucken (`Ctrl + P`) und „Als PDF exportieren …“ über den Systemdruckdialog; gedruckt wird nur die Schreibfläche mit Titel.
+- Vollständige Backups `.pwbackup`: Datenbank (`VACUUM INTO`, `integrity_check`), Dokumente und Medien mit Prüfsummen und Manifest, als ZIP unter temporärem Namen, vor dem Umbenennen vollständig gelesen und geprüft. Keine früheren Backups, keine Entwürfe, Vorschaubilder oder Exporte darin.
+- Ziel frei wählbar, mit Warnung bei gleichem Datenträger; tägliches automatisches Backup beim Start (abschaltbar), 7 bleiben (einstellbar); vor jeder Datenbankmigration ein vollständiges Backup.
+- „Backup prüfen …“ und „Aus Backup wiederherstellen (Stufe 5) …“: Prüfung von Manifest, Prüfsummen, ZIP-Sicherheit und Schemaversion vor jedem Schreiben, Wiederherstellung in einen neuen Ordner; die bisherige Bibliothek bleibt.
+
 ### Phase 9 – Suche
 
 #### Hinzugefügt

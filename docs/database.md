@@ -33,7 +33,7 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 - Nur vorwärts, jede Migration in einer eigenen Transaktion (Test: keine Migration schaltet die Transaktion ab; eine fehlerhafte Migration hinterlässt nichts).
 - **Ausgelieferte Migrationen werden nie geändert.** SQLx prüft eine SHA-384-Prüfsumme je Migration; zusätzlich sind die Prüfsummen in `tests/migrations.rs` festgeschrieben.
 - Vor jeder Änderung: Ist die Datenbank neuer als die App, meldet das Öffnen `SCHEMA_TOO_NEW` und ändert nichts – auch keine Sicherung.
-- **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), kopiert die App sie mit `VACUUM INTO` nach `backups/pre-migration/projectwrite-schema-<alt>-<Zeit>.db`, prüft die Kopie mit `PRAGMA integrity_check` und migriert erst dann. Scheitert die Sicherung, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten Kopien bleiben, ältere entfernt die App (nur eigene Dateien nach diesem Namensmuster). Ab Phase 10 ersetzt ein vollständiges `.pwbackup` diese Kopie (Abschnitt 21).
+- **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), entsteht seit Phase 10 ein vollständiges Backup (`.pwbackup`: Datenbank über `VACUUM INTO` mit `integrity_check`, Dokumente, Medien, Manifest mit Prüfsummen; ADR 0021) in `backups/pre-migration/`, erst dann wird migriert. Scheitert das Backup, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten bleiben, ältere entfernt die App (nur eigene Dateien nach ihrem Namensmuster). Kopien früherer Versionen (`projectwrite-schema-<alt>-<Zeit>.db`) werden weiter auf fünf begrenzt.
 - **Tests ab jeder früheren Version:** `tests/migrations.rs` legt für jede Version 0 … n−1 eine Datenbank an, füllt die Tabellen dieser Version mit Testdaten, migriert auf die aktuelle Version und prüft: Schema identisch zu einer frisch migrierten Datenbank, Daten erhalten, `integrity_check` = ok, `foreign_key_check` leer. Jede neue Migration bringt eine Testzeile für ihre Tabellen mit.
 
 | Version | Datei                           | Inhalt                                                                                                        | Phase |
@@ -101,14 +101,14 @@ Abgeleitete Verbindungen (Referenz, Tag, Enthalten-in, Abschnitt 15) werden **ni
 
 `STRICT, WITHOUT ROWID`. Jeder Schlüssel ist in Rust ein Typ mit Standardwert und Prüfung (`services/settings/library.rs`). Eine Zeile, deren Wert nicht (mehr) passt, ergibt den Standardwert und bleibt unverändert; Schlüssel neuerer Versionen werden nie angefasst.
 
-| Schlüssel                   | Wert                                                     | Phase |
-| --------------------------- | -------------------------------------------------------- | ----- |
-| `storage.acceptedLocation`  | bestätigter Sync-Ordner/Netzlaufwerk (`StorageLocation`) | 2     |
-| `trash.retentionDays`       | Aufbewahrung im Papierkorb, Standard 30                  | 6     |
-| `history.*`                 | Aufbewahrungsregeln der Versionen (Abschnitt 13)         | 6     |
-| `statistics.wordsPerMinute` | Lesezeit, Standard 200                                   | 4     |
-| `backup.*`                  | Ziel, Automatik, Anzahl (Abschnitt 21)                   | 10    |
-| `suggestions.threshold`     | Schwellenwert der Vorschläge, Standard 0,35              | 11    |
+| Schlüssel                         | Wert                                                                                                                                                        | Phase |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `storage.acceptedLocation`        | bestätigter Sync-Ordner/Netzlaufwerk (`StorageLocation`)                                                                                                    | 2     |
+| `trash.retentionDays`             | Aufbewahrung im Papierkorb, Standard 30                                                                                                                     | 6     |
+| `history.*`                       | Aufbewahrungsregeln der Versionen (Abschnitt 13)                                                                                                            | 6     |
+| `statistics.wordsPerMinute`       | Lesezeit, Standard 200                                                                                                                                      | 4     |
+| `backup.automatic`, `backup.keep` | tägliches Backup beim Start (Standard an), Anzahl (Standard 7); das Ziel ist ein Pfad des Rechners und steht in `settings.json` (`backupTargets`, ADR 0021) | 10    |
+| `suggestions.threshold`           | Schwellenwert der Vorschläge, Standard 0,35                                                                                                                 | 11    |
 
 Appweite Einstellungen (Bibliothekspfad, später Fensterzustand, Sprache, Tastenkürzel) liegen **nicht** hier, sondern in `settings.json` im Konfigurationsordner des Systems (ADR 0009).
 

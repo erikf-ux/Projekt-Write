@@ -1,6 +1,6 @@
 # ADR 0021 – Export, Drucken, Backup und Wiederherstellung (Stufe 5)
 
-- Status: vorgeschlagen (Phase 10 in Arbeit)
+- Status: angenommen
 - Datum: 11. November 2026
 - Phase: 10
 
@@ -42,6 +42,16 @@ Die Umwandlungen zwischen den Formaten liegen im Frontend (Editor-Schema und Mar
 10. **Befehle und Oberfläche:** „Exportieren als TXT …“, „Exportieren als Markdown …“, „Als PDF exportieren …“, „Drucken …“ (`Ctrl + P`), „Als Paket exportieren …“, „Paket importieren …“, „Bibliothek exportieren …“, „Backup erstellen“, „Backup prüfen …“, „Aus Backup wiederherstellen …“ (Stufe 5) in Menü „Datei“ und Befehlspalette; Einstellungen › Bibliothek: Backup-Ziel, Automatik, Anzahl, letztes Backup. Lange Vorgänge zeigen Fortschritt und lassen sich abbrechen.
 
 11. **Abweichung macOS:** Abschnitt 25 verlangt PDF-Export und Drucken auf allen drei Systemen. macOS ist auf Wunsch des Auftraggebers zurückgestellt (2. November 2026); geprüft werden Windows und Linux. Den Systemdruckdialog kann der eingebettete WebDriver nicht bedienen (ADR 0003): E2E prüft das Druck-CSS (Darstellung im Druckmedium) und dass `window.print` aufgerufen wird; das echte Drucken und Speichern als PDF ist ein Handtest je System.
+
+## Nachträge aus der Umsetzung
+
+- **Punkt 6, Drucken:** Statt die ganze Oberfläche im Druck auszublenden (feste Höhen und `overflow: hidden` schneiden ab), kopiert die App die sichtbare Schreibfläche mit dem Titel in einen eigenen Container `#pw-print`; das Druck-CSS zeigt nur ihn. Aufgeräumt wird bei `afterprint`, weil nicht jeder Webview in `window.print` blockiert. Der Fenstertitel wird für den Druck zum Dokumenttitel (Vorschlag für den PDF-Namen).
+- **Punkt 7, Schreiben während des Backups:** Die Schreibsperre gilt nur für den Schnappschuss (Datenbankkopie und harte Links); Speichern wartet so lange, Recovery-Entwürfe (Stufe 2) laufen weiter. Die Prüfsummen, das Archiv und die Prüfung laufen danach ohne Sperre. Ein E2E-Test speichert in einer Schleife, während das Backup läuft.
+- **Punkt 7, Automatik:** 30 s nach dem Start, wenn das neueste Backup im Ziel älter als 24 h ist; `.part`-Reste der Bibliothek im Ziel räumt der Start weg. E2E-Builds lassen sie mit `PW_E2E_NO_AUTO_BACKUP` aus, damit sie keine Messung stört.
+- **Punkt 5, Pakete:** Medien über 100 MiB (Grenze des Medienimports für Dateien ohne Dateidialog) werden in einem Paket abgelehnt; der Import nimmt die Medien über `prepare_bytes` und verwendet bei gleicher Prüfsumme das vorhandene Medium.
+- **Punkt 8, Wiederherstellung:** Der gewählte Ordner nimmt einen neuen Unterordner `ProjectWrite-Wiederherstellung-<Zeit>` auf. Die wiederhergestellte Bibliothek trägt dieselbe Bibliotheks-ID wie die alte; beide lassen sich öffnen (jeweils mit eigener Sperre).
+- **Punkt 10, Menü:** Im nativen Menü „Datei“ stehen „Drucken …“ (`Ctrl + P`), „Als PDF exportieren …“ und „Backup erstellen“; die übrigen Export- und Backup-Befehle in Befehlspalette und Einstellungen.
+- **E2E:** Export- und Backup-Dialoge antworten in E2E-Builds aus `PW_E2E_PICK_EXPORT`, getrennt von den übrigen Dialogen.
 
 ## Folgen
 
