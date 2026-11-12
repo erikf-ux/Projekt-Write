@@ -6,13 +6,23 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 9 – Suche** (Abschnitt 19): abgeschlossen, lokal und in CI geprüft (Lauf 109 grün); Bericht in `docs/bericht-phase-9.md`.
 
-**Phase 10 – Export und Backup** (Abschnitt 21): freigegeben („Starte“), in Arbeit; ADR 0021.
+**Phase 10 – Export und Backup** (Abschnitt 21): freigegeben („Starte“), umgesetzt und lokal geprüft; CI-Lauf und Bericht siehe `docs/bericht-phase-10.md`. Wartet danach auf die Freigabe von Phase 11.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46).
+Entscheidungen: ADR 0020 (Suche, mit der Prüfung beim Start, F-46), ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5).
 
 CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+
+## Stand Phase 10
+
+| Schritt | Inhalt                                                                                                                                                                                                                                                                               | Stand                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| 1       | ADR 0021, Plan                                                                                                                                                                                                                                                                       | erledigt                                |
+| 2       | Backup in Rust: Schnappschuss unter der Schreibsperre, Manifest, ZIP mit Prüfung vor dem Umbenennen, „Backup prüfen“, Wiederherstellung Stufe 5, Backup vor jeder Migration, Automatik, Ziel, Befehle; Tests mit 25 harten Abbrüchen, Konsistenz beim Speichern, veränderten Backups | erledigt                                |
+| 3       | Export in Rust: Dokument als TXT und Markdown mit Medien, Gesamtexport, `.pwritepack` hin und zurück; Tests                                                                                                                                                                          | erledigt                                |
+| 4       | Oberfläche: Befehle, Menü „Datei“, `Ctrl + P`, Druckkopie und Druck-CSS, Backup-Einstellungen; Vitest                                                                                                                                                                                | erledigt                                |
+| 5       | E2E, Doku, CI, Bericht                                                                                                                                                                                                                                                               | E2E und Doku erledigt; CI siehe Bericht |
 
 ## Stand Phase 9
 
@@ -192,7 +202,7 @@ CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände un
 - Externe Dateien unter Windows: Rechte (ACL) der ersetzten Datei; die neue Datei erbt die des Ordners. Harte Links werden beim atomaren Ersetzen getrennt (wie bei den meisten Editoren).
 
 - Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
-- Drucken (Phase 10).
+- Drucken und „Als PDF speichern“ im echten Systemdialog von Hand prüfen, unter Windows und Linux (macOS zurückgestellt); E2E prüft Druckkopie und Druck-CSS (ADR 0021, Punkt 11).
 - Echtes Ablegen aus dem Dateimanager in die Schreibfläche und Einfügen eines echten Bildschirmfotos von Hand prüfen; die E2E-Tests erzeugen die Ereignisse synthetisch (ADR 0003).
 - Galerie und PDF-Ansicht auf dem Referenzgerät messen (Release-Build); die E2E-Messung prüft gegen Regressionsgrenzen. Erster Durchgang im Container 95 % 70–88 ms (F-40); danach gegebenenfalls kleinere Vorschaubilder für die Kacheln und Vorladen der nächsten Zeilen.
 - Vorschaubilder von PDFs zeichnet die Oberfläche (PDF.js) nacheinander, sobald die Galerie eine PDF-Kachel ohne Vorschaubild zeigt; mit der Referenzbibliothek beim Durchscrollen der Galerie auf dem Referenzgerät beobachten.
@@ -206,7 +216,6 @@ CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände un
 - Gepatchte Kopie von `sqlx-sqlite` entfernen (`src-tauri/vendor/sqlx-sqlite/`, `[patch.crates-io]`), sobald eine SQLx-Version `libsqlite3-sys` 0.39 oder neuer zulässt (ADR 0018, F-32).
 - Archiv „im Mesh grau“ (Phase 11).
 - Neue Befehle der Phase 7 stehen in Befehlspalette und Kontextmenüs, noch nicht im nativen Menü.
-- Phase 10: Wiederherstellung Stufe 5 (Backup); während des Backups schreibt Autosave nur nach `recovery/` (Abschnitt 21).
 - Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
 - Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
 - Referenzbibliothek ergänzen: Verbindungen (Phase 11; Subnetze und Tags seit Phase 7, Medien seit Phase 8), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
@@ -215,7 +224,7 @@ CI: Lauf 109 grün (Abschluss Phase 9; Lauf 108 rot an F-50). Zwischenstände un
 - Unter macOS schreibt der Webview der E2E-Tests Caches in den Benutzerordner der CI-Maschine (ADR 0003).
 - npm-Audit-Funde in Entwicklungswerkzeugen bei jedem Update von WebdriverIO/ESLint neu bewerten (`docs/dependencies.md`).
 - TypeScript 7 und WebdriverIO 10, sobald `typescript-eslint` und `@wdio/tauri-service` sie unterstützen (ADR 0001).
-- Suche: Hinweis in der Oberfläche, wenn die Prüfung der ganzen Datenbank im Hintergrund scheitert (heute nur im Protokoll; mit Backup und Wiederherstellung, Phase 10). Größe des Index (480 MB bei 81 MB Text der Referenzbibliothek) auf dem Referenzgerät bewerten; gegebenenfalls FTS5 mit gemeinsamer Inhaltstabelle (ADR 0020). Text in PDFs und Office-Dateien durchsuchen (später).
+- Suche: Hinweis in der Oberfläche, wenn die Prüfung der ganzen Datenbank im Hintergrund scheitert (heute nur im Protokoll), mit dem Angebot, aus dem letzten Backup wiederherzustellen. Größe des Index (480 MB bei 81 MB Text der Referenzbibliothek) auf dem Referenzgerät bewerten; gegebenenfalls FTS5 mit gemeinsamer Inhaltstabelle (ADR 0020). Text in PDFs und Office-Dateien durchsuchen (später).
 - Isolation Pattern vor Phase 14 neu bewerten (ADR 0005; vor Phase 8 bewertet, bleibt aus).
 
 ### Entscheidungen des Auftraggebers
@@ -233,4 +242,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 10 (Export und Backup; Abschnitt 25).
+Nach Freigabe: Phase 11 (Mesh; Abschnitt 25).
