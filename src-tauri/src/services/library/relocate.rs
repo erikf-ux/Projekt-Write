@@ -568,15 +568,23 @@ async fn compare_databases(library: &Library, copy: &Path) -> Result<(), MoveErr
         .read_only(true)
         .connect()
         .await?;
-    let copy_version: i64 = sqlx::query_scalar(
-        "SELECT coalesce(max(version), 0) FROM _sqlx_migrations WHERE success = 1",
-    )
-    .fetch_one(&mut connection)
-    .await?;
-    let copy_documents: i64 = sqlx::query_scalar("SELECT count(*) FROM documents")
+    // Closed before an error returns too: a dropped connection is closed
+    // later, and until then Windows cannot remove the copy.
+    let counts = async {
+        let version: i64 = sqlx::query_scalar(
+            "SELECT coalesce(max(version), 0) FROM _sqlx_migrations WHERE success = 1",
+        )
         .fetch_one(&mut connection)
         .await?;
-    connection.close().await?;
+        let documents: i64 = sqlx::query_scalar("SELECT count(*) FROM documents")
+            .fetch_one(&mut connection)
+            .await?;
+        Ok::<_, sqlx::Error>((version, documents))
+    }
+    .await;
+    let closed = connection.close().await;
+    let (copy_version, copy_documents) = counts?;
+    closed?;
     if copy_version != original_version || copy_documents != original_documents {
         return Err(MoveError::VerificationFailed(format!(
             "database copy: schema {copy_version}/{original_version}, documents {copy_documents}/{original_documents}"

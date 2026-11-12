@@ -77,10 +77,15 @@ pub async fn integrity_check_file(path: &Path) -> Result<bool, sqlx::Error> {
         .read_only(true)
         .connect()
         .await?;
-    let rows: Vec<String> = sqlx::query_scalar("PRAGMA integrity_check")
+    // Closed in every case before returning: a dropped connection is closed
+    // later by its worker thread, and until then Windows refuses to delete
+    // the file (a damaged database fails the pragma with an error).
+    let rows: Result<Vec<String>, sqlx::Error> = sqlx::query_scalar("PRAGMA integrity_check")
         .fetch_all(&mut connection)
-        .await?;
-    connection.close().await?;
+        .await;
+    let closed = connection.close().await;
+    let rows = rows?;
+    closed?;
     Ok(rows.len() == 1 && rows[0] == "ok")
 }
 

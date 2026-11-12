@@ -82,7 +82,9 @@ Keine bekannten. Eine Beobachtung: Im ersten lokalen E2E-Gesamtlauf lag die Gale
 
 ## Behobene Fehler
 
-Keine neuen F-Nummern. Während der Arbeit fanden die Tests: einen Typfehler in einer Meldung, eine Bedingung für die sichtbare Schreibfläche, die jsdom nicht auswerten kann, und zwei Tests der Phasen 1 und 2, die von der Datenbankkopie vor einer Migration ausgingen (jetzt ein vollständiges Backup).
+F-51 (CI-Lauf 110, Windows): Nach der Prüfung eines Backups mit beschädigter Datenbank blieb die Prüfkopie im Arbeitsordner liegen. Die Integritätsprüfung brach mit einem Fehler ab und schloss die Datenbankverbindung nicht selbst; geschlossen wurde sie erst später im Hintergrund, und so lange verweigert Windows das Löschen. Jetzt wird die Verbindung in jedem Fall geschlossen, bevor der Fehler zurückkommt; ebenso beim Vergleich der Datenbankkopie beim Verschieben einer Bibliothek (Phase 2). Unter Linux tritt das nicht auf, weil dort auch offene Dateien gelöscht werden können.
+
+Während der Arbeit fanden die Tests außerdem: einen Typfehler in einer Meldung, eine Bedingung für die sichtbare Schreibfläche, die jsdom nicht auswerten kann, und zwei Tests der Phasen 1 und 2, die von der Datenbankkopie vor einer Migration ausgingen (jetzt ein vollständiges Backup).
 
 ## Gefundene Widersprüche und Abweichungen
 
