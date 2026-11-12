@@ -35,6 +35,22 @@ async function announced(): Promise<string> {
   return $('[data-testid="mesh-announce"]').getText();
 }
 
+/**
+ * Clicks a subnet node until the Subnet View shows it. The view loads twice
+ * right after it is shown (graph, then fresh structure): a click in between
+ * may land on a node being replaced.
+ */
+async function showSubnet(id: string, name: string): Promise<void> {
+  const breadcrumb = $('[data-testid="mesh-breadcrumb"]');
+  for (let attempt = 0; attempt < 5 && !(await breadcrumb.getText()).includes(name); attempt += 1) {
+    const node = $(`[data-testid="mesh"] [data-mesh-node="${id}"]`);
+    await node.waitForDisplayed();
+    await node.click();
+    await browser.pause(400);
+  }
+  expect(await breadcrumb.getText()).toContain(name);
+}
+
 async function selectedNode(): Promise<string> {
   return browser.execute(
     () =>
@@ -84,17 +100,7 @@ describe('Mesh (Phase 11)', () => {
     expect(await announced()).not.toBe('');
     // Shift+click selects the subnet without opening it; Enter shows it
     // (Subnet View).
-    // The view loads twice right after opening (graph, then fresh
-    // structure): a click in between may land on a node being replaced.
-    for (
-      let attempt = 0;
-      attempt < 5 && !(await $('[data-testid="mesh-breadcrumb"]').getText()).includes('Küste');
-      attempt += 1
-    ) {
-      await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click();
-      await browser.pause(400);
-    }
-    expect(await $('[data-testid="mesh-breadcrumb"]').getText()).toContain('Küste');
+    await showSubnet(subnet, 'Küste');
     await canvas.click();
     await browser.keys('Escape');
     await browser.waitUntil(
@@ -122,7 +128,7 @@ describe('Mesh (Phase 11)', () => {
 
   it('connects two documents by keyboard, removes the connection with Delete and undoes it', async () => {
     // Focus View of "Leuchtturm Nord" (F), from the Subnet View.
-    await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click();
+    await showSubnet(subnet, 'Küste');
     await $(`[data-testid="mesh"] [data-mesh-node="${nord}"]`).waitForDisplayed();
     const canvas = $('[data-testid="mesh-canvas"]');
     await canvas.click();
@@ -269,7 +275,11 @@ describe('Mesh (Phase 11)', () => {
     const other = await invoke<{ id: string }>('document_create', { title: 'Hafenkran', format: 'md' });
     await invoke('document_assign', { id: other.id, subnetId: subnet });
     await $('[data-testid="mesh-breadcrumb"] button').click();
-    await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click();
+    await browser.waitUntil(
+      async () => !(await $('[data-testid="mesh-breadcrumb"]').getText()).includes('Küste'),
+      { timeoutMsg: 'the breadcrumb did not go back to the Global View' },
+    );
+    await showSubnet(subnet, 'Küste');
     await $(`[data-testid="mesh"] [data-mesh-node="${other.id}"]`).waitForDisplayed();
     // Shown anew (another tab, then back), the Mesh reads subnets and tags again.
     await runFromPalette('media.gallery');

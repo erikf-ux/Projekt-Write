@@ -88,6 +88,17 @@ describe('session (stage 1)', () => {
     expect(takePendingSelection(A)).toBeUndefined();
   });
 
+  it('keeps a tab the user opens while the session comes back as the active one', async () => {
+    const C = '3f8a9a4e-6c39-4d6b-9b7e-6c0f5d2a1b3c';
+    const restoring = restoreSession();
+    // A new document (Ctrl+N) or a restored draft, before the tabs are back.
+    await useWorkspace.getState().openDocument(C);
+    await restoring;
+    const state = useWorkspace.getState();
+    expect(state.tabs).toEqual(expect.arrayContaining([A, B, C]));
+    expect(state.active).toBe(C);
+  });
+
   it('saves 2 s after the tabs change, and not before it was restored', async () => {
     await useWorkspace.getState().openDocument(A);
     await vi.advanceTimersByTimeAsync(SESSION_SAVE_DELAY_MS * 2);

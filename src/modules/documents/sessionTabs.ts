@@ -106,32 +106,59 @@ export function stopSessionTracking(): void {
   }
 }
 
-/** Opens the tabs of the last session in this library again. */
+/**
+ * Opens the tabs of the last session in this library again. A tab the user
+ * opens or activates meanwhile (a new document, a file from a second
+ * start) stays the active one; the tabs of the session open behind it.
+ */
 export async function restoreSession(): Promise<void> {
-  const result = await call('session_restore', {});
-  if (!result.ok || result.value.tabs.length === 0) {
-    return;
-  }
-  const workspace = useWorkspace.getState();
-  const ids: string[] = [];
-  for (const tab of result.value.tabs) {
-    const id = tab.target.kind === 'library' ? tab.target.id : externalTabId(tab.target.file.id);
-    pending.set(id, { anchor: tab.anchor, head: tab.head, view: tab.view });
-    const opened =
-      tab.target.kind === 'library'
-        ? await workspace.openDocument(tab.target.id)
-        : await workspace.openExternal(tab.target.file);
-    if (opened) {
-      ids.push(id);
-    } else {
-      pending.delete(id);
+  // `own` is the tab this function is opening; any other activation is
+  // the user's choice. Watched from the start, before Rust answers.
+  const choice: { own: string | null; chosen: string | null } = { own: null, chosen: null };
+  const stopWatching = useWorkspace.subscribe((state, previous) => {
+    if (state.active !== previous.active && state.active !== choice.own) {
+      choice.chosen = state.active;
     }
-  }
-  const active = result.value.active === null ? undefined : result.value.tabs[result.value.active];
-  if (active) {
-    const id = active.target.kind === 'library' ? active.target.id : externalTabId(active.target.file.id);
-    if (ids.includes(id)) {
-      useWorkspace.getState().activate(id);
+  });
+  const keepChoice = () => {
+    const workspace = useWorkspace.getState();
+    const { chosen } = choice;
+    if (chosen !== null && workspace.active !== chosen) {
+      workspace.activate(chosen);
     }
+  };
+  try {
+    const result = await call('session_restore', {});
+    if (!result.ok || result.value.tabs.length === 0) {
+      return;
+    }
+    const workspace = useWorkspace.getState();
+    const ids: string[] = [];
+    for (const tab of result.value.tabs) {
+      const id = tab.target.kind === 'library' ? tab.target.id : externalTabId(tab.target.file.id);
+      pending.set(id, { anchor: tab.anchor, head: tab.head, view: tab.view });
+      choice.own = id;
+      const opened =
+        tab.target.kind === 'library'
+          ? await workspace.openDocument(tab.target.id)
+          : await workspace.openExternal(tab.target.file);
+      choice.own = null;
+      keepChoice();
+      if (opened) {
+        ids.push(id);
+      } else {
+        pending.delete(id);
+      }
+    }
+    const active = result.value.active === null ? undefined : result.value.tabs[result.value.active];
+    if (choice.chosen === null && active) {
+      const id = active.target.kind === 'library' ? active.target.id : externalTabId(active.target.file.id);
+      if (ids.includes(id)) {
+        choice.own = id;
+        useWorkspace.getState().activate(id);
+      }
+    }
+  } finally {
+    stopWatching();
   }
 }

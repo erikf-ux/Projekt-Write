@@ -120,10 +120,11 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       await treeLoaded;
       await createSampleSubnets();
       void useWorkspace.getState().refreshTrash();
-      // Stage 2: unsaved changes from a crash are offered first.
-      await offerRecovery();
       // Stage 1: the tabs of the last session open again.
       await restoreSession();
+      // Stage 2: unsaved changes from a crash are offered once the tabs are
+      // back, so the tab of a restored draft stays the active one.
+      await offerRecovery();
       startSessionTracking();
       // Files passed at start or by a second start open now.
       setOpenRequestsReady(true);
