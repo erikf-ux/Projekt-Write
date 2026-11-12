@@ -1,0 +1,62 @@
+# Testdaten Satzende (Abschnitt 14). Je Zeile ein Fall: Sprache, Tabulator,
+# die erwarteten Sätze, getrennt durch " | ". Der geprüfte Text sind die
+# Sätze, verbunden durch ein Leerzeichen.
+de	Das ist z. B. ein Test. | Danach folgt der Rest.
+de	Das ist z.B. falsch geschrieben. | Trotzdem klappt es.
+de	Er kam, d. h. er war da. | Dann ging er.
+de	Dr. Müller ist Ärztin. | Sie arbeitet in Berlin.
+de	Es dauert ca. drei Stunden. | Wir warten.
+de	Vgl. dazu Kap. 3 im Anhang. | Dort steht es.
+de	Am 1. Mai ist frei. | Am 3. Oktober auch.
+de	Am 15. März 2024 beginnt es. | Wir freuen uns.
+de	Er wurde 2. Sieger im Lauf. | Sie gewann.
+de	Das Treffen ist am 24.12. um 18 Uhr. | Komm pünktlich.
+de	Bitte bis zum 31.12.2024. | Danke.
+de	Das war im Jahr 2019. | Danach wurde alles anders.
+de	Pi beträgt etwa 3.14 und mehr. | Das reicht.
+de	Version 2.0 ist da. | Sie läuft gut.
+de	Es gibt 1.000 Gäste. | Alle feiern.
+de	Das kostet ca. 3,50 €. | Bitte zahlen.
+de	Das Spiel endet 2:1. | Alle jubeln.
+de	Siehe https://example.com/a.b?c=1. | Dort steht mehr.
+de	Die Seite www.beispiel.de ist neu. | Sie lädt schnell.
+de	Schreib an info@beispiel.de. | Wir antworten.
+de	Er wartete... und dann ging er. | Niemand sah ihn.
+de	Er wartete... | Dann ging er.
+de	Er zögerte … und schwieg. | Später sprach er.
+de	Und dann...
+de	Kommst du? | Ich warte.
+de	Wie schön! | Das freut mich.
+de	Was?! | Das glaube ich nicht.
+de	Was nun? | Weiter!
+de	„Kommst du?“, fragte sie. | Er nickte.
+de	„Wohin?“ fragte sie. | Er schwieg.
+de	Sie sagte: „Ich komme.“ | Dann ging sie.
+de	Hier ein Zitat: »Sei still!« | Sie schwieg.
+de	Er fragte (leise): Kommst du? | Ja.
+de	Das Kapitel endet hier (siehe oben). | Weiter geht es.
+de	Das steht auf S. 12 im Buch. | Lies es.
+de	Das kostet 5 Euro usw. und mehr. | Gut.
+de	Er sagte etc. nichts mehr. | Gut so.
+de	Er trank Kaffee bzw. Tee. | Dann ging er.
+de	Prof. Dr. med. Schmidt operiert. | Alles gut.
+de	Das gilt u. a. für Kinder. | Erwachsene zahlen.
+de	Das ist i. d. R. so. | Ausnahmen gibt es.
+de	Er las J. R. R. Tolkien. | Sie las Fontane.
+de	Die Nr. 5 gewinnt. | Die Nr. 6 nicht.
+de	Er ist ca. 1,80 m groß. | Sie ist kleiner.
+de	Das ist gut. | dann ging er.
+de	Ein Satz ohne Punkt am Ende
+de-AT	Das ist z. B. gut. | Fertig.
+de-CH	Am 1. August ist Feiertag. | Alle haben frei.
+en	Mr. Smith arrived. | He was late.
+en	It costs approx. ten dollars. | That is cheap.
+en	See e.g. the appendix. | It helps.
+en	Pi is about 3.14 here. | Fine.
+en	It happened in 1999. | Then it ended.
+en	I scored 5. | You scored 7.
+en	Visit https://example.org/docs. | It is free.
+en	Wait... what? | Really!
+en	"Are you coming?" she asked. | He nodded.
+en	Dr. Jones met Prof. Lee. | They talked.
+en-GB	Mrs. Brown, i.e. our neighbour, called. | She was upset.

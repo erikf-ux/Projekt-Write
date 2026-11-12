@@ -6,13 +6,28 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 10 – Export und Backup** (Abschnitt 21): abgeschlossen, Drucken nachgetestet (CI-Lauf 112 grün); Bericht in `docs/bericht-phase-10.md`.
 
-**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; CI und Bericht siehe `docs/bericht-phase-11.md`. Wartet danach auf die Freigabe von Phase 12.
+**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; CI und Bericht siehe `docs/bericht-phase-11.md`.
+
+**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): ein erster Teil vorgezogen („Setze schon einmal teilweise fort“), ohne neue Abhängigkeit in der App. Der Rest wartet auf die Freigabe.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout, Vorschläge).
 
 CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Windows an F-51). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+
+## Stand Phase 12
+
+| Schritt | Inhalt                                                                                                     | Stand                                               |
+| ------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1       | Vergleich `spellbook` und Hunspell mit Korpus (1.198 richtige Wörter, 212 Fehler), ADR 0023                | erledigt; `spellbook` gewählt                       |
+| 2       | Satzsegmentierung mit Ausnahmelisten je Sprache, Testdaten Satzende                                        | erledigt (Rust, `services/language/sentences.rs`)   |
+| 3       | Eindeutigkeitsregel der Autokorrektur, je Bedingung ein Test                                               | erledigt (Rust, `services/language/autocorrect.rs`) |
+| 4       | `LanguageEngine` mit `spellbook`, Wörterbücher (Bezug und Auslieferung per ADR), neu sortierte Vorschläge  | offen, nach Freigabe                                |
+| 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Autokorrektur mit Undo, Tippverzögerung            | offen                                               |
+| 6       | Eigene Wörterbücher, Zuweisung, Import und Export; Sprachprofile, Spracherkennung, mehrsprachige Dokumente | offen                                               |
+| 7       | LanguageTool als Zusatzpaket (Sidecar, nur `127.0.0.1`)                                                    | offen                                               |
+| 8       | E2E, Doku, CI, Bericht                                                                                     | offen                                               |
 
 ## Stand Phase 11
 
@@ -208,6 +223,7 @@ CI: Lauf 112 grün (Abschluss Phase 10 mit dem Drucktest; Lauf 110 rot unter Win
 | F-52 | Druckprobe (Phase 10): Ein aus einem Suchtreffer geöffnetes Dokument druckte die Markierung des Treffers mit                                                                                                                                                                                                                          | Die Druckkopie entfernt Markierungen von Suchen und Ersetzen, das ausgewählte Bild und den Lückencursor; E2E prüft die PDF                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | F-53 | Druckprobe mit dem echten GTK-Dialog: Nach „Abbrechen“ blieben Druckkopie, Druckattribut und Fenstertitel stehen; WebKitGTK sendet kein `afterprint`                                                                                                                                                                                  | Die nächste Taste oder der nächste Klick nach `print()` räumt auf                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | F-54 | CI-Lauf 113 (Linux): Im Test der Tastenkürzel bekam der Rekorder den Fokus nicht; danach blieb der Einstellungsdialog offen, und 13 Spec-Dateien scheiterten als Folge                                                                                                                                                                | Der Rekorder nimmt den Fokus auch beim Einhängen (die Liste ist mit den Mesh-Kürzeln länger)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| F-55 | CI-Lauf 115 (Windows, Linux): Die neue stabile Rust-Fassung 1.100 meldet in Clippy `needless_bool` für `automatic_backups_wanted` mit der Funktion `e2e`; Tests und E2E liefen deshalb nicht                                                                                                                                          | Die Funktion ist ein Ausdruck mit `cfg!`; lokal mit Rust 1.100 geprüft. Der Ordner `tools/spell-compare/target/` steht jetzt auch in den Ignorier-Listen von Prettier und ESLint                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## Offene Aufgaben
 

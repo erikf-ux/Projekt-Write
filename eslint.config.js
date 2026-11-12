@@ -9,6 +9,7 @@ export default tseslint.config(
       'dist/',
       'dist-isolation/',
       'src-tauri/',
+      'tools/spell-compare/target/',
       'src/types/generated/',
       'node_modules/',
       'tests/e2e/.tmp/',

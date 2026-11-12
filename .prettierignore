@@ -3,6 +3,7 @@ dist/
 dist-isolation/
 coverage/
 src-tauri/target/
+tools/spell-compare/target/
 src-tauri/gen/
 src/types/generated/
 package-lock.json

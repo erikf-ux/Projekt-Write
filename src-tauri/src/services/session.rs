@@ -1251,11 +1251,7 @@ impl LibrarySession {
 /// End-to-end builds started with `PW_E2E_NO_AUTO_BACKUP` leave out the
 /// automatic backup: it would run in the middle of the measurements.
 fn automatic_backups_wanted() -> bool {
-    #[cfg(feature = "e2e")]
-    if std::env::var_os("PW_E2E_NO_AUTO_BACKUP").is_some() {
-        return false;
-    }
-    true
+    !(cfg!(feature = "e2e") && std::env::var_os("PW_E2E_NO_AUTO_BACKUP").is_some())
 }
 
 async fn run_backup(
