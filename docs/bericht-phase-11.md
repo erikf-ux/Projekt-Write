@@ -114,7 +114,7 @@ ABNAHME
 
 ## Offene Fehler
 
-Keine bekannten.
+Keine bekannten. Eine Beobachtung, wie in Phase 10: Die Galerie-Messung aus Phase 8 lag im Container noch einmal knapp über ihrer Grenze (zweiter Durchgang 56 ms bei 95 %, Grenze 50 ms). In zwei Wiederholungen waren es 37 und 43 ms, in CI liegt sie immer darunter. Ich halte es weiter für Schwankung des Containers.
 
 ## Behobene Fehler
 
