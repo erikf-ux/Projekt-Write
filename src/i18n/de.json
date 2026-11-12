@@ -926,5 +926,13 @@
   "mesh.later": "Später",
   "mesh.accepted": "Vorschlag angenommen und verbunden.",
   "mesh.rejected": "Vorschlag abgelehnt. Er kommt nicht wieder.",
-  "command.mesh.suggestions": "Mesh-Vorschläge zeigen oder verbergen"
+  "command.mesh.suggestions": "Mesh-Vorschläge zeigen oder verbergen",
+  "mesh.menu.label": "Mesh-Kontextmenü",
+  "mesh.menu.open": "Öffnen",
+  "mesh.menu.subnetView": "Subnetzansicht",
+  "mesh.menu.focus": "Fokusansicht",
+  "mesh.menu.connect": "Verbinden mit …",
+  "mesh.menu.unassign": "Aus „{name}“ entfernen",
+  "mesh.menu.remove": "Verbindung entfernen",
+  "mesh.menu.openSource": "Quelle öffnen: {name}"
 }

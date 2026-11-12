@@ -926,5 +926,13 @@
   "mesh.later": "Later",
   "mesh.accepted": "Suggestion accepted and connected.",
   "mesh.rejected": "Suggestion rejected. It will not come back.",
-  "command.mesh.suggestions": "Show or hide the Mesh suggestions"
+  "command.mesh.suggestions": "Show or hide the Mesh suggestions",
+  "mesh.menu.label": "Mesh context menu",
+  "mesh.menu.open": "Open",
+  "mesh.menu.subnetView": "Subnet View",
+  "mesh.menu.focus": "Focus View",
+  "mesh.menu.connect": "Connect with …",
+  "mesh.menu.unassign": "Remove from “{name}”",
+  "mesh.menu.remove": "Remove connection",
+  "mesh.menu.openSource": "Open the source: {name}"
 }

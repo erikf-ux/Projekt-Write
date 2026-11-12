@@ -175,6 +175,13 @@ describe('Mesh (Phase 11)', () => {
     await browser.waitUntil(async () => (await connected()) !== undefined, {
       timeoutMsg: 'undo restored nothing',
     });
+    // Shift+F10 opens the context menu of the selection; Escape closes it.
+    await browser.keys(['Shift', 'F10']);
+    const menu = $('[role="menu"]');
+    await menu.waitForDisplayed({ timeoutMsg: 'no context menu by keyboard' });
+    expect(await menu.getText()).toMatch(/Fokusansicht|Focus View|Verbindung entfernen|Remove connection/);
+    await browser.keys('Escape');
+    await menu.waitForExist({ reverse: true });
   });
 
   it('arranges the view in the web worker and leaves a pinned node where it is', async () => {

@@ -199,7 +199,14 @@ export function ShortcutSettings({
                 <td className="py-1.5 pr-2">
                   {isRecording && recording.step === 'listen' ? (
                     <div
-                      ref={recorder}
+                      ref={(element) => {
+                        recorder.current = element;
+                        // Also when the row is mounted again (a longer list
+                        // scrolls): the recorder must hold the focus (F-54).
+                        if (element && document.activeElement !== element) {
+                          element.focus();
+                        }
+                      }}
                       tabIndex={0}
                       role="textbox"
                       aria-label={t('shortcuts.recordLabel', { command: title })}

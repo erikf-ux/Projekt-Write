@@ -11,8 +11,10 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type MessageKey, useT } from '@/i18n';
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/ContextMenu';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
 import { useStructure } from '@/modules/structure/structureStore';
+import type { MeshEdge } from '@/types/generated/MeshEdge';
 import type { MeshNode } from '@/types/generated/MeshNode';
 import type { MeshPosition } from '@/types/generated/MeshPosition';
 import { UNASSIGNED, useMesh } from './meshStore';
@@ -80,6 +82,7 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
   const control = useRef<MeshCanvasControl | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const suggestionsOpen = useSuggestions((state) => state.open);
   const toggleSuggestions = useSuggestions((state) => state.toggle);
 
@@ -141,6 +144,110 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
     void useMesh.getState().connect(a, b);
   }, []);
 
+  const nodeMenu = useCallback(
+    (node: MeshNode, x: number, y: number) => {
+      const items: ContextMenuItem[] = [];
+      const name = titleOf(node);
+      if (node.kind === 'document' || node.kind === 'media') {
+        items.push({
+          id: 'open',
+          label: t('mesh.menu.open'),
+          onSelect: () => {
+            open(node);
+          },
+        });
+      }
+      if (node.kind === 'subnet') {
+        items.push({
+          id: 'subnet',
+          label: t('mesh.menu.subnetView'),
+          onSelect: () => void useMesh.getState().show({ view: 'subnet', scopeId: node.id }),
+        });
+      }
+      if (node.kind === 'subnet' || node.kind === 'unassigned') {
+        items.push({
+          id: 'toggle',
+          label: node.open ? t('mesh.collapse', { name }) : t('mesh.expand', { name }),
+          onSelect: () => void useMesh.getState().toggle(node.id),
+        });
+      }
+      if (node.kind !== 'unassigned') {
+        items.push(
+          {
+            id: 'focus',
+            label: t('mesh.menu.focus'),
+            onSelect: () => void useMesh.getState().show({ view: 'focus', scopeId: node.id }),
+          },
+          {
+            id: 'connect',
+            label: t('mesh.menu.connect'),
+            onSelect: () => {
+              setConnectFrom(node.id);
+              setAnnouncement(t('mesh.connectStart'));
+            },
+          },
+        );
+      }
+      // Section 15: "Das Entfernen aus einem Subnetz läuft über das Kontextmenü."
+      const hull = node.parentId ? byId.get(node.parentId) : undefined;
+      if ((node.kind === 'document' || node.kind === 'media') && hull?.kind === 'subnet') {
+        items.push({
+          id: 'unassign',
+          label: t('mesh.menu.unassign', { name: titleOf(hull) }),
+          onSelect: () => {
+            void useStructure
+              .getState()
+              .unassign(node.id, hull.id)
+              .then(() => useMesh.getState().load());
+          },
+        });
+      }
+      setMenu({ x, y, items, label: t('mesh.menu.label') });
+    },
+    [byId, open, t, titleOf],
+  );
+
+  const edgeMenu = useCallback(
+    (edge: MeshEdge, x: number, y: number) => {
+      const items: ContextMenuItem[] = [];
+      const connection = edge.connectionId;
+      if (connection) {
+        items.push({
+          id: 'remove',
+          label: t('mesh.menu.remove'),
+          onSelect: () => void useMesh.getState().disconnect(connection),
+        });
+      } else {
+        // Derived: changed at its source, not in the Mesh (section 15).
+        const ends = [byId.get(edge.source), byId.get(edge.target)];
+        const element = ends.find((end) => end?.kind === 'document' || end?.kind === 'media');
+        if (element) {
+          items.push({
+            id: 'source',
+            label: t('mesh.menu.openSource', { name: titleOf(element) }),
+            onSelect: () => {
+              open(element);
+            },
+          });
+        }
+        const cluster = ends.find(
+          (end) => end && !end.open && (end.kind === 'subnet' || end.kind === 'unassigned'),
+        );
+        if (cluster) {
+          items.push({
+            id: 'expand',
+            label: t('mesh.expand', { name: titleOf(cluster) }),
+            onSelect: () => void useMesh.getState().toggle(cluster.id),
+          });
+        }
+      }
+      if (items.length > 0) {
+        setMenu({ x, y, items, label: t('mesh.menu.label') });
+      }
+    },
+    [byId, open, t, titleOf],
+  );
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!graph) {
       return;
@@ -149,6 +256,18 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       void mesh.undo();
+      return;
+    }
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      const box = event.currentTarget.getBoundingClientRect();
+      const edge = graph.edges.find((candidate) => candidate.id === selectedEdge);
+      const node = current ? byId.get(current) : undefined;
+      if (edge) {
+        edgeMenu(edge, box.left + box.width / 2, box.top + box.height / 2);
+      } else if (node) {
+        nodeMenu(node, box.left + box.width / 2, box.top + box.height / 2);
+      }
       return;
     }
     if (event.ctrlKey || event.metaKey || event.altKey) {
@@ -388,6 +507,8 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
                     .then(() => useMesh.getState().load());
                 }}
                 onDropElement={(elementId) => void mesh.show({ view: 'focus', scopeId: elementId })}
+                onNodeMenu={nodeMenu}
+                onEdgeMenu={edgeMenu}
                 onReady={(next) => {
                   control.current = next;
                 }}
@@ -407,6 +528,14 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
       <p className="sr-only" aria-live="polite" data-testid="mesh-announce">
         {announcement}
       </p>
+      {menu ? (
+        <ContextMenu
+          {...menu}
+          onClose={() => {
+            setMenu(null);
+          }}
+        />
+      ) : null}
       {connectFrom ? (
         <p className="border-t border-muted/40 px-2 py-1 text-xs" role="status" data-testid="mesh-connecting">
           {t('mesh.connectStart')}

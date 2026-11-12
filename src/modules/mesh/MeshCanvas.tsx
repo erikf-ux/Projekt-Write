@@ -6,7 +6,7 @@
  * Section 15: memoised node components, no shadows or animations, parents
  * before their children; React Flow draws only what is in view.
  */
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   type Connection,
@@ -22,8 +22,8 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
+  useOnViewportChange,
   useReactFlow,
-  useStore,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -90,9 +90,13 @@ const quietHandle = { ...handleStyle, opacity: 0 };
  * fluid (section 15: "verzichte bei vielen Knoten auf aufwendige …").
  */
 export const DETAIL_ZOOM = 0.45;
+/** Around the threshold the level stays as it is (no flicker, no redraw of every node on each step). */
+const DETAIL_HYSTERESIS = 0.05;
+
+const DetailContext = createContext(false);
 
 function useDetailed(): boolean {
-  return useStore((state) => state.transform[2] >= DETAIL_ZOOM);
+  return useContext(DetailContext);
 }
 
 const ElementNode = memo(function ElementNode({ data }: NodeProps<MeshFlowNode>) {
@@ -101,10 +105,10 @@ const ElementNode = memo(function ElementNode({ data }: NodeProps<MeshFlowNode>)
   if (!detailed) {
     return (
       <div
-        className="h-full w-full rounded-md"
+        className="h-full w-full"
         style={{
+          // Opaque and square: no blending and no rounded edges to paint.
           background: nodeColor(node),
-          opacity: node.archived ? 0.5 : 0.8,
           outline: selected ? '4px solid var(--pw-color-text)' : undefined,
         }}
         data-mesh-node={node.id}
@@ -187,6 +191,7 @@ const ClusterNode = memo(function ClusterNode({ data }: NodeProps<MeshFlowNode>)
 
 const HullNode = memo(function HullNode({ data }: NodeProps<MeshFlowNode>) {
   const t = useT();
+  const detailed = useDetailed();
   const { node, selected, onToggle, label } = data;
   const color = nodeColor(node);
   return (
@@ -196,7 +201,8 @@ const HullNode = memo(function HullNode({ data }: NodeProps<MeshFlowNode>) {
         borderColor: color,
         borderWidth: selected ? 4 : 2,
         borderStyle: node.kind === 'unassigned' ? 'dashed' : 'solid',
-        background: `color-mix(in srgb, ${color} 8%, transparent)`,
+        // A tinted fill is blended over a large area: only up close.
+        ...(detailed ? { background: `color-mix(in srgb, ${color} 8%, transparent)` } : {}),
       }}
       data-mesh-node={node.id}
       data-kind={node.kind}
@@ -263,6 +269,8 @@ function Canvas({
   onDropOnSubnet,
   onDropElement,
   onReady,
+  onNodeMenu,
+  onEdgeMenu,
 }: MeshRendererProps) {
   const t = useT();
   const flow = useReactFlow<MeshFlowNode>();
@@ -324,6 +332,8 @@ function Canvas({
         focusable: true,
         ariaLabel: t(`mesh.edge.${edge.kind}` as MessageKey),
         data: { edge },
+        // Straight lines: much cheaper to draw than curves with many edges.
+        type: 'straight',
         ...edgeStyle(edge, edge.id === selectedEdge),
       })),
     [graph.edges, selectedEdge, t],
@@ -454,71 +464,98 @@ function Canvas({
   );
 
   const many = graph.nodes.length > 300;
+  // The level of detail changes only when the zoom passes the threshold
+  // by more than the hysteresis: every node redraws then, once.
+  const [detailed, setDetailed] = useState(() => flow.getZoom() >= DETAIL_ZOOM);
+  useOnViewportChange({
+    onChange: (viewport) => {
+      setDetailed((current) =>
+        current
+          ? viewport.zoom >= DETAIL_ZOOM - DETAIL_HYSTERESIS
+          : viewport.zoom >= DETAIL_ZOOM + DETAIL_HYSTERESIS,
+      );
+    },
+  });
 
   return (
-    <div
-      className="h-full w-full"
-      onDragOver={(event) => {
-        if (event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE)) {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'link';
-        }
-      }}
-      onDrop={onDrop}
-    >
-      <ReactFlow<MeshFlowNode>
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onNodeClick={(event, node) => {
-          if (event.shiftKey) {
-            onSelect(
-              selectedSet.has(node.id) ? selected.filter((id) => id !== node.id) : [...selected, node.id],
-            );
-            return;
-          }
-          const kind = node.data.node.kind;
-          if (kind === 'subnet' && !node.data.node.open) {
-            onOpen(node.data.node);
-            return;
-          }
-          onSelect([node.id]);
-        }}
-        onNodeDoubleClick={(_, node) => {
-          onOpen(node.data.node);
-        }}
-        onEdgeClick={(_, edge) => {
-          onSelectEdge(edge.id);
-        }}
-        onPaneClick={() => {
-          onSelect([]);
-        }}
-        onConnect={(connection: Connection) => {
-          if (connection.source && connection.target) {
-            onConnect(connection.source, connection.target);
+    <DetailContext.Provider value={detailed}>
+      <div
+        className="h-full w-full"
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes(EXPLORER_DRAG_TYPE)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'link';
           }
         }}
-        onNodeDragStart={onNodeDragStart}
-        onNodeDragStop={onNodeDragStop}
-        onlyRenderVisibleElements={false}
-        minZoom={0.05}
-        maxZoom={2.5}
-        nodesFocusable={false}
-        edgesFocusable={false}
-        deleteKeyCode={null}
-        selectionKeyCode={null}
-        multiSelectionKeyCode={null}
-        zoomOnDoubleClick={false}
-        proOptions={{ hideAttribution: true }}
-        colorMode="system"
-        aria-label={t('mesh.canvas')}
+        onDrop={onDrop}
       >
-        <Background gap={24} size={1} />
-        <Controls showInteractive={false} position="bottom-right" />
-        <MiniMap pannable zoomable position="bottom-left" nodeStrokeWidth={many ? 0 : 2} />
-      </ReactFlow>
-    </div>
+        <ReactFlow<MeshFlowNode>
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onNodeClick={(event, node) => {
+            if (event.shiftKey) {
+              onSelect(
+                selectedSet.has(node.id) ? selected.filter((id) => id !== node.id) : [...selected, node.id],
+              );
+              return;
+            }
+            const kind = node.data.node.kind;
+            if (kind === 'subnet' && !node.data.node.open) {
+              onOpen(node.data.node);
+              return;
+            }
+            onSelect([node.id]);
+          }}
+          onNodeDoubleClick={(_, node) => {
+            onOpen(node.data.node);
+          }}
+          onEdgeClick={(_, edge) => {
+            onSelectEdge(edge.id);
+          }}
+          onNodeContextMenu={(event, node) => {
+            event.preventDefault();
+            onSelect([node.id]);
+            onNodeMenu(node.data.node, event.clientX, event.clientY);
+          }}
+          onEdgeContextMenu={(event, edge) => {
+            event.preventDefault();
+            const found = graph.edges.find((candidate) => candidate.id === edge.id);
+            if (found) {
+              onSelectEdge(edge.id);
+              onEdgeMenu(found, event.clientX, event.clientY);
+            }
+          }}
+          onPaneClick={() => {
+            onSelect([]);
+          }}
+          onConnect={(connection: Connection) => {
+            if (connection.source && connection.target) {
+              onConnect(connection.source, connection.target);
+            }
+          }}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDragStop={onNodeDragStop}
+          onlyRenderVisibleElements={false}
+          minZoom={0.05}
+          maxZoom={2.5}
+          nodesFocusable={false}
+          edgesFocusable={false}
+          deleteKeyCode={null}
+          selectionKeyCode={null}
+          multiSelectionKeyCode={null}
+          zoomOnDoubleClick={false}
+          proOptions={{ hideAttribution: true }}
+          colorMode="system"
+          aria-label={t('mesh.canvas')}
+        >
+          <Background gap={24} size={1} />
+          <Controls showInteractive={false} position="bottom-right" />
+          <MiniMap pannable zoomable position="bottom-left" nodeStrokeWidth={many ? 0 : 2} />
+        </ReactFlow>
+      </div>
+    </DetailContext.Provider>
   );
 }
 

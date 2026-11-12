@@ -3,6 +3,7 @@
  * hinter einer Schnittstelle"). React Flow implements it (MeshCanvas.tsx);
  * Sigma.js would be the fallback (ADR 0022).
  */
+import type { MeshEdge } from '@/types/generated/MeshEdge';
 import type { MeshGraph } from '@/types/generated/MeshGraph';
 import type { MeshNode } from '@/types/generated/MeshNode';
 import type { MeshPosition } from '@/types/generated/MeshPosition';
@@ -44,4 +45,7 @@ export interface MeshRendererProps {
   /** An element from the Explorer dropped beside every subnet. */
   onDropElement: (elementId: string) => void;
   onReady: (control: MeshCanvasControl) => void;
+  /** Right click on a node or an edge, at screen coordinates. */
+  onNodeMenu: (node: MeshNode, x: number, y: number) => void;
+  onEdgeMenu: (edge: MeshEdge, x: number, y: number) => void;
 }
