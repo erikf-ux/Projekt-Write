@@ -82,6 +82,16 @@ pub fn run() {
                 state.media_files = scripted.clone();
                 state.media_folders = scripted;
             }
+            // So do the dialogs of export, packages and backups (ADR 0021).
+            #[cfg(feature = "e2e")]
+            if let Some(list) = std::env::var_os("PW_E2E_PICK_EXPORT") {
+                let answers: Vec<Option<PathBuf>> = std::env::split_paths(&list)
+                    .map(|path| (!path.as_os_str().is_empty()).then_some(path))
+                    .collect();
+                let scripted = Arc::new(services::dialog::ScriptedPicker::new(answers));
+                state.export_files = scripted.clone();
+                state.export_folders = scripted;
+            }
             let menu =
                 services::ui::menu::build(app.handle(), state.ui.locale(), &state.ui.menu_state())?;
             if let Some(window) = app.get_webview_window("main") {

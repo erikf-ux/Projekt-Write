@@ -23,6 +23,10 @@ pub struct AppState {
     /// builds the answers of `PW_E2E_PICK_MEDIA`.
     pub media_files: Arc<dyn FilePicker>,
     pub media_folders: Arc<dyn FolderPicker>,
+    /// Dialogs of export, packages and backups (ADR 0021): the system
+    /// dialogs, in e2e builds the answers of `PW_E2E_PICK_EXPORT`.
+    pub export_files: Arc<dyn FilePicker>,
+    pub export_folders: Arc<dyn FolderPicker>,
     /// External files open in this session.
     pub external: Arc<ExternalFiles>,
     /// Files from start arguments and second starts, until the interface
@@ -60,6 +64,8 @@ impl AppState {
             ui,
             media_files: Arc::clone(&files),
             media_folders: Arc::clone(&picker),
+            export_files: Arc::clone(&files),
+            export_folders: Arc::clone(&picker),
             picker,
             files,
             external,

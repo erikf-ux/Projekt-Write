@@ -112,7 +112,7 @@ pub async fn export_document(
         },
         extensions: vec![kind.extension().to_owned()],
     };
-    let answer = state.files.pick_file(
+    let answer = state.export_files.pick_file(
         FileDialog::Save,
         FilePickRequest {
             title: request.title,
@@ -154,7 +154,7 @@ pub async fn export_library_begin(
 ) -> Result<Option<ExportPlan>, CommandError> {
     let request = request.into_inner();
     let exports = state.session.exports().await?;
-    let answer = state.picker.pick_folder(PickRequest {
+    let answer = state.export_folders.pick_folder(PickRequest {
         title: request.title,
         start_in: None,
     });
@@ -310,7 +310,7 @@ pub async fn export_pack(
         .await
         .map_err(export_error)?;
     let stem = suggested.trim_end_matches(".md").to_owned();
-    let answer = state.files.pick_file(
+    let answer = state.export_files.pick_file(
         FileDialog::Save,
         FilePickRequest {
             title: request.title,
@@ -348,7 +348,7 @@ pub async fn import_pack(
         .session
         .with_documents(|documents| async move { Ok(documents) })
         .await?;
-    let answer = state.files.pick_file(
+    let answer = state.export_files.pick_file(
         FileDialog::Open,
         FilePickRequest {
             title: request.title,

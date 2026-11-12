@@ -13,6 +13,7 @@ import {
   pickedFiles,
   pickedFolders,
   pickedMedia,
+  pickedExport,
   root,
   sandbox,
 } from './sandbox';
@@ -43,8 +44,9 @@ process.env['PW_E2E_APP_DIRS'] = appDirs;
 process.env['PW_E2E_PICK_FOLDERS'] = [pickedFolders.local, pickedFolders.moveTarget].join(path.delimiter);
 process.env['PW_E2E_PICK_FILES'] = Object.values(pickedFiles).join(path.delimiter);
 process.env['PW_E2E_PICK_MEDIA'] = Object.values(pickedMedia).join(path.delimiter);
+process.env['PW_E2E_PICK_EXPORT'] = Object.values(pickedExport).join(path.delimiter);
 // No automatic backup 30 s after each start: it would run in the middle of
-// the measurements (ADR 0021). Backups are made by hand in backup.e2e.ts.
+// the measurements (ADR 0021). Backups are made by hand in export-backup.e2e.ts.
 process.env['PW_E2E_NO_AUTO_BACKUP'] = '1';
 // Web links are recorded there instead of starting a browser.
 process.env['PW_E2E_OPENED_LINKS'] = openedLinks;
@@ -75,6 +77,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'session-restored.e2e.ts'),
     path.join(specs, 'crash.e2e.ts'),
     path.join(specs, 'crash-recovered.e2e.ts'),
+    path.join(specs, 'export-backup.e2e.ts'),
     path.join(specs, 'reference-prepare.e2e.ts'),
     path.join(specs, 'reference.e2e.ts'),
   ],

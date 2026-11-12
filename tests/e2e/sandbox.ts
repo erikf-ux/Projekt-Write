@@ -56,6 +56,25 @@ export const pickedMedia = {
   cancelled: path.join(mediaOriginals, 'Abbruch'),
 };
 
+/** Exports and backups (Phase 10), outside the library. */
+export const exportsDir = path.join(sandbox, 'Export');
+export const backupsDir = path.join(sandbox, 'Sicherungen');
+export const restoreParent = path.join(sandbox, 'Wiederherstellung');
+
+/** Answers of the export and backup dialogs (`PW_E2E_PICK_EXPORT`), in this order. */
+export const pickedExport = {
+  markdown: path.join(exportsDir, 'Bericht.md'),
+  text: path.join(exportsDir, 'Bericht.txt'),
+  pack: path.join(exportsDir, 'Bericht.pwritepack'),
+  packImport: path.join(exportsDir, 'Bericht.pwritepack'),
+  library: exportsDir,
+  backupTarget: backupsDir,
+  check: path.join(backupsDir, 'pruefen.pwbackup'),
+  damaged: path.join(backupsDir, 'kaputt.pwbackup'),
+  restoreFile: path.join(backupsDir, 'pruefen.pwbackup'),
+  restoreFolder: restoreParent,
+};
+
 /** Passed to a second start of the app (not a dialog answer). */
 export const secondStartFile = path.join(ownFiles, 'zweiter-start.md');
 

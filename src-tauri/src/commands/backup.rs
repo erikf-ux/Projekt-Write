@@ -132,7 +132,7 @@ pub async fn backup_choose_target(
     request: Input<DialogTitleRequest>,
 ) -> Result<Option<BackupOverview>, CommandError> {
     let request = request.into_inner();
-    let answer = state.picker.pick_folder(PickRequest {
+    let answer = state.export_folders.pick_folder(PickRequest {
         title: request.title,
         start_in: None,
     });
@@ -194,7 +194,7 @@ pub async fn backup_check(
     on_progress: Channel<BackupProgress>,
 ) -> Result<Option<BackupSummary>, CommandError> {
     let request = request.into_inner();
-    let answer = state.files.pick_file(
+    let answer = state.export_files.pick_file(
         FileDialog::Open,
         FilePickRequest {
             title: request.title,
@@ -222,7 +222,7 @@ pub async fn backup_restore(
     on_progress: Channel<BackupProgress>,
 ) -> Result<Option<LibraryStatus>, CommandError> {
     let request = request.into_inner();
-    let file = state.files.pick_file(
+    let file = state.export_files.pick_file(
         FileDialog::Open,
         FilePickRequest {
             title: request.file_title,
@@ -234,7 +234,7 @@ pub async fn backup_restore(
     let Ok(Some(path)) = file.await else {
         return Ok(None);
     };
-    let folder = state.picker.pick_folder(PickRequest {
+    let folder = state.export_folders.pick_folder(PickRequest {
         title: request.folder_title,
         start_in: None,
     });
