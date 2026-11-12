@@ -229,6 +229,8 @@ export const useMesh = create<MeshStore>((set, get) => {
         notifyError(result.error);
         return;
       }
+      // The view knows what is pinned now.
+      void get().load();
       // Nodes without a stored position before: dropped again on undo.
       const had = new Set(before.map((position) => position.nodeId));
       const dropped = positions.map((position) => position.nodeId).filter((id) => !had.has(id));
@@ -249,12 +251,17 @@ export const useMesh = create<MeshStore>((set, get) => {
     layouting: false,
 
     autoLayout: async (all) => {
-      const graph = get().graph;
-      if (!graph || get().layouting) {
+      if (get().layouting) {
         return false;
       }
       set({ layouting: true });
       try {
+        // What is pinned now, not what was drawn last.
+        await get().load();
+        const graph = get().graph;
+        if (!graph) {
+          return false;
+        }
         const { elkPositions, layoutChanges } = await import('./autoLayout');
         const positions = await elkPositions(graph);
         const changes = layoutChanges(graph, positions, all);
