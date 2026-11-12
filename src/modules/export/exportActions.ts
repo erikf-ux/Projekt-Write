@@ -237,8 +237,9 @@ export async function printActive(asPdf: boolean): Promise<boolean> {
   }
   await workspace.flush(document.id);
   const panel = window.document.getElementById(panelElementId(document.id));
+  // The view not in use sits in a hidden host (session.ts).
   const surface = [...(panel?.querySelectorAll<HTMLElement>('[data-testid="editor"]') ?? [])].find(
-    (element) => element.offsetParent !== null || element.getClientRects().length > 0,
+    (element) => element.closest('[hidden]') === null,
   );
   if (!surface) {
     return false;
