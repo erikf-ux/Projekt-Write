@@ -471,6 +471,15 @@ export function createAppCommands(): CommandDefinition[] {
       },
     },
     {
+      id: 'mesh.open',
+      category: 'view',
+      titleKey: 'command.mesh.open',
+      isAvailable: libraryOpen,
+      run: () => {
+        workspace().openMesh();
+      },
+    },
+    {
       id: 'trash.empty',
       category: 'document',
       titleKey: 'command.trash.empty',

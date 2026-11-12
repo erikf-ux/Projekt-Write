@@ -111,10 +111,14 @@ export interface OpenDocument {
  * A tab that shows no document: the media gallery or one medium (Phase 8,
  * ADR 0019). Its id starts with `view:`; it has nothing to save.
  */
-export type ViewTab = { kind: 'gallery' } | { kind: 'media'; mediaId: string; page: number | null };
+export type ViewTab =
+  { kind: 'gallery' } | { kind: 'mesh' } | { kind: 'media'; mediaId: string; page: number | null };
 
 /** Id of the gallery tab. */
 export const GALLERY_TAB = 'view:gallery';
+
+/** Id of the tab of the Mesh (Phase 11). */
+export const MESH_TAB = 'view:mesh';
 
 /** Id of the tab of a medium. */
 export function mediaTabId(mediaId: string): string {
@@ -138,6 +142,8 @@ interface WorkspaceStore {
   views: Record<string, ViewTab>;
   /** Opens (or shows) the media gallery. */
   openGallery: () => void;
+  /** Opens (or shows) the Mesh. */
+  openMesh: () => void;
   /** Opens (or shows) a medium; a PDF at `page`. */
   openMedia: (mediaId: string, page?: number | null) => void;
   /** Document whose title is being edited in the Explorer. */
@@ -800,6 +806,18 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => {
         active: GALLERY_TAB,
       }));
       if (previous && previous !== GALLERY_TAB) {
+        void get().flush(previous);
+      }
+    },
+
+    openMesh: () => {
+      const previous = get().active;
+      set((state) => ({
+        tabs: state.tabs.includes(MESH_TAB) ? state.tabs : [...state.tabs, MESH_TAB],
+        views: { ...state.views, [MESH_TAB]: { kind: 'mesh' } },
+        active: MESH_TAB,
+      }));
+      if (previous && previous !== MESH_TAB) {
         void get().flush(previous);
       }
     },

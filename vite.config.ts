@@ -6,6 +6,36 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 /**
+ * d3-color (through React Flow, Phase 11) sets `prototype.constructor` by
+ * assignment. The app freezes `Object.prototype` (Tauri `freezePrototype`,
+ * section 20), so that assignment throws in strict mode ("override
+ * mistake") and the Mesh could not load. It is rewritten to define the
+ * property, which a frozen prototype allows (ADR 0022). The build fails if
+ * d3-color changes and the line is gone.
+ */
+function d3ColorFrozenPrototype(): Plugin {
+  const line = 'prototype.constructor = constructor;';
+  return {
+    name: 'd3-color-frozen-prototype',
+    transform(code, id) {
+      if (!/[\\/]node_modules[\\/]d3-color[\\/]/.test(id)) {
+        return null;
+      }
+      if (!code.includes(line)) {
+        this.error(`d3-color changed: "${line}" not found in ${id}`);
+      }
+      return {
+        code: code.replace(
+          line,
+          'Object.defineProperty(prototype, "constructor", { value: constructor, writable: true, configurable: true });',
+        ),
+        map: null,
+      };
+    },
+  };
+}
+
+/**
  * Data files PDF.js loads at run time (ADR 0019, decision 9): standard
  * fonts, CMaps and the JavaScript fallbacks of the JPX and JBIG2 decoders
  * (WebAssembly stays off: the CSP does not allow 'wasm-unsafe-eval'). Served
@@ -59,7 +89,7 @@ function pdfjsAssets(): Plugin {
 
 // Tauri expects a fixed dev server port and must be able to see Rust errors.
 export default defineConfig({
-  plugins: [react(), tailwindcss(), pdfjsAssets()],
+  plugins: [react(), tailwindcss(), pdfjsAssets(), d3ColorFrozenPrototype()],
   clearScreen: false,
   resolve: {
     alias: {

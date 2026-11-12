@@ -35,6 +35,7 @@ export const defaultKeybindings: Readonly<Partial<Record<CommandId, readonly str
   'sidebar.toggle': ['Ctrl+Shift+B'],
   'explorer.focus': ['Ctrl+Shift+E'],
   'search.focus': ['Ctrl+Shift+F'],
+  'mesh.open': ['Ctrl+Shift+M'],
   'document.print': ['Ctrl+P'],
   'focus.toggle': ['F11'],
   'editor.toggleSource': ['Ctrl+/'],

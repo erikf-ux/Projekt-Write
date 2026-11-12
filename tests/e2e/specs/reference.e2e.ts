@@ -345,3 +345,174 @@ describe('Search with the reference library (Phase 9)', () => {
     expect(Math.max(...samples.map((sample) => sample.ms))).toBeLessThanOrEqual(SEARCH_LIMIT_MS);
   });
 });
+
+/** Section 6: "Mesh beim Zoomen und Verschieben ≥ 30 Bilder pro Sekunde". */
+const MESH_FRAME_TARGET_MS = 1000 / 30;
+
+describe('Mesh with the reference library (Phase 11, load test)', () => {
+  it('draws 1,000 nodes and zooms and pans them (target 30 frames per second)', async () => {
+    // The measurement takes longer than the default 30 s for a script.
+    await browser.setTimeout({ script: 180_000 });
+    const started = await browser.execute(() => performance.now());
+    await runFromPalette('mesh.open');
+    await $('[data-testid="mesh"] .react-flow__node').waitForDisplayed({ timeout: 30_000 });
+    const opened = await browser.execute(() => performance.now());
+    // The cluster of elements without a subnet: 2,788 elements, so the view
+    // reaches the limit of 1,000 drawn nodes.
+    await $('[data-mesh-node="unassigned"] [data-testid="mesh-expand"]').click();
+    await $('[data-testid="mesh-hidden"]').waitForDisplayed({ timeout: 30_000 });
+    // Fitted into view: React Flow draws only what is in view.
+    await $('[data-testid="mesh-canvas"]').click();
+    await browser.keys('0');
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(
+          () => document.querySelectorAll('[data-testid="mesh"] .react-flow__node').length,
+        )) >= 900,
+      { timeout: 30_000, timeoutMsg: 'the opened cluster was not drawn' },
+    );
+    const expanded = await browser.execute(() => performance.now());
+    const result = await browser.execute(async () => {
+      const pane = document.querySelector<HTMLElement>('[data-testid="mesh"] .react-flow__pane');
+      const viewport = document.querySelector<HTMLElement>('[data-testid="mesh"] .react-flow__viewport');
+      if (!pane || !viewport) {
+        throw new Error('no Mesh canvas');
+      }
+      const frame = () =>
+        new Promise<number>((resolve) => {
+          requestAnimationFrame(() => {
+            resolve(performance.now());
+          });
+        });
+      const box = pane.getBoundingClientRect();
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const settle = async () => {
+        for (let i = 0; i < 10; i += 1) {
+          await frame();
+        }
+      };
+      await settle();
+      const nodes = document.querySelectorAll('[data-testid="mesh"] .react-flow__node').length;
+      const edges = document.querySelectorAll('[data-testid="mesh"] .react-flow__edge').length;
+      // Zoom: one wheel step a frame, in and out again.
+      const zoom: number[] = [];
+      let before = await frame();
+      for (let step = 0; step < 120; step += 1) {
+        pane.dispatchEvent(
+          new WheelEvent('wheel', {
+            deltaY: step < 60 ? -60 : 60,
+            clientX: cx,
+            clientY: cy,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        const now = await frame();
+        zoom.push(now - before);
+        before = now;
+      }
+      const zoomed = viewport.style.transform;
+      await settle();
+      // Pan: drag the canvas 12 px a frame, there and back.
+      const pan: number[] = [];
+      pane.dispatchEvent(
+        new MouseEvent('mousedown', {
+          clientX: cx,
+          clientY: cy,
+          button: 0,
+          buttons: 1,
+          bubbles: true,
+          view: window,
+        }),
+      );
+      before = await frame();
+      for (let step = 0; step < 120; step += 1) {
+        const offset = step < 60 ? step * 12 : (120 - step) * 12;
+        window.dispatchEvent(
+          new MouseEvent('mousemove', {
+            clientX: cx + offset,
+            clientY: cy + offset / 2,
+            buttons: 1,
+            bubbles: true,
+            view: window,
+          }),
+        );
+        const now = await frame();
+        pan.push(now - before);
+        before = now;
+      }
+      window.dispatchEvent(
+        new MouseEvent('mouseup', { clientX: cx, clientY: cy, bubbles: true, view: window }),
+      );
+      const panned = viewport.style.transform;
+      await settle();
+      // What costs: the same pan without the edges, and without the nodes.
+      const panWithout = async (selector: string) => {
+        const layer = document.querySelector<HTMLElement>(`[data-testid="mesh"] ${selector}`);
+        if (layer) {
+          layer.style.display = 'none';
+        }
+        await settle();
+        const deltas: number[] = [];
+        pane.dispatchEvent(
+          new MouseEvent('mousedown', {
+            clientX: cx,
+            clientY: cy,
+            button: 0,
+            buttons: 1,
+            bubbles: true,
+            view: window,
+          }),
+        );
+        let last = await frame();
+        for (let step = 0; step < 60; step += 1) {
+          window.dispatchEvent(
+            new MouseEvent('mousemove', {
+              clientX: cx + step * 6,
+              clientY: cy,
+              buttons: 1,
+              bubbles: true,
+              view: window,
+            }),
+          );
+          const now = await frame();
+          deltas.push(now - last);
+          last = now;
+        }
+        window.dispatchEvent(
+          new MouseEvent('mouseup', { clientX: cx, clientY: cy, bubbles: true, view: window }),
+        );
+        if (layer) {
+          layer.style.display = '';
+        }
+        await settle();
+        return deltas;
+      };
+      const noEdges = await panWithout('.react-flow__edges');
+      const noNodes = await panWithout('.react-flow__nodes');
+      // The same frames without work, for comparison.
+      const idle: number[] = [];
+      before = await frame();
+      for (let step = 0; step < 60; step += 1) {
+        const now = await frame();
+        idle.push(now - before);
+        before = now;
+      }
+      return { nodes, edges, zoom, pan, idle, zoomed, panned, noEdges, noNodes };
+    });
+    console.log(
+      `Mesh of the reference library (${process.platform}): open ${(opened - started).toFixed(0)} ms, cluster with 1,000 nodes ${(expanded - opened).toFixed(0)} ms; ${String(result.nodes)} nodes and ${String(result.edges)} edges in the DOM; zoom ${format(result.zoom)}; pan ${format(result.pan)}; pan without edges ${format(result.noEdges)}, without nodes ${format(result.noNodes)}; without work ${format(result.idle)}`,
+    );
+    expect(result.nodes).toBeGreaterThanOrEqual(900);
+    // The canvas did move.
+    expect(result.zoomed).not.toBe('');
+    expect(result.panned).not.toBe(result.zoomed);
+    // The load test of section 15 measures first; the renderer is decided
+    // per ADR 0022 from these values on Windows and Linux. Until then the
+    // target is reported, not enforced.
+    console.log(
+      `Mesh target 30 frames per second (${MESH_FRAME_TARGET_MS.toFixed(1)} ms): zoom ${percentile(result.zoom, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}, pan ${percentile(result.pan, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}`,
+    );
+  });
+});

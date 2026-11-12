@@ -5,6 +5,7 @@
  */
 import { panelElementId } from '@/modules/editor/DocumentEditor';
 import type { ViewTab } from '@/modules/documents/workspaceStore';
+import { MeshPanel } from '@/modules/mesh/MeshPanel';
 import { Gallery } from './Gallery';
 import { MediaView } from './MediaView';
 
@@ -36,6 +37,8 @@ export function MediaPanels({ tabs, views, active, tabElementId }: MediaPanelsPr
           >
             {view.kind === 'gallery' ? (
               <Gallery hidden={hidden} />
+            ) : view.kind === 'mesh' ? (
+              <MeshPanel hidden={hidden} />
             ) : (
               <MediaView mediaId={view.mediaId} page={view.page} hidden={hidden} />
             )}

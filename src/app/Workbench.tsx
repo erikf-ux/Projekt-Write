@@ -6,6 +6,7 @@
  */
 import {
   Files,
+  Network,
   FilePlus,
   FileText,
   Maximize2,
@@ -32,6 +33,7 @@ import { OutsideChangeDialog } from '@/modules/documents/OutsideChangeDialog';
 import {
   activeDocument,
   hasUnsavedChanges,
+  MESH_TAB,
   setOpenRequestsReady,
   useWorkspace,
 } from '@/modules/documents/workspaceStore';
@@ -191,7 +193,9 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           title:
             view.kind === 'gallery'
               ? t('media.gallery.title')
-              : (mediaById(mediaState, view.mediaId)?.title ?? '…'),
+              : view.kind === 'mesh'
+                ? t('mesh.title')
+                : (mediaById(mediaState, view.mediaId)?.title ?? '…'),
           marker: undefined,
           tooltip: undefined,
         },
@@ -257,6 +261,10 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
                 pressed: settings.sidebar.visible && sideView === 'search',
               }),
               item('editor.focus', FileText, { label: t('activity.editor') }),
+              item('mesh.open', Network, {
+                label: t('activity.mesh'),
+                pressed: workspace.active === MESH_TAB,
+              }),
             ]}
             bottom={[item('settings.open', Settings)]}
           />

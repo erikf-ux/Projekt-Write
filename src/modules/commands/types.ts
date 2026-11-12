@@ -29,6 +29,7 @@ export type CommandId =
   | 'media.import'
   | 'media.importFolder'
   | 'media.gallery'
+  | 'mesh.open'
   | 'document.history'
   | 'document.saveVersion'
   | 'document.convertToMarkdown'

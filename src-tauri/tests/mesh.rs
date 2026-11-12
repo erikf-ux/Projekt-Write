@@ -283,9 +283,15 @@ async fn positions_are_stored_per_view_and_can_be_dropped() {
         None
     );
     // Undo of a layout: dropped again.
-    mesh.save_positions(MeshView::Global, "", &[], &[l.ideen.clone()], None)
-        .await
-        .unwrap();
+    mesh.save_positions(
+        MeshView::Global,
+        "",
+        &[],
+        std::slice::from_ref(&l.ideen),
+        None,
+    )
+    .await
+    .unwrap();
     let graph = mesh.graph(&query(MeshView::Global, "", &[])).await.unwrap();
     assert_eq!(
         graph.nodes.iter().find(|n| n.id == l.ideen).unwrap().x,
