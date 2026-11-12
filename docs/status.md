@@ -6,7 +6,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 10 – Export und Backup** (Abschnitt 21): abgeschlossen, Drucken nachgetestet (CI-Lauf 112 grün); Bericht in `docs/bericht-phase-10.md`.
 
-**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; CI und Bericht siehe `docs/bericht-phase-11.md`.
+**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; abgeschlossen, CI-Lauf 117 grün; Bericht in `docs/bericht-phase-11.md`. Wartet auf die Freigabe von Phase 12.
 
 **Phase 12 – Sprachprüfung** (Abschnitte 7, 14): angehalten („Fange noch nicht mit Phase 12 an“). Vorgezogen und behalten ist nur der Vergleich der Prüfwerke (ADR 0023, Korpus, `tools/spell-compare`). Ein Entwurf von Satzsegmentierung und Autokorrektur-Regel wurde wieder herausgenommen, ungeprüft; er liegt in Commit `9d47f7c`.
 
@@ -14,7 +14,7 @@ Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur 
 
 Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout, Vorschläge).
 
-CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57); Lauf 117 läuft. Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 12
 
