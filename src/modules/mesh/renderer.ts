@@ -29,6 +29,8 @@ export interface MeshRendererProps {
   graph: MeshGraph;
   selected: readonly string[];
   selectedEdge: string | null;
+  /** A tag to highlight: elements without it are dimmed (section 15). */
+  highlightTag: string | null;
   titleOf: (node: MeshNode) => string;
   onSelect: (ids: readonly string[]) => void;
   onSelectEdge: (id: string | null) => void;

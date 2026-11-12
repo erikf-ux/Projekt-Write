@@ -387,6 +387,7 @@ impl Mesh {
             members: rows::members(pool).await?,
             references: rows::references(pool).await?,
             connections: rows::connections(pool).await?,
+            tags: rows::element_tags(pool).await?,
         })
     }
 

@@ -934,5 +934,7 @@
   "mesh.menu.connect": "Verbinden mit …",
   "mesh.menu.unassign": "Aus „{name}“ entfernen",
   "mesh.menu.remove": "Verbindung entfernen",
-  "mesh.menu.openSource": "Quelle öffnen: {name}"
+  "mesh.menu.openSource": "Quelle öffnen: {name}",
+  "mesh.highlightTag": "Tag hervorheben",
+  "mesh.highlightNone": "keiner"
 }

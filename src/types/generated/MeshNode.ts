@@ -25,4 +25,9 @@ count: number,
 /**
  * Subnets directly below a subnet.
  */
-childSubnets: number, x: number | null, y: number | null, pinned: boolean, };
+childSubnets: number, 
+/**
+ * Tags of a document or medium (section 15: tags are a filter and a
+ * highlight, not edges).
+ */
+tagIds: Array<string>, x: number | null, y: number | null, pinned: boolean, };

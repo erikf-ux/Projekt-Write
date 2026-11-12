@@ -18,6 +18,7 @@ import {
   sandbox,
   tempDir,
 } from './sandbox';
+import { measurementsFile } from './measurements';
 
 if (!fs.existsSync(application)) {
   throw new Error(`App binary not found at ${application}. Run "npm run build:e2e" first.`);
@@ -104,4 +105,10 @@ export const config: WebdriverIO.Config = {
   // why a worker failed to start.
   logLevel: 'warn',
   waitforTimeout: 20_000,
+  // The measurements once more, last in the log (measurements.ts).
+  onComplete: () => {
+    if (fs.existsSync(measurementsFile)) {
+      console.log(`\nMeasurements:\n${fs.readFileSync(measurementsFile, 'utf8')}`);
+    }
+  },
 };

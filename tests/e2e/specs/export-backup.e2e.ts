@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { $, browser, expect } from '@wdio/globals';
 import { activeDocumentId, appendText, renameActive, runFromPalette } from '../editing';
+import { measured } from '../measurements';
 import { readPdf } from '../pdf';
 import { backupsDir, exportsDir, pickedExport, printedPdf, restoreParent } from '../sandbox';
 import { closeSettings, openSettings, pinMainWindow } from '../session';
@@ -229,7 +230,7 @@ describe('Export, printing and backups (Phase 10)', () => {
 
     const pages = await readPdf(new Uint8Array(pdf));
     const all = pages.map((page) => page.text).join(' ');
-    console.log(
+    measured(
       `Printed PDF (${process.platform}): ${String(pages.length)} pages of ${pages[0]?.width.toFixed(0) ?? '?'} x ${pages[0]?.height.toFixed(0) ?? '?'} pt, ${String(pdf.length)} bytes; images ${pages.map((page) => page.images).join('/')}; links ${pages.flatMap((page) => page.links).join(' ')}`,
     );
     // Several pages, in order, with nothing cut off.

@@ -18,6 +18,7 @@ function node(id: string, extra: Partial<MeshNode> = {}): MeshNode {
     open: false,
     count: 0,
     childSubnets: 0,
+    tagIds: [],
     x: null,
     y: null,
     pinned: false,

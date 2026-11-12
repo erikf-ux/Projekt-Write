@@ -9,6 +9,7 @@
  * expect.
  */
 import { $, browser, expect } from '@wdio/globals';
+import { runFromPalette } from '../editing';
 import { pinMainWindow } from '../session';
 
 interface Graph {
@@ -83,10 +84,17 @@ describe('Mesh (Phase 11)', () => {
     expect(await announced()).not.toBe('');
     // Shift+click selects the subnet without opening it; Enter shows it
     // (Subnet View).
-    await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click({ skipRelease: false });
-    await browser.waitUntil(async () =>
-      (await $('[data-testid="mesh-breadcrumb"]').getText()).includes('Küste'),
-    );
+    // The view loads twice right after opening (graph, then fresh
+    // structure): a click in between may land on a node being replaced.
+    for (
+      let attempt = 0;
+      attempt < 5 && !(await $('[data-testid="mesh-breadcrumb"]').getText()).includes('Küste');
+      attempt += 1
+    ) {
+      await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click();
+      await browser.pause(400);
+    }
+    expect(await $('[data-testid="mesh-breadcrumb"]').getText()).toContain('Küste');
     await canvas.click();
     await browser.keys('Escape');
     await browser.waitUntil(
@@ -255,6 +263,61 @@ describe('Mesh (Phase 11)', () => {
         ),
       { timeoutMsg: 'the accepted suggestion made no connection' },
     );
+  });
+
+  it('highlights the elements with a tag and dims the others (tags make no edges)', async () => {
+    const other = await invoke<{ id: string }>('document_create', { title: 'Hafenkran', format: 'md' });
+    await invoke('document_assign', { id: other.id, subnetId: subnet });
+    await $('[data-testid="mesh-breadcrumb"] button').click();
+    await $(`[data-testid="mesh"] [data-mesh-node="${subnet}"]`).click();
+    await $(`[data-testid="mesh"] [data-mesh-node="${other.id}"]`).waitForDisplayed();
+    // Shown anew (another tab, then back), the Mesh reads subnets and tags again.
+    await runFromPalette('media.gallery');
+    await browser.keys(['Control', 'Shift', 'm']);
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          [...document.querySelectorAll('[data-testid="mesh-tag"] option')].some(
+            (option) => option.textContent === 'Licht',
+          ),
+        ),
+      { timeoutMsg: 'the tag is not offered' },
+    );
+    const tag = await browser.execute(
+      () =>
+        [...document.querySelectorAll<HTMLOptionElement>('[data-testid="mesh-tag"] option')].find(
+          (option) => option.textContent === 'Licht',
+        )?.value,
+    );
+    expect(tag).toBeDefined();
+    const choose = (value: string) =>
+      browser.execute((wanted: string) => {
+        const select = document.querySelector<HTMLSelectElement>('[data-testid="mesh-tag"]');
+        if (select) {
+          select.value = wanted;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, value);
+    await choose(tag ?? '');
+    const opacity = (id: string) =>
+      browser.execute(
+        (node: string) =>
+          document.querySelector<HTMLElement>(`.react-flow__node[data-id="${node}"]`)?.style.opacity ?? '',
+        id,
+      );
+    await browser.waitUntil(async () => (await opacity(other.id)) === '0.25', {
+      timeoutMsg: 'nothing dimmed',
+    });
+    expect(await opacity(nord)).toBe('1');
+    // Süd and Ost share the tag (their suggestion was rejected above): no
+    // edge between them. Tags make no edges.
+    const graph = await invoke<Graph>('mesh_graph', { view: 'subnet', scopeId: subnet });
+    expect(
+      graph.edges.some(
+        (edge) => [edge.source, edge.target].includes(sued) && [edge.source, edge.target].includes(ost),
+      ),
+    ).toBe(false);
+    await choose('');
   });
 
   after(async () => {

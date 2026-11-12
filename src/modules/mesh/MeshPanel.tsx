@@ -83,6 +83,8 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [highlightTag, setHighlightTag] = useState<string | null>(null);
+  const tags = useStructure((state) => state.tags);
   const suggestionsOpen = useSuggestions((state) => state.open);
   const toggleSuggestions = useSuggestions((state) => state.toggle);
 
@@ -94,6 +96,12 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
       void useMesh.getState().load();
     }
   }, [hidden, mesh.generation, structureSubnets, structureElements]);
+  // Shown: subnets and tags fresh (imports and other windows change them).
+  useEffect(() => {
+    if (!hidden) {
+      void useStructure.getState().load();
+    }
+  }, [hidden]);
 
   const titleOf = useCallback(
     (node: MeshNode) =>
@@ -450,6 +458,24 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
             {t('mesh.depth2')}
           </label>
         ) : null}
+        <label className="flex items-center gap-1">
+          {t('mesh.highlightTag')}
+          <select
+            className="rounded border border-muted/40 bg-surface px-1"
+            data-testid="mesh-tag"
+            value={highlightTag ?? ''}
+            onChange={(event) => {
+              setHighlightTag(event.target.value === '' ? null : event.target.value);
+            }}
+          >
+            <option value="">{t('mesh.highlightNone')}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           className="rounded px-1.5 py-0.5 hover:bg-muted/30"
@@ -490,6 +516,7 @@ export function MeshPanel({ hidden }: { hidden: boolean }) {
                 graph={graph}
                 selected={selected}
                 selectedEdge={selectedEdge}
+                highlightTag={highlightTag}
                 titleOf={titleOf}
                 onSelect={(ids) => {
                   mesh.select(ids);

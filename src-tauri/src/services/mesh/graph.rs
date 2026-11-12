@@ -75,6 +75,9 @@ pub struct MeshNode {
     pub count: u32,
     /// Subnets directly below a subnet.
     pub child_subnets: u32,
+    /// Tags of a document or medium (section 15: tags are a filter and a
+    /// highlight, not edges).
+    pub tag_ids: Vec<String>,
     pub x: Option<f64>,
     pub y: Option<f64>,
     pub pinned: bool,
@@ -151,6 +154,8 @@ pub struct MeshData {
     pub members: Vec<MemberRow>,
     pub references: Vec<(String, String)>,
     pub connections: Vec<ConnectionRow>,
+    /// (element, tag).
+    pub tags: Vec<(String, String)>,
 }
 
 /// The data, indexed.
@@ -165,6 +170,7 @@ struct Index<'a> {
     unassigned: Vec<&'a str>,
     /// Elements in a subnet and below.
     counts: HashMap<&'a str, u32>,
+    tags: HashMap<&'a str, Vec<String>>,
 }
 
 impl<'a> Index<'a> {
@@ -210,7 +216,14 @@ impl<'a> Index<'a> {
                 None => unassigned.push(element.id.as_str()),
             }
         }
+        let mut tags: HashMap<&str, Vec<String>> = HashMap::new();
+        for (element, tag) in &data.tags {
+            if let Some((&key, _)) = elements.get_key_value(element.as_str()) {
+                tags.entry(key).or_default().push(tag.clone());
+            }
+        }
         Self {
+            tags,
             elements,
             subnets,
             children,
@@ -266,6 +279,7 @@ impl<'a> Index<'a> {
             count: self.counts.get(id).copied().unwrap_or(0),
             child_subnets: u32::try_from(self.children.get(id).map_or(0, Vec::len))
                 .unwrap_or(u32::MAX),
+            tag_ids: Vec::new(),
             x: None,
             y: None,
             pinned: false,
@@ -290,6 +304,7 @@ impl<'a> Index<'a> {
             open: false,
             count: 0,
             child_subnets: 0,
+            tag_ids: self.tags.get(id).cloned().unwrap_or_default(),
             x: None,
             y: None,
             pinned: false,
@@ -308,6 +323,7 @@ impl<'a> Index<'a> {
             open,
             count: u32::try_from(self.unassigned.len()).unwrap_or(u32::MAX),
             child_subnets: 0,
+            tag_ids: Vec::new(),
             x: None,
             y: None,
             pinned: false,
@@ -818,6 +834,7 @@ mod tests {
                 note: None,
                 created_at: String::new(),
             }],
+            tags: vec![("d1".to_owned(), "t".to_owned())],
         }
     }
 
@@ -871,6 +888,7 @@ mod tests {
         assert_eq!(ids(&graph), vec!["a", "b", UNASSIGNED_ID, "a1", "d2", "d1"]);
         let d1 = graph.nodes.iter().find(|n| n.id == "d1").unwrap();
         assert_eq!(d1.parent_id.as_deref(), Some("a1"));
+        assert_eq!(d1.tag_ids, vec!["t".to_owned()]);
         // The manual connection is drawn as itself and can be removed.
         let manual: Vec<_> = graph
             .edges

@@ -48,6 +48,8 @@ import type { MeshRendererProps } from './renderer';
 interface NodeData extends Record<string, unknown> {
   node: MeshNode;
   selected: boolean;
+  /** Without the highlighted tag. */
+  dimmed: boolean;
   onToggle: (id: string) => void;
   label: string;
 }
@@ -259,6 +261,7 @@ function Canvas({
   graph,
   selected,
   selectedEdge,
+  highlightTag,
   titleOf,
   onSelect,
   onSelectEdge,
@@ -284,6 +287,7 @@ function Canvas({
         const isElement = node.kind === 'document' || node.kind === 'media';
         const width = spot?.width ?? 0;
         const height = spot?.height ?? 0;
+        const dimmed = highlightTag !== null && isElement && !node.tagIds.includes(highlightTag);
         return {
           id: node.id,
           type: isElement ? 'element' : node.open ? 'hull' : 'cluster',
@@ -291,12 +295,13 @@ function Canvas({
           ...(node.parentId ? { parentId: node.parentId } : {}),
           width,
           height,
-          style: { width, height },
+          style: { width, height, opacity: dimmed ? 0.25 : 1 },
           zIndex: node.open ? 0 : 1,
           selectable: true,
           data: {
             node,
             selected: selectedSet.has(node.id),
+            dimmed,
             onToggle,
             label: titleOf(node),
           },
@@ -305,7 +310,7 @@ function Canvas({
       }),
     // selection is applied below without rebuilding the nodes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [graph, placed, onToggle, titleOf],
+    [graph, placed, onToggle, titleOf, highlightTag],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   useEffect(() => {

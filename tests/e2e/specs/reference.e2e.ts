@@ -28,6 +28,7 @@
  */
 import { $, browser, expect } from '@wdio/globals';
 import { runFromPalette } from '../editing';
+import { measured } from '../measurements';
 import { pinMainWindow } from '../session';
 
 /** Targets (ADR 0017, decision 17). */
@@ -82,7 +83,7 @@ describe('Explorer with the reference library (Phase 7)', () => {
       subnets: document.querySelectorAll('[data-testid="explorer"] [data-subnet][aria-level="1"]').length,
       unassigned: document.querySelector('[data-group="unassigned"]')?.textContent ?? '',
     }));
-    console.log(
+    measured(
       `Explorer of the reference library (${process.platform}): ready after ${samples.map((ms) => ms.toFixed(0)).join(', ')} ms; ${String(counts.subnets)} subnets on the top level shown; ${counts.unassigned}`,
     );
     expect(Math.max(...samples)).toBeLessThanOrEqual(READY_LIMIT_MS);
@@ -270,7 +271,7 @@ describe('Gallery with the reference library (Phase 8)', () => {
       const again = await pass();
       return { tilesBefore, tilesAfter, height: list.scrollHeight, first, again };
     });
-    console.log(
+    measured(
       `Gallery of the reference library: first tiles after ${(shown - started).toFixed(0)} ms (palette included); ${String(result.tilesBefore)} tiles in the DOM, ${String(result.tilesAfter)} after scrolling; scrolling at 240 px a frame, first pass ${format(result.first)}; same stretch again ${format(result.again)}`,
     );
     // Virtualised: a screenful of tiles, not 5,000.
@@ -334,7 +335,7 @@ describe('Search with the reference library (Phase 9)', () => {
       }
       return results;
     }, queries);
-    console.log(
+    measured(
       `Search in the reference library (${process.platform}), from typing to hits on screen (${String(SEARCH_DELAY_MS)} ms pause included): ${samples
         .map((sample) => `${sample.query} ${sample.ms.toFixed(0)} ms (${String(sample.hits)})`)
         .join('; ')}`,
@@ -501,7 +502,7 @@ describe('Mesh with the reference library (Phase 11, load test)', () => {
       }
       return { nodes, edges, zoom, pan, idle, zoomed, panned, noEdges, noNodes };
     });
-    console.log(
+    measured(
       `Mesh of the reference library (${process.platform}): open ${(opened - started).toFixed(0)} ms, cluster with 1,000 nodes ${(expanded - opened).toFixed(0)} ms; ${String(result.nodes)} nodes and ${String(result.edges)} edges in the DOM; zoom ${format(result.zoom)}; pan ${format(result.pan)}; pan without edges ${format(result.noEdges)}, without nodes ${format(result.noNodes)}; without work ${format(result.idle)}`,
     );
     expect(result.nodes).toBeGreaterThanOrEqual(900);
@@ -511,7 +512,7 @@ describe('Mesh with the reference library (Phase 11, load test)', () => {
     // The load test of section 15 measures first; the renderer is decided
     // per ADR 0022 from these values on Windows and Linux. Until then the
     // target is reported, not enforced.
-    console.log(
+    measured(
       `Mesh target 30 frames per second (${MESH_FRAME_TARGET_MS.toFixed(1)} ms): zoom ${percentile(result.zoom, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}, pan ${percentile(result.pan, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}`,
     );
   });
