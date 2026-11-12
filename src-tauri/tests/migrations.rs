@@ -114,6 +114,24 @@ const FIXTURES: &[(i64, &str, &str)] = &[
          WHERE document_id = '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11' \
            AND indexed_sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'",
     ),
+    (
+        10,
+        "INSERT INTO mesh_connections (id, node_a, node_b, kind, created_at) \
+         VALUES ('1f2e3d4c-5b6a-4978-8f9e-0d1c2b3a4f5e', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', \
+                 '5d2c1e0a-8a1b-4c2d-9e3f-4a5b6c7d8e9f', 'manual', '2026-11-12T10:00:00.000Z'); \
+         INSERT INTO mesh_suggestions (id, node_a, node_b, score, reason, status, created_at, decided_at) \
+         VALUES ('2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', \
+                 '6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f', 0.5, '{\"tags\": 1}', 'rejected', \
+                 '2026-11-12T10:00:00.000Z', '2026-11-12T10:01:00.000Z'); \
+         INSERT INTO mesh_layouts (id, view, scope_id, updated_at) \
+         VALUES ('3b4c5d6e-7f8a-4b9c-8d0e-2f3a4b5c6d7e', 'global', '', '2026-11-12T10:00:00.000Z'); \
+         INSERT INTO mesh_positions (layout_id, node_id, x, y, pinned) \
+         VALUES ('3b4c5d6e-7f8a-4b9c-8d0e-2f3a4b5c6d7e', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', 12.5, -4, 1)",
+        "SELECT count(*) FROM mesh_connections AS c \
+         JOIN mesh_suggestions AS s ON s.node_a = c.node_a AND s.status = 'rejected' \
+         JOIN mesh_positions AS p ON p.node_id = c.node_a AND p.pinned = 1 \
+         WHERE c.kind = 'manual' AND p.x = 12.5",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -163,6 +181,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         9,
         "search",
         "fc1760406e5f82b6fcd1d67447324aa9027791036d9aeb0c044af46e5a92eb3572a1ee995c8296c76cd692ff04bf9f09",
+    ),
+    (
+        10,
+        "mesh",
+        "91b412b63fa3ec1f97a84a07869bf97b20cad8a773d13ccd667b25764b421a51483470234f363e61cefcddf395a4e1bc",
     ),
 ];
 
@@ -244,6 +267,86 @@ async fn every_earlier_schema_version_upgrades_to_the_current_one() {
         assert!(violations.is_empty(), "foreign key violations from {start}");
         db.close().await;
     }
+}
+
+/// Migration 0010 gives every existing document, medium and subnet a node
+/// of the Mesh; triggers give one to every element created later.
+#[tokio::test]
+async fn migration_10_gives_every_element_a_node() {
+    let dir = common::temp_dir("pw-migrate-");
+    let db = fresh(&dir, "from-9.db").await;
+    db.migrate_to(9).await.unwrap();
+    for (version, insert, _) in FIXTURES.iter().filter(|f| f.0 <= 9) {
+        sqlx::raw_sql(AssertSqlSafe(*insert))
+            .execute(db.writer())
+            .await
+            .unwrap_or_else(|e| panic!("fixture {version}: {e}"));
+    }
+    db.migrate().await.unwrap();
+    let kinds: Vec<(String, i64)> =
+        sqlx::query_as("SELECT kind, count(*) FROM mesh_nodes GROUP BY kind ORDER BY kind")
+            .fetch_all(db.reader())
+            .await
+            .unwrap();
+    assert_eq!(
+        kinds,
+        vec![
+            ("document".to_owned(), 2),
+            ("media".to_owned(), 1),
+            ("subnet".to_owned(), 1)
+        ]
+    );
+    // Created later: a node by trigger; deleted: its node and connections go.
+    sqlx::raw_sql(AssertSqlSafe(
+        "INSERT INTO documents (id, title, format, size_bytes, content_sha256, created_at, updated_at) \
+         VALUES ('7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b', 'Neu', 'md', 0, \
+                 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', \
+                 '2026-11-12T10:00:00.000Z', '2026-11-12T10:00:00.000Z'); \
+         INSERT INTO mesh_connections (id, node_a, node_b, kind, created_at) \
+         VALUES ('4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', \
+                 '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b', 'manual', '2026-11-12T10:00:00.000Z')",
+    ))
+    .execute(db.writer())
+    .await
+    .unwrap();
+    let count = |sql: &'static str| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(sql)
+                .fetch_one(db.reader())
+                .await
+                .unwrap()
+        }
+    };
+    assert_eq!(
+        count("SELECT count(*) FROM mesh_nodes WHERE document_id = '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b'").await,
+        1
+    );
+    // No self connection, ends sorted, one row per pair and kind.
+    for bad in [
+        "INSERT INTO mesh_connections (id, node_a, node_b, kind, created_at) VALUES ('5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', 'manual', '2026-11-12T10:00:00.000Z')",
+        "INSERT INTO mesh_connections (id, node_a, node_b, kind, created_at) VALUES ('5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a', '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', 'manual', '2026-11-12T10:00:00.000Z')",
+        "INSERT INTO mesh_connections (id, node_a, node_b, kind, created_at) VALUES ('5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a', '0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b', 'manual', '2026-11-12T10:00:00.000Z')",
+    ] {
+        assert!(
+            sqlx::raw_sql(AssertSqlSafe(bad))
+                .execute(db.writer())
+                .await
+                .is_err(),
+            "{bad}"
+        );
+    }
+    sqlx::raw_sql(AssertSqlSafe(
+        "DELETE FROM documents WHERE id = '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b'",
+    ))
+    .execute(db.writer())
+    .await
+    .unwrap();
+    assert_eq!(
+        count("SELECT count(*) FROM mesh_connections WHERE node_b = '7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a0b'").await,
+        0
+    );
+    db.close().await;
 }
 
 /// Migration 0009 puts what exists into the search index: titles, tags,

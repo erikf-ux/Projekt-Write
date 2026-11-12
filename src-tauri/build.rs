@@ -1,4 +1,7 @@
 fn main() {
+    // `sqlx::migrate!` embeds the migrations at compile time; a new file must
+    // rebuild the crate (recommended by sqlx).
+    println!("cargo:rerun-if-changed=migrations");
     // App manifest (section 20): every app command must be listed here and is
     // denied unless a capability allows it explicitly. Keep this list in sync
     // with `commands::COMMAND_NAMES` (checked by tests/security_config.rs).
