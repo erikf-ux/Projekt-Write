@@ -4,7 +4,7 @@
  * show "Nicht gespeichert" while they have changes, their folder, and
  * their encoding and line endings, which can be changed here (ADR 0015).
  */
-import { CircleAlert, FileText, Keyboard, Library, Lock, TriangleAlert } from 'lucide-react';
+import { CircleAlert, FileText, Keyboard, Languages, Library, Lock, TriangleAlert } from 'lucide-react';
 import { useLocale, useT } from '@/i18n';
 import type { DocumentView, SaveState } from '@/modules/documents/workspaceStore';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
@@ -49,6 +49,9 @@ interface StatusBarProps {
   statistics: { words: number; selectedWords: number | null; minutes: number | null } | null;
   /** Set while the active tab shows an external file. */
   external: ExternalStatus | null;
+  /** The main language of the active document; `off` when the check is off. */
+  language?: { tag: string; off: boolean } | null;
+  onLanguage?: () => void;
   onShowStatistics: () => void;
   onRetrySave: () => void;
   onResetZoom: () => void;
@@ -69,6 +72,8 @@ export function StatusBar({
   conflicts,
   statistics,
   external,
+  language = null,
+  onLanguage,
   onShowStatistics,
   onRetrySave,
   onResetZoom,
@@ -152,6 +157,19 @@ export function StatusBar({
           >
             <Keyboard aria-hidden="true" className="size-3.5" />
             {t('status.conflicts', { count: conflicts })}
+          </button>
+        ) : null}
+        {language ? (
+          <button
+            type="button"
+            className={BUTTON}
+            data-testid="status-language"
+            data-off={language.off}
+            title={t('command.language.document')}
+            onClick={onLanguage}
+          >
+            <Languages aria-hidden="true" className="size-3.5" />
+            {language.off ? t('status.languageOff') : t('status.language', { language: language.tag })}
           </button>
         ) : null}
         {statistics ? (

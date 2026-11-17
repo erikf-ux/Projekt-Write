@@ -31,6 +31,7 @@ import { setImageEditor } from './schema/image';
 import { internalLinkTarget } from './schema/extensions';
 import { takePendingSelection } from '@/modules/documents/sessionTabs';
 import { getSession, openSession } from './session';
+import { openCheckMenu, openCheckMenuAtCursor } from '@/modules/language-check/CheckMenu';
 import './editor.css';
 
 /**
@@ -155,6 +156,11 @@ export function DocumentEditor({
       })}
     </div>
   );
+}
+
+/** The library id of a tab; null for an external file. */
+function libraryId(id: string): string | null {
+  return id.startsWith('ext:') ? null : id;
 }
 
 interface DocumentPanelProps {
@@ -295,6 +301,26 @@ function DocumentPanel({
       {loaded ? (
         <div
           ref={host}
+          onContextMenu={(event) => {
+            const view = getSession(id)?.editor.view;
+            if (!view || !(event.target instanceof Node) || !view.dom.contains(event.target)) {
+              return;
+            }
+            const found = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            if (found && openCheckMenu(view, found.pos, event.clientX, event.clientY, libraryId(id))) {
+              event.preventDefault();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (!((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu')) {
+              return;
+            }
+            const view = getSession(id)?.editor.view;
+            if (view?.hasFocus() && openCheckMenuAtCursor(view, libraryId(id))) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
           className="min-h-0 flex-1 overflow-auto"
           data-limit-width={limitLineWidth}
           data-focus-mode={focusMode}

@@ -19,6 +19,7 @@ import { useFind } from '@/modules/editor/find/findStore';
 import { useHistory } from '@/modules/history/HistoryDialog';
 import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
+import { openProfileDialog } from '@/modules/language-check/DocumentLanguageDialog';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useMedia } from '@/modules/media/mediaStore';
 import { useMesh } from '@/modules/mesh/meshStore';
@@ -795,6 +796,33 @@ export function createAppCommands(): CommandDefinition[] {
       isAvailable: () => activeDocument(workspace())?.loaded === true,
       run: () => {
         useStatistics.getState().showDialog(true);
+      },
+    },
+    {
+      id: 'language.document',
+      category: 'document',
+      titleKey: 'command.language.document',
+      isAvailable: () => {
+        const current = activeDocument(workspace());
+        return current?.loaded === true && current.external === null;
+      },
+      run: () => {
+        const current = activeDocument(workspace());
+        if (current) {
+          openProfileDialog(current.id);
+        }
+      },
+    },
+    {
+      id: 'language.toggle',
+      category: 'view',
+      titleKey: 'command.language.toggle',
+      isAvailable: () => useUi.getState().state?.readOnly === false,
+      run: async () => {
+        const check = useUi.getState().state?.settings.languageCheck;
+        if (check) {
+          await useUi.getState().update({ languageCheck: { ...check, enabled: !check.enabled } });
+        }
       },
     },
     {

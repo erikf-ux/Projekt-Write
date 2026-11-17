@@ -1,4 +1,4 @@
-/** Settings: general, shortcuts, library (section 11; library from Phase 2). */
+/** Settings: general, language check, shortcuts, library (section 11; language check from Phase 12). */
 import { useCallback, useMemo } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { useT, type MessageKey } from '@/i18n';
@@ -6,12 +6,14 @@ import { effectiveKeybindings } from '@/modules/commands/keymap';
 import { allCommands } from '@/modules/commands/registry';
 import { LibraryPanel } from '@/modules/library/LibraryPanel';
 import { GeneralSettings } from './GeneralSettings';
+import { LanguageSettings } from '@/modules/language-check/LanguageSettings';
 import { LibraryPreferences } from './LibraryPreferences';
 import { ShortcutSettings } from './ShortcutSettings';
 import { useUi, type SettingsSection } from './uiStore';
 
 const sections: { id: SettingsSection; key: MessageKey }[] = [
   { id: 'general', key: 'settings.general' },
+  { id: 'language', key: 'settings.language.check' },
   { id: 'shortcuts', key: 'settings.shortcuts' },
   { id: 'library', key: 'settings.library' },
 ];
@@ -91,6 +93,7 @@ export function SettingsDialog() {
       </div>
       <div role="tabpanel" id={`settings-panel-${section}`} aria-labelledby={`settings-tab-${section}`}>
         {section === 'general' ? <GeneralSettings /> : null}
+        {section === 'language' ? <LanguageSettings /> : null}
         {section === 'shortcuts' ? (
           <ShortcutSettings
             commands={allCommands()}

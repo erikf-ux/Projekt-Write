@@ -41,6 +41,9 @@ import { DocumentEditor, panelElementId } from '@/modules/editor/DocumentEditor'
 import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
 import { HistoryDialog, VersionNameDialog } from '@/modules/history/HistoryDialog';
 import { offerRecovery, RecoveryDialog } from '@/modules/recovery/RecoveryDialog';
+import { CheckMenu } from '@/modules/language-check/CheckMenu';
+import { DocumentLanguageDialog, openProfileDialog } from '@/modules/language-check/DocumentLanguageDialog';
+import { documentLanguage, useLanguage } from '@/modules/language-check/languageStore';
 import { ImageDialog } from '@/modules/editor/ImageDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { MediaPicker } from '@/modules/editor/MediaPicker';
@@ -89,6 +92,9 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const current = activeDocument(workspace);
   const statistics = useStatistics((state) => (current ? state.byDocument[current.id] : undefined));
   const statisticsOpen = useStatistics((state) => state.dialogOpen);
+  // Read the profile so the status bar follows a change of it.
+  useLanguage((state) => (current ? state.profiles[current.id] : undefined));
+  const languageTag = documentLanguage(current && current.external === null ? current.id : null);
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
   const conflicts = useMemo(() => findConflicts(bindings).length, [bindings]);
   const created = useRef(false);
@@ -379,6 +385,16 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
                 }
               : null
           }
+          language={
+            current?.loaded && current.external === null
+              ? { tag: languageTag, off: !settings.languageCheck.enabled }
+              : null
+          }
+          onLanguage={() => {
+            if (current) {
+              openProfileDialog(current.id);
+            }
+          }}
           onShowStatistics={() => {
             useStatistics.getState().showDialog(true);
           }}
@@ -403,6 +419,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       <ImageDialog />
       <HistoryDialog />
       <RecoveryDialog />
+      <CheckMenu />
+      <DocumentLanguageDialog />
       <VersionNameDialog />
       <SubnetDialog />
       <SubnetPicker />

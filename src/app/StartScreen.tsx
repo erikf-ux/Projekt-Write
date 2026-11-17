@@ -77,6 +77,7 @@ export function StartScreen() {
 
         <LibraryPanel />
         <LanguageChoice />
+        <AutocorrectChoice />
 
         <section
           aria-labelledby="checks-title"
@@ -151,6 +152,53 @@ export function StartScreen() {
  * First start (section 11: "Bibliotheksort, Sprache …"): the language,
  * after the library. Applies at once and is saved in settings.json.
  */
+/** D5: the autocorrect is off unless the user turns it on; the first start asks. */
+function AutocorrectChoice() {
+  const t = useT();
+  const check = useUi((state) => state.state?.settings.languageCheck);
+  const update = useUi((state) => state.update);
+  if (check === undefined) {
+    return null;
+  }
+  const choose = (autocorrect: boolean) =>
+    void update({ languageCheck: { ...check, autocorrect, autocorrectAsked: true } });
+  return (
+    <section
+      aria-labelledby="first-start-autocorrect"
+      className="mb-4 rounded-pw bg-sidebar p-4"
+      data-testid="first-start-autocorrect"
+    >
+      <h2
+        id="first-start-autocorrect"
+        className="text-ui mb-1 font-semibold tracking-wide text-muted uppercase"
+      >
+        {t('start.autocorrect.title')}
+      </h2>
+      <p className="text-ui mb-2 text-muted">{t('start.autocorrect.text')}</p>
+      <div
+        role="radiogroup"
+        aria-labelledby="first-start-autocorrect"
+        className="flex flex-wrap gap-x-4 gap-y-1"
+      >
+        {[false, true].map((value) => (
+          <label key={String(value)} className="text-ui flex items-center gap-2">
+            <input
+              type="radio"
+              name="first-start-autocorrect"
+              checked={check.autocorrect === value}
+              data-testid={`first-start-autocorrect-${value ? 'on' : 'off'}`}
+              onChange={() => {
+                choose(value);
+              }}
+            />
+            {t(value ? 'start.autocorrect.on' : 'start.autocorrect.off')}
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function LanguageChoice() {
   const t = useT();
   const language = useUi((state) => state.state?.settings.language);

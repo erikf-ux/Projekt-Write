@@ -67,6 +67,8 @@ export type CommandId =
   | 'editor.focus'
   | 'editor.toggleSource'
   | 'statistics.show'
+  | 'language.document'
+  | 'language.toggle'
   | 'find.show'
   | 'replace.show'
   | 'find.next'
