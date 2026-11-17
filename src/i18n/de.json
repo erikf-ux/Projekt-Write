@@ -1097,5 +1097,14 @@
   "settings.locations.library": "Bibliothek",
   "settings.locations.open": "Ordner öffnen",
   "settings.locations.openLabel": "Ordner „{name}“ öffnen",
-  "settings.locations.noLibrary": "Keine Bibliothek geöffnet."
+  "settings.locations.noLibrary": "Keine Bibliothek geöffnet.",
+  "settings.extensions.title": "Eingebaute Erweiterungen",
+  "settings.extensions.about": "Erweiterungen von Dritten lassen sich in dieser Version nicht installieren; die App lädt keinen fremden Code. Die Liste zeigt, was die App selbst über ihre Register einbindet.",
+  "settings.extensions.editorFeatures": "Editorfunktionen",
+  "settings.extensions.documentFormats": "Dateiformate",
+  "settings.extensions.languageEngines": "Prüfwerke",
+  "settings.extensions.exporters": "Exporter",
+  "settings.extensions.meshRenderers": "Mesh-Renderer",
+  "settings.extensions.builtin": "(eingebaut)",
+  "settings.extensions.addOn": "(eingebaut, nutzt ein Zusatzpaket)"
 }

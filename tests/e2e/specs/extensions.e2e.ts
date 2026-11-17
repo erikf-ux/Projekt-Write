@@ -26,8 +26,8 @@
  *
  * Runs after language.e2e.ts in the same library.
  */
-import { browser, expect } from '@wdio/globals';
-import { closeSettings, pinMainWindow } from '../session';
+import { $, browser, expect } from '@wdio/globals';
+import { closeSettings, openSettings, pinMainWindow } from '../session';
 
 type Attempt =
   | 'eval'
@@ -266,5 +266,18 @@ describe('No foreign code (Phase 13)', () => {
       }),
     );
     expect(exposed).toEqual([]);
+  });
+
+  it('lists the built-in extensions of every registry, read only, in Settings › Erweitert', async () => {
+    await openSettings('advanced');
+    const list = $('[data-testid="advanced-extensions"]');
+    await list.waitForDisplayed();
+    // Rust (formats, engines, exporters) and the interface (editor, Mesh).
+    for (const id of ['pwrite', 'spelling', 'languagetool', 'pack', 'print', 'react-flow']) {
+      await list.$(`[data-extension="${id}"]`).waitForExist({ timeoutMsg: `${id} is not listed` });
+    }
+    // Nothing to install, switch on or remove: no controls in the list.
+    expect(await list.$$('button, input, select').length).toBe(0);
+    await closeSettings();
   });
 });

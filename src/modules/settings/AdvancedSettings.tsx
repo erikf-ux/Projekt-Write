@@ -15,6 +15,7 @@ import type { SettingsArea } from '@/types/generated/SettingsArea';
 import type { SettingsImportPreview } from '@/types/generated/SettingsImportPreview';
 import type { StorageFolder } from '@/types/generated/StorageFolder';
 import type { StorageLocations } from '@/types/generated/StorageLocations';
+import { ExtensionsList } from './ExtensionsList';
 import { applySettingsResult, formatSettingValue, settingLabel, SKIP_REASONS } from './settingsTransfer';
 import { useUi } from './uiStore';
 
@@ -207,12 +208,7 @@ export function AdvancedSettings() {
         </p>
       ) : null}
 
-      {/*
-        Built-in extensions per registry (ADR 0027, decision 5): read-only,
-        origin "eingebaut", from `extensions_list`. Filled in by the
-        registries' part of Phase 13.
-      */}
-      <div data-testid="advanced-extensions" />
+      <ExtensionsList />
 
       <fieldset className={FIELDSET} data-testid="settings-locations">
         <legend className={LEGEND}>{t('settings.locations')}</legend>

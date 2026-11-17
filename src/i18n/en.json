@@ -1097,5 +1097,14 @@
   "settings.locations.library": "Library",
   "settings.locations.open": "Open folder",
   "settings.locations.openLabel": "Open folder “{name}”",
-  "settings.locations.noLibrary": "No library open."
+  "settings.locations.noLibrary": "No library open.",
+  "settings.extensions.title": "Built-in extensions",
+  "settings.extensions.about": "Extensions from third parties cannot be installed in this version; the app loads no foreign code. The list shows what the app itself provides through its registries.",
+  "settings.extensions.editorFeatures": "Editor features",
+  "settings.extensions.documentFormats": "File formats",
+  "settings.extensions.languageEngines": "Checking engines",
+  "settings.extensions.exporters": "Exporters",
+  "settings.extensions.meshRenderers": "Mesh renderers",
+  "settings.extensions.builtin": "(built in)",
+  "settings.extensions.addOn": "(built in, uses an add-on)"
 }
