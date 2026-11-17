@@ -12,6 +12,7 @@ export default tseslint.config(
       'tools/spell-compare/target/',
       'src/types/generated/',
       'node_modules/',
+      '.claude/',
       'tests/e2e/.tmp/',
     ],
   },
