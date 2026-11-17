@@ -35,6 +35,24 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // No foreign code (ADR 0027, decision 3): nothing runs text as code
+      // (`eval`, `new Function`, `setTimeout` with a string) and nothing is
+      // imported from an address computed at run time. The CSP blocks the
+      // same in the app; these rules keep the code from needing it.
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      // The type-aware variant of `no-implied-eval` (it also knows aliases
+      // of `setTimeout` and `Function`); the base rule stays off as
+      // typescript-eslint requires.
+      'no-implied-eval': 'off',
+      '@typescript-eslint/no-implied-eval': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "ImportExpression[source.type!='Literal']",
+          message: 'import() only with a fixed string: the frontend loads no code from computed addresses.',
+        },
+      ],
       // The frontend never talks to Tauri directly: all calls go through src/services.
       'no-restricted-imports': [
         'error',

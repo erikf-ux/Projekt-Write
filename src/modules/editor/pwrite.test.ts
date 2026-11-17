@@ -5,7 +5,8 @@
 import type { JSONContent } from '@tiptap/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { markdownSchema } from './markdown/probe';
-import { closeAllSessions, openSession, pwriteContent } from './session';
+import { pwriteContent } from './formats';
+import { closeAllSessions, openSession } from './session';
 
 function session(text: string) {
   const created = openSession({

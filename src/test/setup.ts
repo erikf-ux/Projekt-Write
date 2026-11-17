@@ -1,6 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
+import { registerBuiltins } from '@/extensions/builtin';
+import { sealRegistries } from '@/extensions/registries';
+
+// The registries as `main.tsx` leaves them: the built-in entries, sealed.
+// Each test file gets its own module instances, so its own registries.
+registerBuiltins();
+sealRegistries();
 
 afterEach(() => {
   cleanup();

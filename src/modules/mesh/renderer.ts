@@ -1,8 +1,11 @@
 /**
  * What the Mesh view needs from a renderer (section 7: "Der Renderer liegt
  * hinter einer Schnittstelle"). React Flow implements it (MeshCanvas.tsx);
- * Sigma.js would be the fallback (ADR 0022).
+ * Sigma.js would be the fallback (ADR 0022). `MeshPanel` takes the renderer
+ * from the registry.
  */
+import type { ComponentType } from 'react';
+import type { RegistryEntry } from '@/core/registry';
 import type { MeshEdge } from '@/types/generated/MeshEdge';
 import type { MeshGraph } from '@/types/generated/MeshGraph';
 import type { MeshNode } from '@/types/generated/MeshNode';
@@ -51,3 +54,12 @@ export interface MeshRendererProps {
   onNodeMenu: (node: MeshNode, x: number, y: number) => void;
   onEdgeMenu: (edge: MeshEdge, x: number, y: number) => void;
 }
+
+/** A Mesh renderer in the registry (ADR 0027, decision 2). */
+export interface MeshRenderer extends RegistryEntry {
+  /** The canvas; loaded when the Mesh is first shown. */
+  readonly component: ComponentType<MeshRendererProps>;
+}
+
+/** The renderer the Mesh view uses. */
+export const MESH_RENDERER = 'react-flow';

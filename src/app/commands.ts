@@ -28,13 +28,8 @@ import { useStructureDialogs } from '@/modules/structure/dialogStore';
 import { useStructure } from '@/modules/structure/structureStore';
 import { rebuildSearchIndex } from '@/modules/search/rebuild';
 import { useBackup } from '@/modules/backup/backupStore';
-import {
-  exportActive,
-  exportLibrary,
-  exportPackActive,
-  importPack,
-  printActive,
-} from '@/modules/export/exportActions';
+import { importPack } from '@/modules/export/exportActions';
+import { registries } from '@/extensions/registries';
 import { useSearch } from '@/modules/search/searchStore';
 import type { TextFormat } from '@/types/generated/TextFormat';
 import type { UiSettings } from '@/types/generated/UiSettings';
@@ -139,6 +134,37 @@ function setTheme(theme: string): CommandDefinition['run'] {
       .then(() => undefined);
 }
 
+/** "Paket importieren …" (an import, so not an exporter). */
+const importPackCommand: CommandDefinition = {
+  id: 'import.pack',
+  category: 'document',
+  titleKey: 'command.import.pack',
+  isAvailable: libraryOpen,
+  run: async () => {
+    await importPack();
+  },
+};
+
+/**
+ * The commands of the exporters, in the order of the registry (ADR 0027,
+ * decision 2). "Paket importieren …" keeps its place after "Als Paket
+ * exportieren …".
+ */
+function exportCommands(): CommandDefinition[] {
+  const commands = registries.exporters.list().map((exporter): CommandDefinition => ({
+    id: exporter.command,
+    category: exporter.category,
+    titleKey: exporter.titleKey,
+    isAvailable: exporter.isAvailable,
+    run: async () => {
+      await exporter.run();
+    },
+  }));
+  const pack = commands.findIndex((command) => command.id === 'export.pack');
+  commands.splice(pack === -1 ? commands.length : pack + 1, 0, importPackCommand);
+  return commands;
+}
+
 export function createAppCommands(): CommandDefinition[] {
   return [
     {
@@ -193,69 +219,7 @@ export function createAppCommands(): CommandDefinition[] {
         }
       },
     },
-    {
-      id: 'document.print',
-      category: 'document',
-      titleKey: 'command.document.print',
-      isAvailable: () => activeDocument(workspace())?.loaded === true,
-      run: async () => {
-        await printActive(false);
-      },
-    },
-    {
-      id: 'export.pdf',
-      category: 'document',
-      titleKey: 'command.export.pdf',
-      isAvailable: () => activeDocument(workspace())?.loaded === true,
-      run: async () => {
-        await printActive(true);
-      },
-    },
-    {
-      id: 'export.txt',
-      category: 'document',
-      titleKey: 'command.export.txt',
-      isAvailable: () => activeLibraryDocument()?.loaded === true,
-      run: async () => {
-        await exportActive('txt');
-      },
-    },
-    {
-      id: 'export.markdown',
-      category: 'document',
-      titleKey: 'command.export.markdown',
-      isAvailable: () => activeLibraryDocument()?.loaded === true,
-      run: async () => {
-        await exportActive('markdown');
-      },
-    },
-    {
-      id: 'export.pack',
-      category: 'document',
-      titleKey: 'command.export.pack',
-      isAvailable: () => activeLibraryDocument()?.loaded === true,
-      run: async () => {
-        await exportPackActive();
-      },
-    },
-    {
-      id: 'import.pack',
-      category: 'document',
-      titleKey: 'command.import.pack',
-      isAvailable: libraryOpen,
-      run: async () => {
-        await importPack();
-      },
-    },
-    {
-      id: 'export.library',
-      category: 'app',
-      titleKey: 'command.export.library',
-      isAvailable: libraryOpen,
-      run: async () => {
-        await exportLibrary();
-      },
-    },
+    ...exportCommands(),
     {
       id: 'backup.create',
       category: 'app',

@@ -6,6 +6,11 @@
  *   view cannot hold, the document opens in the source view and the reason
  *   is shown (section 10).
  * * `.txt`: the minimal schema only.
+ * * `.pwrite`: rich text only.
+ *
+ * How a format is read and written comes from the document format
+ * registry (`formats.ts`), the extensions of the editors from the editor
+ * features (`features.ts`), ADR 0027.
  *
  * A session lives as long as its tab, so the undo history does too; both
  * views keep their own history, and switching the view is one undo step.
@@ -13,19 +18,18 @@
  * runs first, block by block, for changed blocks only (ADR 0014).
  */
 import { Editor, type JSONContent } from '@tiptap/core';
-import FindAndReplace from '@tiptap/extension-find-and-replace';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type { DocumentFormat } from '@/types/generated/DocumentFormat';
 import { parseMarkdown, serializeMarkdown } from './markdown/adapter';
 import { excerpt, findLosses, type Loss } from './markdown/losses';
 import type { ConversionSource } from './convert';
-import { firstDifference, markdownSchema, probeMarkdown, type ProbeIssue } from './markdown/probe';
-import { plainClipboardText, plainDocument, plainExtensions, plainText } from './plain/schema';
+import { firstDifference, markdownSchema, type ProbeIssue } from './markdown/probe';
+import { plainClipboardText, plainDocument, plainText } from './plain/schema';
 import { isDocumentFile } from '@/modules/documents/importFiles';
 import { mediaReference } from '@/modules/media/mediaUrl';
 import { handleRichPaste } from './paste';
-import { markdownExtensions } from './schema/extensions';
-import { LanguageCheck } from '@/modules/language-check/plugin';
+import { editorExtensions, type EditorSchema } from './features';
+import { formatAdapter, type DocumentFormatAdapter, type OpenedText } from './formats';
 import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
 import { useStatistics } from './statisticsStore';
 
@@ -91,26 +95,11 @@ export interface ViewSwitch {
 
 const SURFACE_CLASS = 'pw-surface';
 
-/** An empty `.pwrite` document (one empty paragraph). */
-const EMPTY_PWRITE: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
-
-/**
- * The content of a `.pwrite` document as Rust hands it over (JSON of the
- * editor document), or null if it does not fit the schema.
- */
-export function pwriteContent(text: string): JSONContent | null {
-  try {
-    const content = JSON.parse(text) as JSONContent;
-    markdownSchema().nodeFromJSON(content).check();
-    return content;
-  } catch {
-    return null;
-  }
-}
-
 export class EditorSession {
   readonly id: string;
   readonly format: DocumentFormat;
+  /** How the format is read and written (the document format registry). */
+  private readonly adapter: DocumentFormatAdapter;
   /** Holds both views; the panel of the tab shows it. */
   readonly root: HTMLDivElement;
   view: EditorView;
@@ -135,27 +124,16 @@ export class EditorSession {
     this.format = options.format;
     this.root = document.createElement('div');
     this.root.className = 'pw-session h-full';
-    if (options.format === 'md') {
-      const probe = probeMarkdown(options.text);
-      this.openIssues = probe.issues;
-      if (probe.issues.length === 0) {
-        this.frontMatter = probe.document.frontMatter;
-        this.view = 'rich';
-        this.rich = this.createRich(probe.document.body);
-      } else {
-        this.view = 'source';
-        this.plain = this.createPlain(options.text);
-      }
-    } else if (options.format === 'pwrite') {
-      // `.pwrite` holds what the editor holds: no probe, no source view.
-      const content = pwriteContent(options.text);
-      this.openIssues = content ? [] : [{ kind: 'invalid' }];
+    this.adapter = formatAdapter(options.format);
+    const opened: OpenedText = this.adapter.open(options.text);
+    this.openIssues = opened.issues;
+    if (opened.view === 'rich') {
+      this.frontMatter = opened.frontMatter;
       this.view = 'rich';
-      this.rich = this.createRich(content ?? EMPTY_PWRITE);
+      this.rich = this.createRich(opened.content);
     } else {
-      this.openIssues = [];
       this.view = 'source';
-      this.plain = this.createPlain(options.text);
+      this.plain = this.createPlain(opened.text);
     }
     // Counted after the text is shown: a long document opens sooner
     // (section 6: 50,000 words in ≤ 500 ms).
@@ -186,8 +164,9 @@ export class EditorSession {
     }, STATISTICS_DELAY_MS);
   }
 
+  /** Rich text with a source view (Markdown). */
   get isMarkdown(): boolean {
-    return this.format === 'md';
+    return this.adapter.sourceView;
   }
 
   /** The editor of the current view. */
@@ -219,11 +198,8 @@ export class EditorSession {
 
   /** The text of the current view, as it would be saved (`.pwrite`: the content as JSON). */
   text(): string {
-    if (this.format === 'pwrite') {
-      return this.rich ? JSON.stringify(this.rich.getJSON()) : '';
-    }
     if (this.view === 'rich' && this.rich) {
-      return serializeMarkdown({ frontMatter: this.frontMatter, body: this.rich.getJSON() });
+      return this.adapter.serialize(this.rich.getJSON(), this.frontMatter);
     }
     return this.plain ? plainText(this.plain.state.doc) : '';
   }
@@ -294,7 +270,7 @@ export class EditorSession {
 
   /** What a conversion starts from: the rich text if it is shown, else the text. */
   conversionSource(): ConversionSource {
-    if (this.rich && (this.format === 'pwrite' || (this.isMarkdown && this.view === 'rich'))) {
+    if (this.rich && this.view === 'rich') {
       return { kind: 'rich', content: this.rich.getJSON(), frontMatter: this.frontMatter };
     }
     return { kind: 'text', text: this.text() };
@@ -353,16 +329,16 @@ export class EditorSession {
       this.show('source');
       return { ok: true, issues: [] };
     }
-    const probe = probeMarkdown(this.text());
-    if (probe.issues.length > 0) {
-      return { ok: false, issues: probe.issues };
+    const opened = this.adapter.open(this.text());
+    if (opened.view !== 'rich') {
+      return { ok: false, issues: opened.issues };
     }
-    this.frontMatter = probe.document.frontMatter;
+    this.frontMatter = opened.frontMatter;
     if (this.rich) {
-      this.replace(this.rich, probe.document.body);
+      this.replace(this.rich, opened.content);
       this.trust(this.rich);
     } else {
-      this.rich = this.createRich(probe.document.body);
+      this.rich = this.createRich(opened.content);
     }
     this.show('rich');
     return { ok: true, issues: [] };
@@ -473,19 +449,18 @@ export class EditorSession {
 
   /** A rich editor for content the probe has checked: its blocks need no check. */
   private createRich(content: JSONContent): Editor {
-    const editor = this.createEditor(
-      [...markdownExtensions(), findExtension(), this.languageCheck(true)],
-      content,
-      'pw-rich',
-    );
+    const editor = this.createEditor(this.extensions('markdown', false), content, 'pw-rich');
     this.trust(editor);
     return editor;
   }
 
-  /** The language check (section 14); external files have no library id. */
-  private languageCheck(enabled: boolean) {
+  /**
+   * The editor features of a schema (find, language check and the rest);
+   * external files have no library id.
+   */
+  private extensions(schema: EditorSchema, source: boolean) {
     const documentId = this.options.id.startsWith('ext:') ? null : this.options.id;
-    return LanguageCheck.configure({ documentId, enabled });
+    return editorExtensions(schema, { documentId, source });
   }
 
   private trust(editor: Editor): void {
@@ -497,7 +472,7 @@ export class EditorSession {
   private createPlain(text: string): Editor {
     return this.createEditor(
       // The Markdown source view is syntax, not text: no language check.
-      [...plainExtensions(), findExtension(), this.languageCheck(!this.isMarkdown)],
+      this.extensions('plain', this.isMarkdown),
       plainDocument(text),
       this.isMarkdown ? 'pw-source' : 'pw-plain',
     );
@@ -646,11 +621,6 @@ export function linkAt(document: ProseMirrorNode, position: number): string | nu
     }
   }
   return null;
-}
-
-/** Find and replace (section 12); highlights styled in `editor.css` (no inline style, CSP). */
-function findExtension() {
-  return FindAndReplace.configure({ injectCSS: false, searchDebounceMs: 0 });
 }
 
 /**
