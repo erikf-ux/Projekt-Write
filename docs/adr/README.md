@@ -29,3 +29,5 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0022](0022-mesh.md)                              | Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout und Vorschläge                 | angenommen                                    |
 | [0023](0023-rechtschreibpruefwerk.md)             | Prüfwerk für die Rechtschreibung: `spellbook` statt Hunspell-Bindings (Vergleich mit Korpus) | angenommen                                    |
 | [0024](0024-woerterbuecher.md)                    | Wörterbücher: Herkunft, Lizenzen, Auslieferung als Datenpakete                               | angenommen                                    |
+| [0025](0025-sprachpruefung.md)                    | Sprachprüfung: Ablauf, eigene Wörterbücher, Autokorrektur, Erkennung und Sprachabschnitte    | angenommen                                    |
+| [0026](0026-languagetool.md)                      | LanguageTool als Zusatzpaket über eine vorhandene Installation                               | angenommen                                    |

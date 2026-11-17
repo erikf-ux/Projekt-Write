@@ -2,7 +2,8 @@
  * Phase 12, language check (section 14, ADR 0023 to 0025), in the real
  * app with the shipped dictionaries: underlines, suggestions in the
  * context menu, own dictionaries, code left out, the simple rules, the
- * autocorrect with its own undo step and rejection, and switching off.
+ * autocorrect with its own undo step and rejection, switching off, the
+ * detection of a paragraph's language and the LanguageTool section.
  *
  * Runs after mesh.e2e.ts in the same library.
  */
@@ -185,5 +186,26 @@ describe('Language check (Phase 12)', () => {
       await autocorrect.click();
     }
     await closeSettings();
+  });
+
+  it('detects an English paragraph in a German document', async () => {
+    await newDocument();
+    await (await activeEditor()).click();
+    // At least 40 letters: the paragraph is checked in English.
+    await typeText('The window of the house stays open all day long becuase nobody closes it.');
+    await waitForUnderline('spelling', 'becuase');
+    expect(await underlined('spelling')).toEqual(['becuase']);
+    expect(await $('[data-testid="status-language"]').getText()).toContain('de-DE');
+  });
+
+  it('shows LanguageTool as not set up, without starting anything', async () => {
+    await openSettings('language');
+    const state = $('[data-testid="languagetool-state"]');
+    await state.waitForDisplayed();
+    expect(await state.getAttribute('data-state')).toBe('off');
+    expect(await $('[data-testid="languagetool-choose"]').isDisplayed()).toBe(true);
+    expect(await $('[data-testid="languagetool-enabled"]').isExisting()).toBe(false);
+    await closeSettings();
+    expect(await $('[data-testid="status-languagetool"]').isExisting()).toBe(false);
   });
 });

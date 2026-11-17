@@ -1,6 +1,6 @@
 # Datenbank – Project Write
 
-Stand: Phase 9 (11. November 2026). Diese Datei enthält das **vollständige geplante Schema** (Abschnitt 18) und kennzeichnet, was bereits per Migration existiert. Tabellen entstehen in der Phase, die sie braucht; Spalten, die eine spätere Phase braucht, kommen mit einer eigenen Migration hinzu.
+Stand: Phase 12 (17. November 2026). Diese Datei enthält das **vollständige geplante Schema** (Abschnitt 18) und kennzeichnet, was bereits per Migration existiert. Tabellen entstehen in der Phase, die sie braucht; Spalten, die eine spätere Phase braucht, kommen mit einer eigenen Migration hinzu.
 
 ## 1. Konventionen (Abschnitt 18)
 
@@ -36,25 +36,25 @@ Der Modus wird bei **jedem** Öffnen aus dem Speicherort bestimmt. Eine Biblioth
 - **Sicherung vorab:** Stehen Migrationen an und hat die Datenbank schon ein Schema (Version ≥ 1), entsteht seit Phase 10 ein vollständiges Backup (`.pwbackup`: Datenbank über `VACUUM INTO` mit `integrity_check`, Dokumente, Medien, Manifest mit Prüfsummen; ADR 0021) in `backups/pre-migration/`, erst dann wird migriert. Scheitert das Backup, wird nicht migriert (`LIBRARY_BACKUP_FAILED`). Die fünf neuesten bleiben, ältere entfernt die App (nur eigene Dateien nach ihrem Namensmuster). Kopien früherer Versionen (`projectwrite-schema-<alt>-<Zeit>.db`) werden weiter auf fünf begrenzt.
 - **Tests ab jeder früheren Version:** `tests/migrations.rs` legt für jede Version 0 … n−1 eine Datenbank an, füllt die Tabellen dieser Version mit Testdaten, migriert auf die aktuelle Version und prüft: Schema identisch zu einer frisch migrierten Datenbank, Daten erhalten, `integrity_check` = ok, `foreign_key_check` leer. Jede neue Migration bringt eine Testzeile für ihre Tabellen mit.
 
-| Version | Datei                           | Inhalt                                                                                                        | Phase |
-| ------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----- |
-| 1       | `0001_application_settings.sql` | Tabelle `application_settings`                                                                                | 1     |
-| 2       | `0002_documents.sql`            | Tabelle `documents`                                                                                           | 2     |
-| 3       | `0003_document_import.sql`      | `documents.original_name`                                                                                     | 3     |
-| 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent`                             | 5     |
-| 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                                                      | 5     |
-| 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                                                    | 6     |
-| 7       | `0007_subnets_and_tags.sql`     | Tabellen `subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger                             | 7     |
-| 8       | `0008_media.sql`                | Tabellen `media`, `media_tags`, `document_media`; Neuaufbau von `subnet_memberships` mit `media_id`           | 8     |
-| 9       | `0009_search.sql`               | Tabelle `search_entries`, FTS5-Tabellen `search_words` und `search_parts`, drei Ansichten, Trigger (ADR 0020) | 9     |
+| Version | Datei                           | Inhalt                                                                                                                                     | Phase |
+| ------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| 1       | `0001_application_settings.sql` | Tabelle `application_settings`                                                                                                             | 1     |
+| 2       | `0002_documents.sql`            | Tabelle `documents`                                                                                                                        | 2     |
+| 3       | `0003_document_import.sql`      | `documents.original_name`                                                                                                                  | 3     |
+| 4       | `0004_favorites_and_recent.sql` | `documents.favorited_at`, `documents.last_opened_at`, Index `ix_documents_recent`                                                          | 5     |
+| 5       | `0005_document_links.sql`       | Tabelle `document_links`                                                                                                                   | 5     |
+| 6       | `0006_document_history.sql`     | Tabelle `document_history`                                                                                                                 | 6     |
+| 7       | `0007_subnets_and_tags.sql`     | Tabellen `subnets`, `subnet_memberships`, `tags`, `document_tags`, Zyklus-Trigger                                                          | 7     |
+| 8       | `0008_media.sql`                | Tabellen `media`, `media_tags`, `document_media`; Neuaufbau von `subnet_memberships` mit `media_id`                                        | 8     |
+| 9       | `0009_search.sql`               | Tabelle `search_entries`, FTS5-Tabellen `search_words` und `search_parts`, drei Ansichten, Trigger (ADR 0020)                              | 9     |
+| 10      | `0010_mesh.sql`                 | Tabellen `mesh_nodes`, `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions` (ADR 0022)                                 | 11    |
+| 11      | `0011_language.sql`             | Tabellen `user_dictionaries`, `user_dictionary_words`, `user_dictionary_targets`, `autocorrect_rejections`, `document_language` (ADR 0025) | 12    |
 
 Geplante Migrationen (Nummern vergibt die jeweilige Phase):
 
-| Phase | Inhalt                                                                                                                                     |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015)                                                                                 |
-| 11    | `mesh_nodes` (mit Triggern und Nachtrag für bestehende Elemente), `mesh_connections`, `mesh_suggestions`, `mesh_layouts`, `mesh_positions` |
-| 12    | `dictionaries`, `dictionary_words`, `document_dictionaries`, `subnet_dictionaries`, `language_profiles`, `autocorrect_rejections`          |
+| Phase | Inhalt                                                     |
+| ----- | ---------------------------------------------------------- |
+| 8     | `documents.import_folder` (mit dem Ordnerimport, ADR 0015) |
 
 ## 4. Gesamtschema
 
@@ -82,12 +82,11 @@ Legende: **vorhanden** = per Migration angelegt; **geplant (Phase n)** = Entwurf
 | `mesh_suggestions`             | Vorschläge mit Wert, Begründung und Status       | Migration 0010     |
 | `mesh_layouts`                 | Layout je Ansicht                                | Migration 0010     |
 | `mesh_positions`               | Knotenpositionen je Layout                       | Migration 0010     |
-| `dictionaries`                 | Eigene und Hunspell-Wörterbücher                 | geplant (Phase 12) |
-| `dictionary_words`             | Einträge eigener Wörterbücher                    | geplant (Phase 12) |
-| `document_dictionaries`        | Wörterbücher eines Dokuments                     | geplant (Phase 12) |
-| `subnet_dictionaries`          | Wörterbücher eines Subnetzes                     | geplant (Phase 12) |
-| `language_profiles`            | Sprachprofil je Dokument                         | geplant (Phase 12) |
-| `autocorrect_rejections`       | Abgelehnte Autokorrekturen                       | geplant (Phase 12) |
+| `user_dictionaries`            | Eigene Wörterbücher                              | Migration 0011     |
+| `user_dictionary_words`        | Wörter eigener Wörterbücher                      | Migration 0011     |
+| `user_dictionary_targets`      | Dokumente und Subnetze eines Wörterbuchs         | Migration 0011     |
+| `autocorrect_rejections`       | Abgelehnte Autokorrekturen                       | Migration 0011     |
+| `document_language`            | Sprachprofil je Dokument                         | Migration 0011     |
 
 Abgeleitete Verbindungen (Referenz, Tag, Enthalten-in, Abschnitt 15) werden **nicht** gespeichert, sondern aus `document_links`, `document_media`, `document_tags`/`media_tags` und `subnet_memberships` berechnet.
 
@@ -290,15 +289,15 @@ Die Ansichten `search_document_fields`, `search_media_fields` und `search_subnet
 
 Umgesetzt wie geplant, mit diesen Ergänzungen: `mesh_suggestions` prüft, dass `decided_at` genau bei entschiedenen Vorschlägen gesetzt ist, und hat einen Index auf offene Vorschläge nach Wert; `mesh_layouts.scope_id` ist genau in der Global View leer; Positionen sind auf ±10⁷ begrenzt. Abgeleitete Verbindungen (Links, Medien im Text, weitere Subnetze, Tags) stehen in keiner Mesh-Tabelle; das Mesh berechnet sie bei jeder Ansicht (ADR 0022, Punkt 3). Der Cluster „Nicht zugeordnet“ ist kein Knoten; seine Position wird nicht gespeichert.
 
-### Sprachprüfung – geplant (Phase 12)
+### Sprachprüfung – Migration 0011 (ADR 0025)
 
-- `dictionaries`: `id`, `name`, `kind` (`custom`, `hunspell`), `language` (BCP 47, NULL = sprachunabhängig), `is_global` (0/1, „gesamte Anwendung“), `package` (Name des Wörterbuch-Datenpakets bei Hunspell), `created_at`, `updated_at`.
-- `dictionary_words`: `dictionary_id` → `dictionaries` (CASCADE), `word`, `word_key` (normalisiert), `category` (`word`, `term`, `name`, `abbreviation`), `created_at`; Primärschlüssel `(dictionary_id, word_key)`.
-- `document_dictionaries (document_id, dictionary_id)`, `subnet_dictionaries (subnet_id, dictionary_id)`: Primärschlüssel über beide, CASCADE. Für ein Dokument gilt die Vereinigung aus globalen, eigenen und den Wörterbüchern aller Subnetze samt Eltern (Abschnitt 14).
-- `language_profiles`: `document_id` (Primärschlüssel, → `documents`, CASCADE), `language`, `detect_paragraphs` (0/1), `autocorrect` (NULL = globale Einstellung, sonst 0/1), `updated_at`.
-- `autocorrect_rejections`: `original`, `replacement`, `language`, `created_at`; Primärschlüssel `(original, replacement, language)` (Bedingung 7 der Eindeutigkeitsregel).
+- `user_dictionaries`: `id` (UUID), `name` (1–100 Zeichen), `name_key` (normalisiert, eindeutig), `for_all` (0/1, „Gesamte Anwendung“), `created_at`, `updated_at`.
+- `user_dictionary_words`: `dictionary_id` → `user_dictionaries` (CASCADE), `word` (1–100 Zeichen, ohne Leerraum), `category` (`word`, `term`, `name`, `abbreviation`), `created_at`; Primärschlüssel `(dictionary_id, word)`.
+- `user_dictionary_targets`: `dictionary_id` → `user_dictionaries` (CASCADE), genau eines von `document_id` → `documents` und `subnet_id` → `subnets` (beide CASCADE); eindeutig je Wörterbuch und Ziel. Für ein Dokument gelten die Wörterbücher mit `for_all`, die des Dokuments und die aller seiner Subnetze samt deren Eltern (rekursive Abfrage).
+- `autocorrect_rejections`: `word`, `correction`, `created_at`; Primärschlüssel `(word, correction)` (Bedingung 7 der Eindeutigkeitsregel).
+- `document_language`: `document_id` (Primärschlüssel, → `documents`, CASCADE), `languages` (JSON-Liste mit höchstens 5 Tags, die erste ist die Hauptsprache; leer = Standardsprache), `autocorrect` (0/1), `updated_at`. Keine Zeile = Standardwerte.
 
-Hunspell-Wörterbücher selbst liegen als getrennte Datenpakete vor, nicht in der Datenbank (Abschnitt 7, Lizenzen).
+Abweichungen vom Plan: Wörterbücher sind sprachunabhängig, deshalb fehlt eine Sprachspalte; die Hunspell-Wörterbücher sind Dateien (ADR 0024) und haben keine Zeile. Zuordnungen zu Dokumenten und Subnetzen stehen in einer Tabelle statt in zweien. Die Erkennung je Absatz ist eine Einstellung der App (`languageCheck.detect`), nicht des Dokuments. Abgelehnte Korrekturen gelten für alle Sprachen.
 
 ## 5. Papierkorb und Archiv
 

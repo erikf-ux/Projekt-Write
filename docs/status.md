@@ -6,15 +6,15 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 10 – Export und Backup** (Abschnitt 21): abgeschlossen, Drucken nachgetestet (CI-Lauf 112 grün); Bericht in `docs/bericht-phase-10.md`.
 
-**Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; abgeschlossen, CI-Lauf 117 grün; Bericht in `docs/bericht-phase-11.md`. Wartet auf die Freigabe von Phase 12.
+**Phase 11 – Mesh** (Abschnitte 6, 15): abgeschlossen, CI-Lauf 117 grün; Bericht in `docs/bericht-phase-11.md`.
 
-**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): freigegeben („Setze fort“), in Arbeit. Rechtschreibung, Regeln, Autokorrektur, eigene Wörterbücher und Profile stehen; Spracherkennung, Sprachabschnitte und LanguageTool folgen.
+**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): freigegeben („Setze fort“), umgesetzt und lokal geprüft. LanguageTool nach Entscheidung des Auftraggebers als Variante 2 (vorhandene Installation, kein Download). Bericht in `docs/bericht-phase-12.md`. Wartet auf die Freigabe von Phase 13.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh: Renderer nach Lasttest, Ansichten, Verbindungen, Layout, Vorschläge).
+Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh), ADR 0023 (Prüfwerk `spellbook`), ADR 0024 (Wörterbücher), ADR 0025 (Sprachprüfung), ADR 0026 (LanguageTool über eine vorhandene Installation).
 
-CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Phase 12: Lauf 118 grün (Zwischenstand), Abschluss siehe Bericht. Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 12
 
@@ -25,9 +25,9 @@ CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot 
 | 3       | `LanguageEngine`, Rechtschreibung mit `spellbook`, einfache Regeln, Satzsegmentierung, Vorschläge nach Abschnitt 14, Eindeutigkeitsregel; Korpus-Abnahme       | erledigt (0 von 1.198 richtigen Wörtern markiert, 209 von 212 Fehlern erkannt, Autokorrektur ohne falsche Korrektur) |
 | 4       | Migration 0011: eigene Wörterbücher, Zuweisung, abgelehnte Korrekturen, Sprachprofile; Befehle                                                                 | erledigt                                                                                                             |
 | 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Kontextmenü, Autokorrektur mit eigenem Undo-Schritt, Einstellungen, Erststart-Frage (D5), Statusleiste | erledigt; E2E `language.e2e.ts`; Tippverzögerung lokal 95 % 34 ms                                                    |
-| 6       | Spracherkennung je Absatz, Sprachabschnitte, mehrsprachige Dokumente                                                                                           | offen                                                                                                                |
-| 7       | LanguageTool als Zusatzpaket                                                                                                                                   | offen                                                                                                                |
-| 8       | Doku, ADR 0025, CI, Bericht                                                                                                                                    | offen                                                                                                                |
+| 6       | Spracherkennung je Absatz, Sprachabschnitte, mehrsprachige Dokumente                                                                                           | erledigt                                                                                                             |
+| 7       | LanguageTool als Zusatzpaket                                                                                                                                   | erledigt (Variante 2)                                                                                                |
+| 8       | Doku, ADR 0025, ADR 0026, CI, Bericht                                                                                                                          | erledigt                                                                                                             |
 
 ## Stand Phase 11
 
@@ -234,7 +234,7 @@ CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot 
 - Dateizuordnung auf echten Systemen von Hand prüfen: Doppelklick und „Öffnen mit“ unter Windows (Installer, Phase 14) und Linux (installiertes `.deb`); in CI sind nur Startargumente und zweiter Start testbar. Der erste Start mit Dateiargument ist per Rust-Test (Argumente, Warteschlange, Abholen) geprüft, nicht im E2E-Test.
 - Externe Dateien unter Windows: Rechte (ACL) der ersetzten Datei; die neue Datei erbt die des Ordners. Harte Links werden beim atomaren Ersetzen getrennt (wie bei den meisten Editoren).
 
-- Tippverzögerung mit aktiver Sprachprüfung erneut messen (Phase 12); alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6).
+- Alle Leistungswerte auf dem Referenzgerät messen (Abschnitt 6), auch die Tippverzögerung mit aktiver Sprachprüfung (im Container 95 % 34 ms).
 - Drucken und „Als PDF speichern“ im echten Systemdialog von Hand prüfen, unter Windows und Linux (macOS zurückgestellt); E2E prüft Druckkopie und Druck-CSS (ADR 0021, Punkt 11).
 - Echtes Ablegen aus dem Dateimanager in die Schreibfläche und Einfügen eines echten Bildschirmfotos von Hand prüfen; die E2E-Tests erzeugen die Ereignisse synthetisch (ADR 0003).
 - Galerie und PDF-Ansicht auf dem Referenzgerät messen (Release-Build); die E2E-Messung prüft gegen Regressionsgrenzen. Erster Durchgang im Container 95 % 70–88 ms (F-40); danach gegebenenfalls kleinere Vorschaubilder für die Kacheln und Vorladen der nächsten Zeilen.
@@ -251,7 +251,8 @@ CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot 
 - Archiv „im Mesh grau“ (Phase 11).
 - Neue Befehle der Phase 7 stehen in Befehlspalette und Kontextmenüs, noch nicht im nativen Menü.
 - Harter Abbruch durch Stromausfall oder Systemabsturz: geprüft ist der Prozessabbruch (`SIGKILL`, `taskkill /F`); ob das Betriebssystem den Entwurf vor einem Stromausfall auf die Platte schreibt, hängt am Dateisystem (atomares Schreiben mit `fsync`, Abschnitt 6).
-- Phase 12: Frage nach der Autokorrektur im ersten Start (D5).
+- LanguageTool mit einer echten Installation (Java 17, LanguageTool 6.x) unter Windows und Linux von Hand prüfen; in CI ist es nicht installiert (ADR 0026). Variante 1 (Herunterladen nach Bestätigung, mit fester Prüfsumme) bei Bedarf nachrüsten.
+- Lizenz des Wörterbuchs en-GB (SCOWL oder LGPL) und die Weitergabe der GPL-Wörterbücher mit D4 klären (ADR 0024).
 - Referenzbibliothek ergänzen: Verbindungen (Phase 11; Subnetze und Tags seit Phase 7, Medien seit Phase 8), `.pwrite`-Dokumente mit dem Format (Phase 4/5; ADR 0010).
 - Echten Ordnerdialog unter Windows einmal von Hand prüfen; CI kann native Dialoge nicht bedienen (ADR 0008).
 - Echte Sync-Clients (OneDrive, Dropbox) und Netzlaufwerke auf einem Testgerät prüfen; CI hat keine.
@@ -276,4 +277,4 @@ Noch offen (vor Phase 14):
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 12 (Sprachprüfung; Abschnitt 25).
+Nach Freigabe: Phase 13 (Abschnitt 25).

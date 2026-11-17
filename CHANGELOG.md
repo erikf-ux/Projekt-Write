@@ -4,6 +4,18 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 12 – Sprachprüfung
+
+#### Hinzugefügt
+
+- Rechtschreibprüfung beim Tippen mit mitgelieferten Wörterbüchern für Deutsch (`de-DE`, `de-AT`, `de-CH`) und Englisch (`en-US`, `en-GB`); weitere Hunspell-Wörterbücher lassen sich als Sprache hinzufügen.
+- Rote, wellige Unterstreichung für Rechtschreibung, blaue, gestrichelte für Regeln (doppeltes Wort, doppeltes Leerzeichen, Großschreibung am Satzanfang); Code und Links werden nicht geprüft; im Druck unsichtbar.
+- Kontextmenü (Rechtsklick, Kontextmenütaste, `Shift + F10`) mit höchstens fünf Vorschlägen, „Zum Wörterbuch hinzufügen“ und „Ignorieren“.
+- Eigene Wörterbücher je Bibliothek: Wörter mit Kategorie, Zuordnung zu Dokumenten, Subnetzen (mit Unter-Subnetzen) oder der ganzen Bibliothek, Import und Export als Textdatei.
+- Autokorrektur nur bei eindeutigen Fehlern (sieben Bedingungen aus Abschnitt 14), als eigener Rückgängig-Schritt; eine rückgängig gemachte Korrektur wird nicht wiederholt. Aus, bis der Nutzer sie einschaltet (Startbildschirm oder Einstellungen).
+- Sprachprofil je Dokument (eine oder mehrere Sprachen, Autokorrektur aus), markierte Abschnitte in einer anderen Sprache (in Markdown `<span lang>`, `.pwrite` Formatversion 2) und Spracherkennung je Absatz.
+- LanguageTool als Zusatzpaket über eine vorhandene Installation: Grammatik, Zeichensetzung und Kontextfehler, Server nur auf `127.0.0.1`, Zustand in Einstellungen und Statusleiste.
+
 ### Phase 11 – Mesh
 
 #### Hinzugefügt

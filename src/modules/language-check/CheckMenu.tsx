@@ -101,8 +101,9 @@ export function openCheckMenu(
         apply(view, finding, replacement);
       },
     }));
-    if (items.length === 0) {
-      items.push({
+    // LanguageTool explains its findings; the explanation leads the menu.
+    if (items.length === 0 || (finding.finding.message && finding.finding.rule.startsWith('lt:'))) {
+      items.unshift({
         id: 'message',
         label: finding.finding.message ?? t(`language.rule.${finding.finding.rule}` as MessageKey),
         onSelect: () => undefined,

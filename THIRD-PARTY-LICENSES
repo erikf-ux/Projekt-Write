@@ -10,10 +10,10 @@ separate data packages in dictionaries/<language>/ with their own licence text
 (master prompt, section 7). The source of igerman98 lies in
 dictionaries/sources/.
 
-Rust crates (normal dependencies, all target platforms): 438
+Rust crates (normal dependencies, all target platforms): 441
 Licence summary:
-   197  MIT OR Apache-2.0
-   110  MIT
+   198  MIT OR Apache-2.0
+   111  MIT
     40  Apache-2.0 OR MIT
     18  Unicode-3.0
     15  Zlib OR Apache-2.0 OR MIT
@@ -31,13 +31,13 @@ Licence summary:
      2  MIT OR Apache-2.0 OR LGPL-2.1-or-later
      2  MIT OR Zlib OR Apache-2.0
      2  Unlicense/MIT
+     2  Zlib
      1  (MIT OR Apache-2.0) AND Unicode-3.0
      1  0BSD OR MIT OR Apache-2.0
      1  Apache-2.0 / MIT
      1  Apache-2.0 AND MIT
      1  BSD-3-Clause AND MIT
      1  BSD-3-Clause/MIT
-     1  Zlib
 
 npm packages (production dependencies): 86
 Licence summary:
@@ -153,6 +153,7 @@ field-offset 0.3.6                  MIT OR Apache-2.0
 flate2 1.1.10                       MIT OR Apache-2.0
 flume 0.12.0                        Apache-2.0/MIT
 fnv 1.0.7                           Apache-2.0 / MIT
+foldhash 0.1.5                      Zlib
 foldhash 0.2.0                      Zlib
 foreign-types 0.5.0                 MIT/Apache-2.0
 foreign-types-macros 0.2.4          MIT/Apache-2.0
@@ -190,6 +191,7 @@ gtk 0.18.2                          MIT
 gtk-sys 0.18.2                      MIT
 gtk3-macros 0.18.2                  MIT
 hashbrown 0.12.3                    MIT OR Apache-2.0
+hashbrown 0.15.5                    MIT OR Apache-2.0
 hashbrown 0.16.1                    MIT OR Apache-2.0
 hashbrown 0.17.1                    MIT OR Apache-2.0
 hashlink 0.11.1                     MIT OR Apache-2.0
@@ -435,6 +437,7 @@ webview2-com 0.39.1                 MIT
 webview2-com-macros 0.8.1           MIT
 webview2-com-sys 0.39.1             MIT
 weezl 0.1.12                        MIT OR Apache-2.0
+whatlang 0.18.0                     MIT
 winapi 0.3.9                        MIT/Apache-2.0
 winapi-i686-pc-windows-gnu 0.4.0    MIT/Apache-2.0
 winapi-util 0.1.11                  Unlicense OR MIT
