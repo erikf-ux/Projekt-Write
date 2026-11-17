@@ -138,6 +138,7 @@
     "allow-theme-import",
     "allow-theme-remove",
     "allow-link-open",
+    "allow-extensions-list",
     "allow-media-list",
     "allow-media-trash-list",
     "allow-media-get",

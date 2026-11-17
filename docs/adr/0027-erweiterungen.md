@@ -32,6 +32,13 @@ Phase 13 nennt zusätzlich „Erweiterte Einstellungen“. Ihre Abnahme verlangt
 - **Nutzung:** Der Code wählt Format, Exporter und Prüfwerk über das Register (Nachschlagen per ID oder Dateiendung) statt über fest verdrahtete Fallunterscheidungen.
 - **Auskunft:** Der Befehl `extensions_list` nennt die Einträge aller Register in Rust, für die Oberfläche (Punkt 5).
 
+#### Umsetzung in Rust (Nachtrag)
+
+Zwei Präzisierungen, die sich bei der Umsetzung ergeben haben:
+
+- **Ein Exemplar je Prozess:** Die Register stehen in `Extensions` (`services/extensions.rs`). Sie entstehen einmal je Prozess beim ersten Zugriff (`extensions::shared()`), spätestens in `AppState::initialize`; `AppState` hält dasselbe Exemplar. Dienste ohne `AppState` (Dokumente, Suche, Backup) schlagen Formate so ebenfalls im Register nach.
+- **Art des Dateiformats:** Sie hat drei Werte: reiner Text, Markdown und Rich Text. Markdown braucht eigene Wege für Verweise, Medien und Suchtext. Der Lese- und Schreibweg folgt aus der Art: Rich Text geht über die `.pwrite`-Hülle, Text über UTF-8.
+
 ### 2. Register im Frontend
 
 - **Ort:** `src/core/registry.ts` mit `createRegistry<T>(kind)`. Methoden: `register(entry)`, `get(id)`, `require(id)`, `list()`, `seal()`.

@@ -160,6 +160,7 @@ fn main() {
         "theme_import",
         "theme_remove",
         "link_open",
+        "extensions_list",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

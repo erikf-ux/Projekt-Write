@@ -12,6 +12,7 @@ use std::sync::Arc;
 use project_write_lib::services::language::autocorrect::{Blocked, Candidate, Span};
 use project_write_lib::services::language::dictionaries::DictionaryStore;
 use project_write_lib::services::language::engine::{FindingKind, OwnWords};
+use project_write_lib::services::language::engines::AddOns;
 use project_write_lib::services::language::{CheckParts, LanguageService};
 use sha2::{Digest, Sha256};
 
@@ -55,7 +56,14 @@ const SPELLING: CheckParts = CheckParts {
 
 fn flagged(service: &LanguageService, word: &str) -> bool {
     service
-        .check(word, "de-DE", &[], &OwnWords::default(), SPELLING, None)
+        .check(
+            word,
+            "de-DE",
+            &[],
+            &OwnWords::default(),
+            SPELLING,
+            &AddOns::none(),
+        )
         .findings
         .iter()
         .any(|f| f.kind == FindingKind::Spelling)

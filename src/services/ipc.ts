@@ -103,6 +103,7 @@ import type { ExportPlan } from '@/types/generated/ExportPlan';
 import type { ExportLibraryAddRequest } from '@/types/generated/ExportLibraryAddRequest';
 import type { ExportIdRequest } from '@/types/generated/ExportIdRequest';
 import type { ExportPackRequest } from '@/types/generated/ExportPackRequest';
+import type { ExtensionInfo } from '@/types/generated/ExtensionInfo';
 import type { PackImport } from '@/types/generated/PackImport';
 import type { SearchRequest } from '@/types/generated/SearchRequest';
 import type { UpdateSubnetRequest } from '@/types/generated/UpdateSubnetRequest';
@@ -296,6 +297,7 @@ export interface Commands {
   library_preferences: { request: EmptyRequest; response: LibraryPreferences };
   library_update_preferences: { request: LibraryPreferences; response: LibraryPreferences };
   link_open: { request: OpenLinkRequest; response: null };
+  extensions_list: { request: EmptyRequest; response: ExtensionInfo[] };
   document_import: { request: ImportDocumentRequest; response: ImportResult };
   theme_import: { request: ImportThemeRequest; response: UiState };
   theme_remove: { request: RemoveThemeRequest; response: UiState };

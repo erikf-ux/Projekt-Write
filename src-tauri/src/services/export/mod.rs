@@ -1,12 +1,14 @@
 //! Exports (section 21; ADR 0021, decisions 2 to 4): one document as TXT or
 //! Markdown, and the whole library as a folder of Markdown and media that
-//! stays usable without the app.
+//! stays usable without the app. The commands choose the exporter through
+//! the registry in [`exporters`] (ADR 0027).
 //!
 //! The frontend converts `.pwrite` content (it owns the editor schema);
 //! Rust writes every file, copies media and rewrites the links. Files are
 //! written atomically; the library export goes into a hidden folder next to
 //! the target and is renamed only at the end.
 
+pub mod exporters;
 pub mod names;
 pub mod pack;
 
@@ -53,22 +55,6 @@ pub enum ExportError {
     Path(#[from] PathError),
     #[error("file error: {0}")]
     Io(#[from] io::Error),
-}
-
-/// What to write a document as.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextKind {
-    Txt,
-    Markdown,
-}
-
-impl TextKind {
-    pub fn extension(self) -> &'static str {
-        match self {
-            TextKind::Txt => "txt",
-            TextKind::Markdown => "md",
-        }
-    }
 }
 
 /// A document of a library export that the frontend converts (`.pwrite`).
@@ -162,29 +148,28 @@ impl Exports {
         Ok(())
     }
 
-    /// The suggested file name of a document: its title.
-    pub async fn suggested_name(&self, id: Uuid, kind: TextKind) -> Result<String, ExportError> {
+    /// The suggested file name of a document without extension: its title.
+    pub async fn suggested_stem(&self, id: Uuid) -> Result<String, ExportError> {
         let row =
             crate::database::documents::get(self.database.reader(), &id.hyphenated().to_string())
                 .await?
                 .ok_or(ExportError::NotFound)?;
-        Ok(format!(
-            "{}.{}",
-            safe_name(&row.title, "Dokument"),
-            kind.extension()
-        ))
+        Ok(safe_name(&row.title, "Dokument"))
     }
 
-    /// Writes one document to `file`. Markdown gets the media it uses in
-    /// `<name>-Medien/` next to it; links to other documents become their
-    /// text (ADR 0021, decision 3).
+    /// Writes one document, `text` in the text `format`, to `file`.
+    /// Markdown gets the media it uses in `<name>-Medien/` next to it; links
+    /// to other documents become their text (ADR 0021, decision 3).
     pub async fn export_document(
         &self,
         id: Uuid,
         text: &str,
-        kind: TextKind,
+        format: DocumentFormat,
         file: &Path,
     ) -> Result<ExportOutcome, ExportError> {
+        if format.is_rich_text() {
+            return Err(ExportError::Invalid("not a text format"));
+        }
         if text.len() as u64 > MAX_DOCUMENT_BYTES {
             return Err(ExportError::Invalid("too large"));
         }
@@ -194,36 +179,35 @@ impl Exports {
         let folder = file.parent().ok_or(ExportError::Invalid("no folder"))?;
         self.check_outside(folder)?;
         let mut media_count = 0;
-        let body = match kind {
-            TextKind::Txt => text.to_owned(),
-            TextKind::Markdown => {
-                let stem = file
-                    .file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .unwrap_or("Dokument")
-                    .to_owned();
-                let media_dir_name = format!("{stem}-{MEDIA_FOLDER}");
-                let mut targets = LinkTargets::default();
-                let mut names = UniqueNames::default();
-                for (medium, _) in media_in(DocumentFormat::Md, text.as_bytes()) {
-                    let Ok(medium) = Uuid::try_parse(&medium) else {
-                        continue;
-                    };
-                    if targets.media.contains_key(&medium) {
-                        continue;
-                    }
-                    if let Some(name) = self
-                        .copy_medium(medium, &folder.join(&media_dir_name), &mut names)
-                        .await?
-                    {
-                        targets
-                            .media
-                            .insert(medium, format!("{media_dir_name}/{name}"));
-                        media_count += 1;
-                    }
+        let body = if !format.is_markdown() {
+            text.to_owned()
+        } else {
+            let stem = file
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("Dokument")
+                .to_owned();
+            let media_dir_name = format!("{stem}-{MEDIA_FOLDER}");
+            let mut targets = LinkTargets::default();
+            let mut names = UniqueNames::default();
+            for (medium, _) in media_in(format, text.as_bytes()) {
+                let Ok(medium) = Uuid::try_parse(&medium) else {
+                    continue;
+                };
+                if targets.media.contains_key(&medium) {
+                    continue;
                 }
-                rewrite_links(text, &targets)
+                if let Some(name) = self
+                    .copy_medium(medium, &folder.join(&media_dir_name), &mut names)
+                    .await?
+                {
+                    targets
+                        .media
+                        .insert(medium, format!("{media_dir_name}/{name}"));
+                    media_count += 1;
+                }
             }
+            rewrite_links(text, &targets)
         };
         let path = file.to_owned();
         tokio::task::spawn_blocking(move || write_atomic(&path, body.as_bytes()))
@@ -278,9 +262,14 @@ impl Exports {
     }
 
     /// Starts a library export into a new folder inside `parent`: writes the
-    /// Markdown and text documents at once and returns the `.pwrite` ones
-    /// for the frontend to convert (ADR 0021, decision 4).
-    pub async fn begin_library_export(&self, parent: &Path) -> Result<ExportPlan, ExportError> {
+    /// documents in a format of `direct` (text and Markdown) at once and
+    /// returns the others (`.pwrite`) for the frontend to convert to
+    /// Markdown (ADR 0021, decision 4).
+    pub async fn begin_library_export(
+        &self,
+        parent: &Path,
+        direct: &[DocumentFormat],
+    ) -> Result<ExportPlan, ExportError> {
         self.check_outside(parent)?;
         if lock(&self.open).len() >= MAX_OPEN_EXPORTS {
             return Err(ExportError::Invalid("too many exports at once"));
@@ -360,11 +349,13 @@ impl Exports {
                     format!("{ARCHIVE_FOLDER}/{dir}")
                 };
             }
-            let extension = if format == DocumentFormat::Txt {
-                "txt"
+            // Written as it is, or converted to Markdown by the frontend.
+            let written_as = if direct.contains(&format) {
+                format
             } else {
-                "md"
+                DocumentFormat::Md
             };
+            let extension = written_as.extension();
             let file = files_in
                 .entry(dir.clone())
                 .or_default()
@@ -388,21 +379,18 @@ impl Exports {
         };
         let mut to_convert = Vec::new();
         for (id, (format, title)) in &formats {
-            match format {
-                DocumentFormat::Pwrite => {
-                    export.pending.insert(*id);
-                    to_convert.push(ExportItem {
-                        id: id.hyphenated().to_string(),
-                        title: title.clone(),
-                    });
-                }
-                DocumentFormat::Md | DocumentFormat::Txt => {
-                    let path = self.root.resolve(&format.relative_path(*id))?;
-                    let data = read_limited(&path, MAX_DOCUMENT_BYTES)?;
-                    let text = String::from_utf8_lossy(&data).into_owned();
-                    self.write_into(&mut export, *id, &text, *format == DocumentFormat::Md)
-                        .await?;
-                }
+            if direct.contains(format) {
+                let path = self.root.resolve(&format.relative_path(*id))?;
+                let data = read_limited(&path, MAX_DOCUMENT_BYTES)?;
+                let text = String::from_utf8_lossy(&data).into_owned();
+                self.write_into(&mut export, *id, &text, format.is_markdown())
+                    .await?;
+            } else {
+                export.pending.insert(*id);
+                to_convert.push(ExportItem {
+                    id: id.hyphenated().to_string(),
+                    title: title.clone(),
+                });
             }
         }
         let written = export.written;

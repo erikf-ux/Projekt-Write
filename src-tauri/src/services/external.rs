@@ -284,7 +284,7 @@ impl ExternalFiles {
             (file.path.clone(), file.format)
         };
         let (data, stamp) = read_with_stamp(&path)?;
-        let (text, loaded) = if format == DocumentFormat::Pwrite {
+        let (text, loaded) = if format.is_rich_text() {
             let (text, envelope, newer_format) = match pwrite::parse(&data) {
                 Ok(pwrite::Parsed::Current(file)) => (to_json(&file.content), Some(file), false),
                 Ok(pwrite::Parsed::Newer { content, .. }) => (to_json(&content), None, true),
@@ -487,7 +487,7 @@ impl ExternalFiles {
         let file = open.get(id).ok_or(ExternalError::Unknown)?;
         let name = file_name(&file.path);
         let text = normalise(text);
-        let data = if file.format == DocumentFormat::Pwrite {
+        let data = if file.format.is_rich_text() {
             let content = parse_content(&text)?;
             let loaded = file.loaded.as_ref().ok_or(ExternalError::Unknown)?;
             if loaded.newer_format {
@@ -620,7 +620,7 @@ impl ExternalFiles {
         line_ending: LineEnding,
         loaded: &Loaded,
     ) -> Result<(Vec<u8>, Option<Box<PwriteFile>>), ExternalError> {
-        if format != DocumentFormat::Pwrite {
+        if !format.is_rich_text() {
             let data =
                 encoding::encode(text, encoding, line_ending).map_err(|error| match error {
                     EncodingError::Unencodable(code) => ExternalError::Unencodable(code),
@@ -681,7 +681,7 @@ fn with_extension_of(target: &Path, format: DocumentFormat) -> PathBuf {
     }
     let mut name = target.file_name().unwrap_or_default().to_os_string();
     name.push(".");
-    name.push(format.as_str());
+    name.push(format.extension());
     target.with_file_name(name)
 }
 
@@ -713,7 +713,7 @@ fn normalise(text: &str) -> String {
 
 /// `.pwrite` is always UTF-8 JSON on one line.
 fn effective_encoding(format: DocumentFormat, encoding: TextEncoding) -> TextEncoding {
-    if format == DocumentFormat::Pwrite {
+    if format.is_rich_text() {
         TextEncoding::Utf8
     } else {
         encoding
@@ -721,7 +721,7 @@ fn effective_encoding(format: DocumentFormat, encoding: TextEncoding) -> TextEnc
 }
 
 fn effective_line_ending(format: DocumentFormat, line_ending: LineEnding) -> LineEnding {
-    if format == DocumentFormat::Pwrite {
+    if format.is_rich_text() {
         LineEnding::Lf
     } else {
         line_ending

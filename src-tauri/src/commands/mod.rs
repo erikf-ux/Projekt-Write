@@ -9,6 +9,7 @@
 pub mod backup;
 pub mod documents;
 pub mod export;
+pub mod extensions;
 pub mod external;
 pub mod input;
 pub mod language;
@@ -182,6 +183,7 @@ pub const COMMAND_NAMES: &[&str] = &[
     "theme_import",
     "theme_remove",
     "link_open",
+    "extensions_list",
 ];
 
 /// The invoke handler with every app command.
@@ -341,5 +343,6 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         ui::theme_import,
         ui::theme_remove,
         links::link_open,
+        extensions::extensions_list,
     ]
 }

@@ -185,7 +185,7 @@ fn element_entry(name: &str) -> bool {
         let id = Uuid::try_parse(stem).ok()?;
         (id.hyphenated().to_string() == stem).then(|| (id, extension.to_owned()))
     };
-    for format in DocumentFormat::ALL {
+    for format in DocumentFormat::all() {
         if let Some(rest) = name.strip_prefix(&format!("{}/", format.directory()))
             && let Some((_, extension)) = id_and_extension(rest)
         {

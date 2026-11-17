@@ -190,6 +190,57 @@ fn valid_request_returns_typed_result() {
     assert!(results.iter().all(|r| r["passed"] == true), "{value}");
 }
 
+/// `extensions_list` (ADR 0027): exactly the built-in entries of the
+/// registries in Rust, all of origin "builtin"; LanguageTool is the only
+/// add-on. Works without a library.
+#[test]
+fn extensions_list_names_exactly_the_built_in_entries() {
+    let app = app();
+    let value = call(&app, "extensions_list", json!({})).expect("extensions_list succeeds");
+    let entries: Vec<(String, String, String, bool)> = value
+        .as_array()
+        .expect("a list")
+        .iter()
+        .map(|entry| {
+            let keys: Vec<&String> = entry.as_object().unwrap().keys().collect();
+            assert_eq!(keys, ["addOn", "id", "origin", "registry"], "{entry}");
+            (
+                entry["registry"].as_str().unwrap().to_owned(),
+                entry["id"].as_str().unwrap().to_owned(),
+                entry["origin"].as_str().unwrap().to_owned(),
+                entry["addOn"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    let expected = [
+        ("documentFormats", "txt", false),
+        ("documentFormats", "md", false),
+        ("documentFormats", "pwrite", false),
+        ("exporters", "txt", false),
+        ("exporters", "markdown", false),
+        ("exporters", "pack", false),
+        ("exporters", "library", false),
+        ("languageEngines", "spelling", false),
+        ("languageEngines", "rules", false),
+        ("languageEngines", "languagetool", true),
+    ]
+    .map(|(registry, id, add_on)| {
+        (
+            registry.to_owned(),
+            id.to_owned(),
+            "builtin".to_owned(),
+            add_on,
+        )
+    });
+    assert_eq!(entries, expected);
+
+    // The request is checked like any other.
+    let error = call(&app, "extensions_list", json!({ "extra": 1 })).unwrap_err();
+    assert_uniform_error(&error, "request");
+    let error = invoke(&app.webview, "extensions_list", json!({})).unwrap_err();
+    assert_uniform_error(&error, "request");
+}
+
 #[test]
 fn invalid_requests_return_the_uniform_error_format() {
     let app = app();

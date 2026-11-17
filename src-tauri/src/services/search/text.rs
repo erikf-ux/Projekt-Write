@@ -16,26 +16,31 @@ use crate::database::search::{HIT_END, HIT_START};
 use crate::services::documents::{DocumentFormat, INTERNAL_LINK_PREFIX, MEDIA_PREFIX};
 use crate::services::pwrite;
 
-/// The text the index holds for a content.
+/// The text the index holds for a content, read as the format's registry
+/// entry says.
 pub fn searchable_text(format: DocumentFormat, content: &[u8]) -> String {
-    let text = match format {
-        DocumentFormat::Txt => String::from_utf8_lossy(content).into_owned(),
-        DocumentFormat::Md => without_ids(&String::from_utf8_lossy(content)),
-        DocumentFormat::Pwrite => match pwrite::parse(content) {
-            Ok(pwrite::Parsed::Current(file)) => {
-                let mut text = String::new();
-                collect_text(&file.content, &mut text);
-                text
-            }
-            Ok(pwrite::Parsed::Newer { content, .. }) => {
-                let mut text = String::new();
-                collect_text(&content, &mut text);
-                text
-            }
-            Err(_) => String::new(),
-        },
-    };
-    clean(&text)
+    clean(&(format.spec().text)(content))
+}
+
+/// TXT: the text as it is.
+pub(crate) fn plain_text(content: &[u8]) -> String {
+    String::from_utf8_lossy(content).into_owned()
+}
+
+/// Markdown: the source without the ids of links and media.
+pub(crate) fn markdown_text(content: &[u8]) -> String {
+    without_ids(&String::from_utf8_lossy(content))
+}
+
+/// `.pwrite`: the text of the content, also of a newer format version.
+pub(crate) fn pwrite_text(content: &[u8]) -> String {
+    let mut text = String::new();
+    match pwrite::parse(content) {
+        Ok(pwrite::Parsed::Current(file)) => collect_text(&file.content, &mut text),
+        Ok(pwrite::Parsed::Newer { content, .. }) => collect_text(&content, &mut text),
+        Err(_) => {}
+    }
+    text
 }
 
 fn clean(text: &str) -> String {
