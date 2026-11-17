@@ -4,6 +4,13 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 13 – Erweiterungen
+
+#### Hinzugefügt
+
+- Einstellungen › Erweitert: Einstellungen als `.pwsettings` exportieren, mit Vorschau der Änderungen importieren und getrennt für App und Bibliothek zurücksetzen; vorher legt die App eine Sicherung an (die fünf neuesten). Speicherorte von Konfiguration, Protokoll und Bibliothek mit „Ordner öffnen“. Liste der eingebauten Erweiterungen.
+- Interne Register für Editorfunktionen, Dateiformate, Prüfwerke, Exporter und Mesh-Renderer; die eigenen Module nutzen sie. Erweiterungen von Dritten sind nicht möglich, die App lädt keinen fremden Code (Konzept für später in `docs/plugin-concept.md`).
+
 ### Phase 12 – Sprachprüfung
 
 #### Hinzugefügt

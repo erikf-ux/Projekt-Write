@@ -50,6 +50,12 @@ Zwei Präzisierungen, die sich bei der Umsetzung ergeben haben:
   - **Mesh-Renderer:** React Flow. `MeshPanel` nimmt den Renderer aus dem Register.
 - **Prüfwerke:** Sie liegen nur in Rust; das Frontend kennt sie über `extensions_list`.
 
+#### Umsetzung im Frontend (Nachtrag)
+
+- **Schemata:** Die Editorfunktionen sind nach den Schemata `markdown` und `plain` gegliedert. `.pwrite` nutzt das Markdown-Schema; ein eigenes Rich-Text-Schema gibt es nicht. Ein Test belegt, dass die Editoren dieselben Tiptap-Erweiterungen in derselben Reihenfolge erhalten wie vorher.
+- **Befehle:** Die Exportbefehle entstehen aus dem Register, mit unveränderten IDs, Titeln und Tastenkürzeln. Deshalb registriert `main.tsx` die Befehle erst nach dem Versiegeln (vorher geschah das beim Laden von `App.tsx`). Das native Menü bleibt in Rust definiert.
+- **Exporter:** Der Export der ganzen Bibliothek steht auch im Frontend-Register.
+
 ### 3. Kein fremder Code
 
 Es gibt keinen Weg, Code von außen in die App zu bringen.
@@ -67,6 +73,9 @@ Es gibt keinen Weg, Code von außen in die App zu bringen.
   - `register` nach dem Start.
 
   Dazu kommen Unit-Tests der Register in Vitest und Rust.
+
+- **Abweichung beim Test „`register` nach dem Start“:** Das E2E-Programm nutzt dasselbe Frontend wie die Auslieferung; nur Rust hat die Eigenschaft `e2e`. Ein Testzugang zu den Registern würde also mit ausgeliefert. Deshalb prüft Vitest das Versiegeln mit derselben Startfolge wie `main.tsx`. Der E2E-Test belegt, dass kein Objekt auf `window` ein Register anbietet.
+- **Abhängigkeitsbaum:** `dlopen2` kommt unter Linux über `tao` (Tauri) hinein. Es lädt nur die feste Systembibliothek `libunity` für Fortschritt und Zähler in der Taskleiste; die App nutzt das nicht, und die Capability erlaubt keine `core:window`-Befehle. `libloading`, `libffi`, Skript- und WebAssembly-Laufzeiten kommen nicht vor. Das Laden von SQLite-Erweiterungen ist nicht eingeschaltet.
 
 ### 4. Einstellungen exportieren, importieren, zurücksetzen
 
@@ -97,6 +106,13 @@ Es gibt keinen Weg, Code von außen in die App zu bringen.
 - **Zurücksetzen:** getrennt für App und Bibliothek, nach Bestätigung, auf die Standardwerte. Bibliotheksdaten und eigene Wörterbücher bleiben unberührt.
 - **Sicherung:** Vor jedem Import und jedem Zurücksetzen legt die App den bisherigen Stand als `.pwsettings` im Konfigurationsordner ab (`settings-backups/`, die fünf neuesten).
 
+#### Umsetzung (Nachtrag)
+
+- **Nicht übertragen** wird außerdem `languageCheck.autocorrectAsked` (ob der erste Start schon nach der Autokorrektur gefragt hat). Es bleibt auch beim Zurücksetzen erhalten. In `library` fehlt `storage.acceptedLocation`, weil es an den Ort gebunden ist.
+- **Fehlende Schlüssel** behalten ihren Wert. Verschachtelte Werte wie `sidebar` müssen vollständig sein, sonst ist der Wert ungültig.
+- **Übernehmen** nimmt nur ein Kennzeichen aus der Vorschau entgegen; die geprüften Werte bleiben in Rust. Eine neue Vorschau ersetzt die alte. Ist eine andere Bibliothek offen als bei der Vorschau, scheitert das Übernehmen (`SETTINGS_IMPORT_EXPIRED`).
+- **Speicherorte:** `system_locations` nennt die Pfade, `system_open_location` öffnet einen Ordner. Der Befehl nimmt einen Namen (`config`, `logs`, `library`), nie einen Pfad.
+
 ### 5. Erweiterte Einstellungen
 
 Der neue Abschnitt „Erweitert“ in den Einstellungen enthält:
@@ -121,5 +137,6 @@ Der neue Abschnitt „Erweitert“ in den Einstellungen enthält:
 - Neue Befehle:
   - `extensions_list`;
   - `settings_export`, `settings_import_preview`, `settings_import_apply`, `settings_reset`;
-  - `system_open_location`, falls noch nicht vorhanden.
+  - `system_locations`, `system_open_location`.
+- Neue Fehlercodes: `SETTINGS_FILE_INVALID`, `SETTINGS_FILE_NEWER`, `SETTINGS_VALUE_INVALID`, `SETTINGS_IMPORT_EXPIRED`, `FOLDER_OPEN_FAILED`.
 - Neue Datei `.pwsettings`; ihr Format beschreibt `docs/settings-format.md`.
