@@ -197,7 +197,7 @@ Während der Arbeit gefunden und behoben, keiner davon in einem CI-Lauf:
 | ---- | ----------- | ------------------------------------------------------------------ |
 | 118  | grün        | Zwischenstand: Rechtschreibung, Regeln, Autokorrektur, UI          |
 | 119  | rot (Linux) | F-58: Rekorder ohne Fokus, 14 Spec-Dateien als Folge; Windows grün |
-| 120  | LAUF120     | Abschluss Phase 12 mit F-58                                        |
+| 120  | grün        | Abschluss Phase 12 mit F-58                                        |
 
 ## Nächster Schritt
 
