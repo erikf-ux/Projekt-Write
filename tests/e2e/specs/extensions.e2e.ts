@@ -58,25 +58,70 @@ interface Outcome {
 /** An address on another host (the app has no network access either way). */
 const REMOTE = 'https://example.org/project-write-foreign.js';
 
-/** Runs one attempt in the page and reports what happened. */
+/** What an attempt leaves in the page until `collect` reads it. */
+interface AttemptState {
+  violations: string[];
+  policy: string | null;
+  off: () => void;
+}
+
+/**
+ * Runs one attempt in the page and reports what happened.
+ *
+ * WebKitGTK's driver reports an error that the page code catches (the
+ * EvalError of the CSP, a rejected `import()`) as a failed command (CI and
+ * local run, Phase 13). That error is still the page refusing the code: it
+ * counts as the attempt's error, and a second command reads the flag and
+ * the violations the attempt left in the page.
+ */
 async function attempt(kind: Attempt): Promise<Outcome> {
+  let inPage: { error: string | null; script: string | null } | null = null;
+  let thrown: string | null = null;
+  try {
+    inPage = await run(kind);
+  } catch (caught) {
+    thrown = caught instanceof Error ? caught.message : String(caught);
+  }
+  const state = await browser.execute(async () => {
+    // Violation events and timers are queued tasks.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 500);
+    });
+    const global = window as unknown as Record<string, unknown>;
+    const left = global['__pwAttempt'] as AttemptState | undefined;
+    left?.off();
+    delete global['__pwAttempt'];
+    const ran = global['__pwForeignCodeRan'] === true;
+    global['__pwForeignCodeRan'] = false;
+    return { ran, violations: left?.violations ?? [], policy: left?.policy ?? null };
+  });
+  return {
+    ran: state.ran,
+    error: inPage?.error ?? thrown,
+    script: inPage?.script ?? null,
+    violations: state.violations,
+    policy: state.policy,
+  };
+}
+
+/** The attempt itself, in the page. */
+async function run(kind: Attempt): Promise<{ error: string | null; script: string | null }> {
   return browser.execute(
-    async (which: Attempt, remote: string): Promise<Outcome> => {
+    async (which: Attempt, remote: string): Promise<{ error: string | null; script: string | null }> => {
       const flag = '__pwForeignCodeRan';
       const global = window as unknown as Record<string, unknown>;
       global[flag] = false;
       const code = `window.${flag} = true;`;
-      const violations: string[] = [];
-      let policy: string | null = null;
+      const state: AttemptState = { violations: [], policy: null, off: () => undefined };
       const onViolation = (event: SecurityPolicyViolationEvent) => {
-        violations.push(`${event.effectiveDirective} ${event.blockedURI}`);
-        policy = event.originalPolicy;
+        state.violations.push(`${event.effectiveDirective} ${event.blockedURI}`);
+        state.policy = event.originalPolicy;
       };
       document.addEventListener('securitypolicyviolation', onViolation);
-      const pause = (ms: number) =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, ms);
-        });
+      state.off = () => {
+        document.removeEventListener('securitypolicyviolation', onViolation);
+      };
+      global['__pwAttempt'] = state;
       /** Adds a script element and waits for its load or error event. */
       const loadScript = (source: string) =>
         new Promise<string>((resolve) => {
@@ -162,12 +207,7 @@ async function attempt(kind: Attempt): Promise<Outcome> {
       } catch (caught) {
         error = caught instanceof Error ? `${caught.name}: ${caught.message}` : String(caught);
       }
-      // Violation events and timers are queued tasks.
-      await pause(500);
-      document.removeEventListener('securitypolicyviolation', onViolation);
-      const ran = global[flag] === true;
-      global[flag] = false;
-      return { ran, error, script, violations, policy };
+      return { error, script };
     },
     kind,
     REMOTE,
@@ -197,11 +237,11 @@ describe('No foreign code (Phase 13)', () => {
   it('cannot run text as code: eval, new Function and setTimeout with a string', async () => {
     const evaluated = await attempt('eval');
     expect(evaluated.ran).toBe(false);
-    expect(evaluated.error).toMatch(/^EvalError/);
+    expect(evaluated.error).toMatch(/EvalError/);
 
     const constructed = await attempt('function');
     expect(constructed.ran).toBe(false);
-    expect(constructed.error).toMatch(/^EvalError/);
+    expect(constructed.error).toMatch(/EvalError/);
 
     const timer = await attempt('timeout');
     expect(timer.ran).toBe(false);
