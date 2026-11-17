@@ -52,6 +52,7 @@ fn dirs(base: &Path) -> AppDirs {
         config: base.join("config"),
         logs: base.join("logs"),
         documents: Some(base.join("Dokumente")),
+        dictionaries: Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("dictionaries")),
     }
 }
 

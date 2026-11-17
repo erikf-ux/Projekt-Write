@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictionary-word-update"
+description = "Enables the dictionary_word_update command without any pre-configured scope."
+commands.allow = ["dictionary_word_update"]
+
+[[permission]]
+identifier = "deny-dictionary-word-update"
+description = "Denies the dictionary_word_update command without any pre-configured scope."
+commands.deny = ["dictionary_word_update"]

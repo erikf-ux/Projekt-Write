@@ -54,6 +54,9 @@ pub struct AppDirs {
     pub logs: PathBuf,
     /// The user's documents folder; parent of the default library location.
     pub documents: Option<PathBuf>,
+    /// The shipped dictionaries (resource folder, ADR 0024); none when the
+    /// resource folder cannot be found.
+    pub dictionaries: Option<PathBuf>,
 }
 
 /// What a chosen folder is meant for.
@@ -424,6 +427,24 @@ impl LibrarySession {
             Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
         };
         let result = operation(mesh, structure).await;
+        drop(slot);
+        result
+    }
+
+    /// Runs `operation` with the language data of the open library (own
+    /// dictionaries, rejections, profiles; ADR 0025).
+    pub async fn with_language<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(crate::services::language::own::OwnData) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let data = match &*slot {
+            Slot::Open { library, .. } => library.language(),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => return Err(CommandError::new(ErrorCode::LibraryNotOpen)),
+        };
+        let result = operation(data).await;
         drop(slot);
         result
     }

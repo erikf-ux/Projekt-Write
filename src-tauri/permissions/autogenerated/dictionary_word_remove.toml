@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictionary-word-remove"
+description = "Enables the dictionary_word_remove command without any pre-configured scope."
+commands.allow = ["dictionary_word_remove"]
+
+[[permission]]
+identifier = "deny-dictionary-word-remove"
+description = "Denies the dictionary_word_remove command without any pre-configured scope."
+commands.deny = ["dictionary_word_remove"]

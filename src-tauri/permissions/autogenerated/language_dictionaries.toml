@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-dictionaries"
+description = "Enables the language_dictionaries command without any pre-configured scope."
+commands.allow = ["language_dictionaries"]
+
+[[permission]]
+identifier = "deny-language-dictionaries"
+description = "Denies the language_dictionaries command without any pre-configured scope."
+commands.deny = ["language_dictionaries"]

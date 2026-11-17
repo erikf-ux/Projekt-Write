@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-suggest"
+description = "Enables the language_suggest command without any pre-configured scope."
+commands.allow = ["language_suggest"]
+
+[[permission]]
+identifier = "deny-language-suggest"
+description = "Denies the language_suggest command without any pre-configured scope."
+commands.deny = ["language_suggest"]

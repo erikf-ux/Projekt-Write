@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictionaries-list"
+description = "Enables the dictionaries_list command without any pre-configured scope."
+commands.allow = ["dictionaries_list"]
+
+[[permission]]
+identifier = "deny-dictionaries-list"
+description = "Denies the dictionaries_list command without any pre-configured scope."
+commands.deny = ["dictionaries_list"]

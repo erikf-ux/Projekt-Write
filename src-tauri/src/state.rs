@@ -6,6 +6,8 @@ use crate::clock::{Generators, Timestamp};
 use crate::database::{Database, DatabaseError};
 use crate::services::dialog::{FilePicker, FolderPicker};
 use crate::services::external::ExternalFiles;
+use crate::services::language::LanguageService;
+use crate::services::language::dictionaries::DictionaryStore;
 use crate::services::links::LinkOpener;
 use crate::services::locale;
 use crate::services::opening::OpenQueue;
@@ -34,6 +36,11 @@ pub struct AppState {
     pub opening: OpenQueue,
     /// Opens web links (`link_open`).
     pub links: Arc<dyn LinkOpener>,
+    /// The language check (section 14): dictionaries and engines, for all
+    /// libraries.
+    pub language: Arc<LanguageService>,
+    /// Dialogs of the language check (own word lists, Hunspell files).
+    pub language_files: Arc<dyn FilePicker>,
     /// In-memory database for the system check while no library is open
     /// (the bundled SQLite is checked either way).
     probe: Database,
@@ -57,6 +64,10 @@ impl AppState {
             Arc::clone(&settings),
             generators.clone(),
         ));
+        let language = Arc::new(LanguageService::new(Arc::new(DictionaryStore::new(
+            dirs.dictionaries.clone(),
+            dirs.config.join("dictionaries"),
+        ))));
         let session = LibrarySession::new(dirs, generators, settings, &outcome);
         session.open_configured().await;
         Ok(Self {
@@ -66,6 +77,8 @@ impl AppState {
             media_folders: Arc::clone(&picker),
             export_files: Arc::clone(&files),
             export_folders: Arc::clone(&picker),
+            language_files: Arc::clone(&files),
+            language,
             picker,
             files,
             external,

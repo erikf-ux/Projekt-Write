@@ -132,6 +132,26 @@ const FIXTURES: &[(i64, &str, &str)] = &[
          JOIN mesh_positions AS p ON p.node_id = c.node_a AND p.pinned = 1 \
          WHERE c.kind = 'manual' AND p.x = 12.5",
     ),
+    (
+        11,
+        "INSERT INTO user_dictionaries (id, name, name_key, for_all, created_at, updated_at) \
+         VALUES ('4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f', 'Fachbegriffe', 'fachbegriffe', 1, \
+                 '2026-11-17T10:00:00.000Z', '2026-11-17T10:00:00.000Z'); \
+         INSERT INTO user_dictionary_words (dictionary_id, word, category, created_at) \
+         VALUES ('4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f', 'Tauri', 'term', '2026-11-17T10:00:00.000Z'); \
+         INSERT INTO user_dictionary_targets (dictionary_id, subnet_id) \
+         VALUES ('4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f', '7a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d'); \
+         INSERT INTO autocorrect_rejections (word, correction, created_at) \
+         VALUES ('Mitter', 'Mutter', '2026-11-17T10:00:00.000Z'); \
+         INSERT INTO document_language (document_id, languages, autocorrect, updated_at) \
+         VALUES ('0b0e5a3e-0c5f-4a43-9f39-3a3b9a9d2c11', '[\"de-CH\",\"en-GB\"]', 0, '2026-11-17T10:00:00.000Z')",
+        "SELECT count(*) FROM user_dictionaries AS d \
+         JOIN user_dictionary_words AS w ON w.dictionary_id = d.id AND w.category = 'term' \
+         JOIN user_dictionary_targets AS t ON t.dictionary_id = d.id \
+         JOIN autocorrect_rejections AS r ON r.correction = 'Mutter' \
+         JOIN document_language AS l ON l.autocorrect = 0 AND json_extract(l.languages, '$[0]') = 'de-CH' \
+         WHERE d.for_all = 1",
+    ),
 ];
 
 /// Version, description and SHA-384 checksum (hex) of every shipped
@@ -186,6 +206,11 @@ const SHIPPED: &[(i64, &str, &str)] = &[
         10,
         "mesh",
         "91b412b63fa3ec1f97a84a07869bf97b20cad8a773d13ccd667b25764b421a51483470234f363e61cefcddf395a4e1bc",
+    ),
+    (
+        11,
+        "language",
+        "eac10a9f3e8f1d26adeadc92b337e31ce9dc7a983b8725f694e1b989718a997e0bd0dc5fcee24a469f51ddc1541111e2",
     ),
 ];
 

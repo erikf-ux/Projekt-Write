@@ -936,5 +936,11 @@
   "mesh.menu.remove": "Remove connection",
   "mesh.menu.openSource": "Open the source: {name}",
   "mesh.highlightTag": "Highlight tag",
-  "mesh.highlightNone": "none"
+  "mesh.highlightNone": "none",
+  "error.dictionaryNotFound": "The dictionary no longer exists.",
+  "error.dictionaryNameTaken": "A dictionary with this name already exists.",
+  "error.dictionaryWordNotFound": "The word is no longer in the dictionary.",
+  "error.languageNoDictionary": "There is no dictionary for this language.",
+  "error.languageDictionaryInvalid": "The chosen files are not a readable Hunspell dictionary.",
+  "error.languageDictionaryBundled": "A dictionary shipped with the app cannot be removed."
 }

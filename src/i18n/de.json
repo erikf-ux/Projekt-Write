@@ -936,5 +936,11 @@
   "mesh.menu.remove": "Verbindung entfernen",
   "mesh.menu.openSource": "Quelle öffnen: {name}",
   "mesh.highlightTag": "Tag hervorheben",
-  "mesh.highlightNone": "keiner"
+  "mesh.highlightNone": "keiner",
+  "error.dictionaryNotFound": "Das Wörterbuch gibt es nicht mehr.",
+  "error.dictionaryNameTaken": "Ein Wörterbuch mit diesem Namen gibt es schon.",
+  "error.dictionaryWordNotFound": "Das Wort steht nicht mehr im Wörterbuch.",
+  "error.languageNoDictionary": "Für diese Sprache gibt es kein Wörterbuch.",
+  "error.languageDictionaryInvalid": "Die gewählten Dateien sind kein lesbares Hunspell-Wörterbuch.",
+  "error.languageDictionaryBundled": "Ein mitgeliefertes Wörterbuch lässt sich nicht entfernen."
 }

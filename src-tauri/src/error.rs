@@ -165,11 +165,23 @@ pub enum ErrorCode {
     MeshAnalysisRunning,
     /// The grouping analysis was cancelled; what it found so far stays.
     MeshAnalysisCancelled,
+    /// An own dictionary does not exist (any more).
+    DictionaryNotFound,
+    /// An own dictionary with this name exists.
+    DictionaryNameTaken,
+    /// The word is not in the own dictionary (any more).
+    DictionaryWordNotFound,
+    /// There is no dictionary for the language.
+    LanguageNoDictionary,
+    /// The chosen files are no usable Hunspell dictionary.
+    LanguageDictionaryInvalid,
+    /// A dictionary shipped with the app cannot be removed.
+    LanguageDictionaryBundled,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 72] = [
+    pub const ALL: [ErrorCode; 78] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -242,6 +254,12 @@ impl ErrorCode {
         ErrorCode::MeshSuggestionNotFound,
         ErrorCode::MeshAnalysisRunning,
         ErrorCode::MeshAnalysisCancelled,
+        ErrorCode::DictionaryNotFound,
+        ErrorCode::DictionaryNameTaken,
+        ErrorCode::DictionaryWordNotFound,
+        ErrorCode::LanguageNoDictionary,
+        ErrorCode::LanguageDictionaryInvalid,
+        ErrorCode::LanguageDictionaryBundled,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -319,6 +337,12 @@ impl ErrorCode {
             ErrorCode::MeshSuggestionNotFound => "error.meshSuggestionNotFound",
             ErrorCode::MeshAnalysisRunning => "error.meshAnalysisRunning",
             ErrorCode::MeshAnalysisCancelled => "error.meshAnalysisCancelled",
+            ErrorCode::DictionaryNotFound => "error.dictionaryNotFound",
+            ErrorCode::DictionaryNameTaken => "error.dictionaryNameTaken",
+            ErrorCode::DictionaryWordNotFound => "error.dictionaryWordNotFound",
+            ErrorCode::LanguageNoDictionary => "error.languageNoDictionary",
+            ErrorCode::LanguageDictionaryInvalid => "error.languageDictionaryInvalid",
+            ErrorCode::LanguageDictionaryBundled => "error.languageDictionaryBundled",
         }
     }
 }

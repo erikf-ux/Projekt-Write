@@ -202,10 +202,12 @@ fn app_dirs<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<AppDirs> {
             config: base.join("config"),
             logs: base.join("logs"),
             documents: Some(base.join("documents")),
+            dictionaries: dictionaries_dir(app),
         });
     }
     let path = app.path();
     Ok(AppDirs {
+        dictionaries: dictionaries_dir(app),
         config: path.app_config_dir()?,
         logs: path.app_log_dir()?,
         documents: path.document_dir().ok().or_else(|| {
@@ -214,6 +216,17 @@ fn app_dirs<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<AppDirs> {
                 .map(|home| home.join(documents_folder_name()))
         }),
     })
+}
+
+/// The shipped dictionaries next to the program (Tauri resources).
+fn dictionaries_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    let folder = app.path().resource_dir().ok()?.join("dictionaries");
+    if folder.is_dir() {
+        Some(folder)
+    } else {
+        log::warn!("no dictionaries in the resource folder");
+        None
+    }
 }
 
 fn documents_folder_name() -> PathBuf {

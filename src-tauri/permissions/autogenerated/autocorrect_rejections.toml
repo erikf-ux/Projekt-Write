@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-autocorrect-rejections"
+description = "Enables the autocorrect_rejections command without any pre-configured scope."
+commands.allow = ["autocorrect_rejections"]
+
+[[permission]]
+identifier = "deny-autocorrect-rejections"
+description = "Denies the autocorrect_rejections command without any pre-configured scope."
+commands.deny = ["autocorrect_rejections"]

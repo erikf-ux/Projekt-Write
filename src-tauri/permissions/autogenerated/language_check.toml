@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-check"
+description = "Enables the language_check command without any pre-configured scope."
+commands.allow = ["language_check"]
+
+[[permission]]
+identifier = "deny-language-check"
+description = "Denies the language_check command without any pre-configured scope."
+commands.deny = ["language_check"]

@@ -491,6 +491,16 @@ impl Library {
         )
     }
 
+    /// Own dictionaries, rejected autocorrections and language profiles
+    /// (section 14, ADR 0025).
+    pub fn language(&self) -> crate::services::language::own::OwnData {
+        crate::services::language::own::OwnData::new(
+            self.database.clone(),
+            self.generators.clone(),
+            self.write_lock.clone(),
+        )
+    }
+
     /// Exports of this library (section 21, ADR 0021).
     pub fn exports(&self) -> crate::services::export::Exports {
         crate::services::export::Exports::new(

@@ -11,6 +11,7 @@ pub mod documents;
 pub mod export;
 pub mod external;
 pub mod input;
+pub mod language;
 pub mod library;
 pub mod links;
 pub mod media;
@@ -271,6 +272,29 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         mesh::mesh_analysis_cancel,
         mesh::mesh_suggestion_decide,
         mesh::mesh_set_threshold,
+        language::language_dictionaries,
+        language::language_check,
+        language::language_suggest,
+        language::language_autocorrect,
+        language::language_reject,
+        language::autocorrect_rejections,
+        language::autocorrect_forget,
+        language::language_profile,
+        language::language_profile_set,
+        language::dictionaries_list,
+        language::dictionary_create,
+        language::dictionary_rename,
+        language::dictionary_delete,
+        language::dictionary_assign,
+        language::dictionary_words,
+        language::dictionary_word_add,
+        language::dictionary_word_remove,
+        language::dictionary_word_update,
+        language::dictionary_add_word,
+        language::dictionary_import,
+        language::dictionary_export,
+        language::language_dictionary_import,
+        language::language_dictionary_remove,
         external::external_open,
         external::external_read,
         external::external_check,

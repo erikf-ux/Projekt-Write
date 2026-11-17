@@ -22,7 +22,9 @@
 //! asynchronously, and drops the result when the word has changed since.
 
 /// Where the word stands (condition 6).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub enum Span {
     Text,
     Code,

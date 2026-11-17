@@ -9,6 +9,7 @@
 pub mod autocorrect;
 pub mod dictionaries;
 pub mod engine;
+pub mod own;
 pub mod rules;
 pub mod sentences;
 pub mod spelling;
@@ -145,11 +146,13 @@ impl LanguageService {
     }
 
     /// Checks one text in one language. A language without a dictionary
-    /// only gets the rules.
+    /// only gets the rules. A word that is correct in one of `also` (the
+    /// other languages of the document's profile) is not flagged.
     pub fn check(
         &self,
         text: &str,
         language: &str,
+        also: &[String],
         own: &OwnWords,
         parts: CheckParts,
     ) -> CheckedText {
@@ -157,7 +160,13 @@ impl LanguageService {
         let mut raw = Vec::new();
         if parts.spelling && dictionary.is_some() {
             match self.spelling.check(text, language, own) {
-                Ok(found) => raw.extend(found),
+                Ok(found) => raw.extend(found.into_iter().filter(|finding| {
+                    let word = &text[finding.start..finding.end];
+                    !also
+                        .iter()
+                        .filter(|other| other.as_str() != language)
+                        .any(|other| self.is_correct(word, other, own).unwrap_or(false))
+                })),
                 Err(error) => log::warn!("spelling check failed: {error}"),
             }
         }
@@ -280,7 +289,7 @@ mod tests {
     #[test]
     fn findings_come_in_utf_16_offsets() {
         let text = "😀 Größe Fesnter  gut.";
-        let checked = service().check(text, "de-DE", &OwnWords::default(), ALL);
+        let checked = service().check(text, "de-DE", &[], &OwnWords::default(), ALL);
         let units: Vec<u16> = text.encode_utf16().collect();
         let shown: Vec<String> = checked
             .findings
@@ -293,7 +302,7 @@ mod tests {
 
     #[test]
     fn a_language_without_dictionary_gets_the_rules_only() {
-        let checked = service().check("bonjour  le monde", "fr-FR", &OwnWords::default(), ALL);
+        let checked = service().check("bonjour  le monde", "fr-FR", &[], &OwnWords::default(), ALL);
         assert_eq!(checked.dictionary, None);
         assert_eq!(checked.findings.len(), 2, "{:?}", checked.findings);
     }
@@ -307,6 +316,7 @@ mod tests {
         let checked = service().check(
             "Das Fesnter  ist offen.",
             "de-DE",
+            &[],
             &OwnWords::default(),
             only_rules,
         );
@@ -318,6 +328,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["doubleSpace"]
         );
+    }
+
+    #[test]
+    fn a_word_of_another_profile_language_is_not_flagged() {
+        let text = "Das Spreadsheet war kurz.";
+        let none = OwnWords::default();
+        let alone = service().check(text, "de-DE", &[], &none, ALL);
+        assert_eq!(alone.findings.len(), 1);
+        let both = service().check(text, "de-DE", &["en-GB".to_owned()], &none, ALL);
+        assert!(both.findings.is_empty());
     }
 
     #[test]

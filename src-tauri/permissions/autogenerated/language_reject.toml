@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-reject"
+description = "Enables the language_reject command without any pre-configured scope."
+commands.allow = ["language_reject"]
+
+[[permission]]
+identifier = "deny-language-reject"
+description = "Denies the language_reject command without any pre-configured scope."
+commands.deny = ["language_reject"]

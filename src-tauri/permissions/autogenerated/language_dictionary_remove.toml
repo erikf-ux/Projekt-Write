@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-dictionary-remove"
+description = "Enables the language_dictionary_remove command without any pre-configured scope."
+commands.allow = ["language_dictionary_remove"]
+
+[[permission]]
+identifier = "deny-language-dictionary-remove"
+description = "Denies the language_dictionary_remove command without any pre-configured scope."
+commands.deny = ["language_dictionary_remove"]

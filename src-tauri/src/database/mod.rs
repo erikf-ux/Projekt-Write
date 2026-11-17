@@ -12,6 +12,7 @@ pub mod diagnostics;
 pub mod documents;
 pub mod fts;
 pub mod history;
+pub mod language;
 pub mod media;
 pub mod mesh;
 pub mod search;

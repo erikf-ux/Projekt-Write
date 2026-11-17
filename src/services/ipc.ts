@@ -120,6 +120,29 @@ import type { MeshThresholdRequest } from '@/types/generated/MeshThresholdReques
 import type { MeshConnectionRequest } from '@/types/generated/MeshConnectionRequest';
 import type { MeshConnectRequest } from '@/types/generated/MeshConnectRequest';
 import type { MeshGraph } from '@/types/generated/MeshGraph';
+import type { AddWordRequest } from '@/types/generated/AddWordRequest';
+import type { AutocorrectAnswer } from '@/types/generated/AutocorrectAnswer';
+import type { AutocorrectRequest } from '@/types/generated/AutocorrectRequest';
+import type { CheckedText } from '@/types/generated/CheckedText';
+import type { DictionaryAssignRequest } from '@/types/generated/DictionaryAssignRequest';
+import type { DictionaryCreateRequest } from '@/types/generated/DictionaryCreateRequest';
+import type { DictionaryFileRequest } from '@/types/generated/DictionaryFileRequest';
+import type { DictionaryIdRequest } from '@/types/generated/DictionaryIdRequest';
+import type { DictionaryRenameRequest } from '@/types/generated/DictionaryRenameRequest';
+import type { DictionaryWordRequest } from '@/types/generated/DictionaryWordRequest';
+import type { DictionaryWordUpdateRequest } from '@/types/generated/DictionaryWordUpdateRequest';
+import type { DocumentIdRequest } from '@/types/generated/DocumentIdRequest';
+import type { DocumentLanguage } from '@/types/generated/DocumentLanguage';
+import type { LanguageCheckRequest } from '@/types/generated/LanguageCheckRequest';
+import type { LanguageDictionary } from '@/types/generated/LanguageDictionary';
+import type { LanguageDictionaryImportRequest } from '@/types/generated/LanguageDictionaryImportRequest';
+import type { LanguageSuggestRequest } from '@/types/generated/LanguageSuggestRequest';
+import type { LanguageTagRequest } from '@/types/generated/LanguageTagRequest';
+import type { OwnDictionary } from '@/types/generated/OwnDictionary';
+import type { OwnWord } from '@/types/generated/OwnWord';
+import type { ProfileRequest } from '@/types/generated/ProfileRequest';
+import type { Rejection } from '@/types/generated/Rejection';
+import type { WordImport } from '@/types/generated/WordImport';
 import type { MeshGraphRequest } from '@/types/generated/MeshGraphRequest';
 import type { MeshPositionsRequest } from '@/types/generated/MeshPositionsRequest';
 import type { MeshRestoreRequest } from '@/types/generated/MeshRestoreRequest';
@@ -202,6 +225,32 @@ export interface Commands {
   mesh_analysis_cancel: { request: EmptyRequest; response: boolean };
   mesh_suggestion_decide: { request: MeshDecisionRequest; response: MeshConnection | null };
   mesh_set_threshold: { request: MeshThresholdRequest; response: number };
+  language_dictionaries: { request: EmptyRequest; response: LanguageDictionary[] };
+  language_check: { request: LanguageCheckRequest; response: CheckedText[] };
+  language_suggest: { request: LanguageSuggestRequest; response: string[] };
+  language_autocorrect: { request: AutocorrectRequest; response: AutocorrectAnswer };
+  language_reject: { request: Rejection; response: null };
+  autocorrect_rejections: { request: EmptyRequest; response: Rejection[] };
+  autocorrect_forget: { request: Rejection; response: null };
+  language_profile: { request: DocumentIdRequest; response: DocumentLanguage };
+  language_profile_set: { request: ProfileRequest; response: DocumentLanguage };
+  dictionaries_list: { request: EmptyRequest; response: OwnDictionary[] };
+  dictionary_create: { request: DictionaryCreateRequest; response: OwnDictionary };
+  dictionary_rename: { request: DictionaryRenameRequest; response: OwnDictionary };
+  dictionary_delete: { request: DictionaryIdRequest; response: null };
+  dictionary_assign: { request: DictionaryAssignRequest; response: OwnDictionary };
+  dictionary_words: { request: DictionaryIdRequest; response: OwnWord[] };
+  dictionary_word_add: { request: DictionaryWordRequest; response: boolean };
+  dictionary_word_remove: { request: DictionaryWordRequest; response: null };
+  dictionary_word_update: { request: DictionaryWordUpdateRequest; response: null };
+  dictionary_add_word: { request: AddWordRequest; response: OwnDictionary };
+  dictionary_import: { request: DictionaryFileRequest; response: WordImport | null };
+  dictionary_export: { request: DictionaryFileRequest; response: boolean };
+  language_dictionary_import: {
+    request: LanguageDictionaryImportRequest;
+    response: LanguageDictionary | null;
+  };
+  language_dictionary_remove: { request: LanguageTagRequest; response: null };
   structure_undo: { request: EmptyRequest; response: StructureUpdate | null };
   structure_redo: { request: EmptyRequest; response: StructureUpdate | null };
   subnet_create: { request: CreateSubnetRequest; response: StructureUpdate };
@@ -345,6 +394,12 @@ const errorCodes: Record<ErrorCode, true> = {
   MESH_SUGGESTION_NOT_FOUND: true,
   MESH_ANALYSIS_RUNNING: true,
   MESH_ANALYSIS_CANCELLED: true,
+  DICTIONARY_NOT_FOUND: true,
+  DICTIONARY_NAME_TAKEN: true,
+  DICTIONARY_WORD_NOT_FOUND: true,
+  LANGUAGE_NO_DICTIONARY: true,
+  LANGUAGE_DICTIONARY_INVALID: true,
+  LANGUAGE_DICTIONARY_BUNDLED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };

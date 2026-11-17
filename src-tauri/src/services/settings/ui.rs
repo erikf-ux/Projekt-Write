@@ -109,6 +109,39 @@ impl Default for ReadingTimeSettings {
     }
 }
 
+/// The language check (section 14, ADR 0025). The autocorrect is off until
+/// the user turns it on; the first start asks (D5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct LanguageCheckSettings {
+    /// The whole language check.
+    pub enabled: bool,
+    /// Repeated words, double spaces, sentence start.
+    pub rules: bool,
+    pub autocorrect: bool,
+    /// The first start asked about the autocorrect.
+    pub autocorrect_asked: bool,
+    /// Language of documents without a profile; none: from the interface
+    /// language (`de-DE` or `en-US`).
+    pub default_language: Option<String>,
+    /// Detect the language of each paragraph.
+    pub detect: bool,
+}
+
+impl Default for LanguageCheckSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            rules: true,
+            autocorrect: false,
+            autocorrect_asked: false,
+            default_language: None,
+            detect: true,
+        }
+    }
+}
+
 /// The interface settings the frontend reads and changes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -129,6 +162,7 @@ pub struct UiSettings {
     /// Shortcuts that differ from the defaults: command id → chords such as
     /// `Ctrl+Shift+P`. An empty list removes every shortcut of the command.
     pub keybindings: BTreeMap<String, Vec<String>>,
+    pub language_check: LanguageCheckSettings,
 }
 
 impl Default for UiSettings {
@@ -142,6 +176,7 @@ impl Default for UiSettings {
             reading_time: ReadingTimeSettings::default(),
             autosave_external: false,
             keybindings: BTreeMap::new(),
+            language_check: LanguageCheckSettings::default(),
         }
     }
 }
@@ -156,6 +191,7 @@ const KEY_LIMIT_LINE_WIDTH: &str = "limitLineWidth";
 const KEY_READING_TIME: &str = "readingTime";
 const KEY_AUTOSAVE_EXTERNAL: &str = "autosaveExternal";
 const KEY_KEYBINDINGS: &str = "keybindings";
+const KEY_LANGUAGE_CHECK: &str = "languageCheck";
 const KEY_WINDOW: &str = "window";
 
 impl UiSettings {
@@ -170,6 +206,8 @@ impl UiSettings {
             .map_err(|reason| CommandError::invalid_input("readingTime", reason))?;
         validate_keybindings(&self.keybindings)
             .map_err(|reason| CommandError::invalid_input("keybindings", reason))?;
+        validate_language_check(&self.language_check)
+            .map_err(|reason| CommandError::invalid_input("languageCheck", reason))?;
         Ok(())
     }
 
@@ -192,6 +230,8 @@ impl UiSettings {
                 .unwrap_or(defaults.autosave_external),
             keybindings: take(object, KEY_KEYBINDINGS, validate_keybindings)
                 .unwrap_or(defaults.keybindings),
+            language_check: take(object, KEY_LANGUAGE_CHECK, validate_language_check)
+                .unwrap_or(defaults.language_check),
         }
     }
 
@@ -306,6 +346,15 @@ fn validate_sidebar(sidebar: &SidebarSettings) -> Result<(), &'static str> {
         Ok(())
     } else {
         Err("width range")
+    }
+}
+
+fn validate_language_check(settings: &LanguageCheckSettings) -> Result<(), &'static str> {
+    match &settings.default_language {
+        Some(tag) if !crate::services::language::dictionaries::is_tag(tag) => {
+            Err("defaultLanguage")
+        }
+        _ => Ok(()),
     }
 }
 
@@ -601,6 +650,11 @@ mod tests {
             },
             autosave_external: true,
             keybindings: BTreeMap::new(),
+            language_check: LanguageCheckSettings {
+                autocorrect: true,
+                default_language: Some("de-CH".to_owned()),
+                ..LanguageCheckSettings::default()
+            },
         };
         settings
             .keybindings

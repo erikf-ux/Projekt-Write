@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-profile"
+description = "Enables the language_profile command without any pre-configured scope."
+commands.allow = ["language_profile"]
+
+[[permission]]
+identifier = "deny-language-profile"
+description = "Denies the language_profile command without any pre-configured scope."
+commands.deny = ["language_profile"]

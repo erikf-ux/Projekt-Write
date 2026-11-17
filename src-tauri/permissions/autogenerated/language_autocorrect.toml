@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-language-autocorrect"
+description = "Enables the language_autocorrect command without any pre-configured scope."
+commands.allow = ["language_autocorrect"]
+
+[[permission]]
+identifier = "deny-language-autocorrect"
+description = "Denies the language_autocorrect command without any pre-configured scope."
+commands.deny = ["language_autocorrect"]

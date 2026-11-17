@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dictionary-assign"
+description = "Enables the dictionary_assign command without any pre-configured scope."
+commands.allow = ["dictionary_assign"]
+
+[[permission]]
+identifier = "deny-dictionary-assign"
+description = "Denies the dictionary_assign command without any pre-configured scope."
+commands.deny = ["dictionary_assign"]
