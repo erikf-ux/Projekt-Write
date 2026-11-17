@@ -43,4 +43,21 @@ describe('Dialog', () => {
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
   });
+
+  it('gives the focus back to the control that had it when something outside takes it (F-58)', () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    render(
+      <Dialog title="Test" onClose={vi.fn()}>
+        <button type="button">Erster</button>
+        <button type="button">Zweiter</button>
+      </Dialog>,
+    );
+    const second = screen.getByRole('button', { name: 'Zweiter' });
+    second.focus();
+    // As a focus call that lands a frame late, after the dialog opened.
+    outside.focus();
+    expect(document.activeElement).toBe(second);
+    outside.remove();
+  });
 });

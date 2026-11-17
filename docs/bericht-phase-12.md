@@ -101,7 +101,7 @@ Die Entscheidungen stehen in ADR 0023 bis 0026.
 | Art                      | Anzahl                            | Ergebnis                                                                        |
 | ------------------------ | --------------------------------- | ------------------------------------------------------------------------------- |
 | Rust (Unit, Integration) | 610 (605 ausgeführt, 5 ignoriert) | bestanden                                                                       |
-| Vitest                   | 742 in 43 Dateien                 | bestanden                                                                       |
+| Vitest                   | 743 in 43 Dateien                 | bestanden                                                                       |
 | E2E (WebdriverIO)        | 20 Spec-Dateien                   | bestanden (lokal, Linux; eine Schwankung unter „Offene Fehler“; CI siehe unten) |
 
 Lokal ausgeführt und bestanden: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy (ohne und mit `e2e`), alle Rust-Tests, erzeugte Typen, Lizenzliste, E2E-Gesamtlauf.
@@ -156,6 +156,12 @@ Keine bekannten. Beobachtung wie in Phase 10 und 11: Im E2E-Gesamtlauf lag die G
 
 ## Behobene Fehler
 
+- **F-58 (CI-Lauf 119, Linux):** Im Test der Tastenkürzel verlor der Rekorder den Fokus an das Suchfeld. Danach blieb der Einstellungsdialog offen, und 14 Spec-Dateien scheiterten als Folge.
+  - **Ursache:** Tiptap setzt den Fokus in den Editor erst im nächsten Animationsframe. Unter Xvfb kam das Frame aus dem Befehl „Fokusmodus“ des vorigen Tests rund 500 ms später, als der Dialog schon offen war. Die Fokusfalle des Dialogs gab den Fokus dann dem ersten Element statt dem Rekorder.
+  - **Nachgestellt:** lokal, mit einem Protokoll der Fokuswechsel samt Stacktraces, etwa in jedem dritten Lauf.
+  - **Behebung:** Ein modaler Dialog gibt einen entwichenen Fokus jetzt dem Element zurück, das ihn zuletzt hatte, und nur sonst dem ersten. Das betraf auch Nutzer, nicht nur den Test.
+  - **Belegt:** ein neuer Vitest-Fall, der mit dem alten Code scheitert; danach bestand der Ablauf sechsmal in Folge, der E2E-Gesamtlauf mit 20 von 20 Dateien.
+
 Während der Arbeit gefunden und behoben, keiner davon in einem CI-Lauf:
 
 - **Autokorrektur im Korpus:** Fünf Fehler wurden falsch korrigiert, etwa über einen ausgeschriebenen Umlaut. Der ausgeschriebene Umlaut zählt jetzt als ein Schritt.
@@ -187,10 +193,11 @@ Während der Arbeit gefunden und behoben, keiner davon in einem CI-Lauf:
 
 ## CI
 
-| Lauf | Ergebnis | Inhalt                                                    |
-| ---- | -------- | --------------------------------------------------------- |
-| 118  | grün     | Zwischenstand: Rechtschreibung, Regeln, Autokorrektur, UI |
-| 119  | LAUF119  | Abschluss Phase 12                                        |
+| Lauf | Ergebnis    | Inhalt                                                             |
+| ---- | ----------- | ------------------------------------------------------------------ |
+| 118  | grün        | Zwischenstand: Rechtschreibung, Regeln, Autokorrektur, UI          |
+| 119  | rot (Linux) | F-58: Rekorder ohne Fokus, 14 Spec-Dateien als Folge; Windows grün |
+| 120  | LAUF120     | Abschluss Phase 12 mit F-58                                        |
 
 ## Nächster Schritt
 

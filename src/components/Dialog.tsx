@@ -59,11 +59,24 @@ export function Dialog({
       openDialogs.push(element);
     }
     const isTop = () => element !== null && topDialog() === element;
+    // The control inside that had the focus last.
+    let last: HTMLElement | null = null;
     // The dialog is modal: focus that leaves it (or falls back to the page
-    // because the focused control disappeared) comes back.
+    // because the focused control disappeared) comes back, to the control
+    // that had it. A focus call that lands late (Tiptap focuses in the next
+    // animation frame) must not move it to the first control (F-58).
     const onFocusIn = (event: FocusEvent) => {
-      if (isTop() && element && event.target instanceof Node && !element.contains(event.target)) {
-        focusFirst();
+      if (!element || !(event.target instanceof Node)) {
+        return;
+      }
+      if (element.contains(event.target)) {
+        last = event.target instanceof HTMLElement ? event.target : last;
+      } else if (isTop()) {
+        if (last?.isConnected && element.contains(last)) {
+          last.focus();
+        } else {
+          focusFirst();
+        }
       }
     };
     document.addEventListener('focusin', onFocusIn);
