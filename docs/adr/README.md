@@ -31,3 +31,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0024](0024-woerterbuecher.md)                    | Wörterbücher: Herkunft, Lizenzen, Auslieferung als Datenpakete                               | angenommen                                    |
 | [0025](0025-sprachpruefung.md)                    | Sprachprüfung: Ablauf, eigene Wörterbücher, Autokorrektur, Erkennung und Sprachabschnitte    | angenommen                                    |
 | [0026](0026-languagetool.md)                      | LanguageTool als Zusatzpaket über eine vorhandene Installation                               | angenommen                                    |
+| [0027](0027-erweiterungen.md)                     | Erweiterungen: interne Register, kein fremder Code, Einstellungen übertragen                 | angenommen                                    |
