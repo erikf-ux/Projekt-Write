@@ -263,6 +263,54 @@
   outline: 2px solid var(--pw-color-accent);
 }
 
+/* Language check (section 14): spelling and context red and wavy, grammar
+   and punctuation blue and dashed. Colour is not the only sign: the line
+   styles differ too (section 11). */
+.pw-surface .pw-check-spelling,
+.pw-surface .pw-check-context {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--pw-color-error);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+.pw-surface .pw-check-grammar,
+.pw-surface .pw-check-punctuation {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: #2f6fe0;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+/* A double space has no glyph to underline. */
+.pw-surface .pw-check[data-check-rule='doubleSpace'] {
+  background: color-mix(in srgb, #2f6fe0 25%, transparent);
+}
+
+/* A correction of the autocorrect, briefly. */
+.pw-surface .pw-check-corrected {
+  background: color-mix(in srgb, var(--pw-color-success) 30%, transparent);
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pw-surface .pw-check-corrected {
+    transition: background-color 0.3s;
+  }
+}
+
+@media print {
+  .pw-check,
+  .pw-check-corrected {
+    text-decoration: none !important;
+    background: none !important;
+  }
+}
+
 /* ProseMirror needs these for its gap cursor and hidden fields. */
 .ProseMirror .ProseMirror-gapcursor {
   display: none;

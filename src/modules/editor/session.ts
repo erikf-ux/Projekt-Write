@@ -25,6 +25,7 @@ import { isDocumentFile } from '@/modules/documents/importFiles';
 import { mediaReference } from '@/modules/media/mediaUrl';
 import { handleRichPaste } from './paste';
 import { markdownExtensions } from './schema/extensions';
+import { LanguageCheck } from '@/modules/language-check/plugin';
 import { plainStatistics, richStatistics, selectionStatistics, type TextStatistics } from './statistics';
 import { useStatistics } from './statisticsStore';
 
@@ -472,9 +473,19 @@ export class EditorSession {
 
   /** A rich editor for content the probe has checked: its blocks need no check. */
   private createRich(content: JSONContent): Editor {
-    const editor = this.createEditor([...markdownExtensions(), findExtension()], content, 'pw-rich');
+    const editor = this.createEditor(
+      [...markdownExtensions(), findExtension(), this.languageCheck(true)],
+      content,
+      'pw-rich',
+    );
     this.trust(editor);
     return editor;
+  }
+
+  /** The language check (section 14); external files have no library id. */
+  private languageCheck(enabled: boolean) {
+    const documentId = this.options.id.startsWith('ext:') ? null : this.options.id;
+    return LanguageCheck.configure({ documentId, enabled });
   }
 
   private trust(editor: Editor): void {
@@ -485,7 +496,8 @@ export class EditorSession {
 
   private createPlain(text: string): Editor {
     return this.createEditor(
-      [...plainExtensions(), findExtension()],
+      // The Markdown source view is syntax, not text: no language check.
+      [...plainExtensions(), findExtension(), this.languageCheck(!this.isMarkdown)],
       plainDocument(text),
       this.isMarkdown ? 'pw-source' : 'pw-plain',
     );

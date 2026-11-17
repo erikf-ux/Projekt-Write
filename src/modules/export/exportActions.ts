@@ -235,7 +235,9 @@ export const PRINT_ROOT_ID = 'pw-print';
  * the selected image and the gap cursor.
  */
 export function stripScreenMarks(copy: HTMLElement): void {
-  for (const mark of copy.querySelectorAll('.find-and-replace-result, .find-and-replace-result-current')) {
+  for (const mark of copy.querySelectorAll(
+    '.find-and-replace-result, .find-and-replace-result-current, .pw-check, .pw-check-corrected',
+  )) {
     mark.replaceWith(...mark.childNodes);
   }
   for (const node of copy.querySelectorAll('.ProseMirror-selectednode')) {
