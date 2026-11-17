@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-open-location"
+description = "Enables the system_open_location command without any pre-configured scope."
+commands.allow = ["system_open_location"]
+
+[[permission]]
+identifier = "deny-system-open-location"
+description = "Denies the system_open_location command without any pre-configured scope."
+commands.deny = ["system_open_location"]

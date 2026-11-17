@@ -1,10 +1,14 @@
-/** Settings: general, language check, shortcuts, library (section 11; language check from Phase 12). */
+/**
+ * Settings: general, language check, shortcuts, library, advanced (section
+ * 11; language check from Phase 12, advanced from Phase 13).
+ */
 import { useCallback, useMemo } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { useT, type MessageKey } from '@/i18n';
 import { effectiveKeybindings } from '@/modules/commands/keymap';
 import { allCommands } from '@/modules/commands/registry';
 import { LibraryPanel } from '@/modules/library/LibraryPanel';
+import { AdvancedSettings } from './AdvancedSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { LanguageSettings } from '@/modules/language-check/LanguageSettings';
 import { LibraryPreferences } from './LibraryPreferences';
@@ -16,6 +20,7 @@ const sections: { id: SettingsSection; key: MessageKey }[] = [
   { id: 'language', key: 'settings.language.check' },
   { id: 'shortcuts', key: 'settings.shortcuts' },
   { id: 'library', key: 'settings.library' },
+  { id: 'advanced', key: 'settings.advanced' },
 ];
 
 export function SettingsDialog() {
@@ -110,6 +115,7 @@ export function SettingsDialog() {
             <LibraryPreferences />
           </>
         ) : null}
+        {section === 'advanced' ? <AdvancedSettings /> : null}
       </div>
     </Dialog>
   );

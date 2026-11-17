@@ -161,6 +161,12 @@ fn main() {
         "theme_remove",
         "link_open",
         "extensions_list",
+        "settings_export",
+        "settings_import_preview",
+        "settings_import_apply",
+        "settings_reset",
+        "system_locations",
+        "system_open_location",
     ]);
 
     let mut attributes = tauri_build::Attributes::new().app_manifest(app_manifest);

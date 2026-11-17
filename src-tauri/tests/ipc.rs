@@ -2944,3 +2944,283 @@ fn backups_are_created_checked_and_restored_through_the_commands() {
     }
     app.shut_down();
 }
+
+// ---------------------------------------------------------------------------
+// Settings transfer and storage locations (Phase 13, ADR 0027)
+
+fn library_preferences(trash: u32) -> Value {
+    json!({
+        "trashRetentionDays": trash,
+        "history": { "keepAllHours": 24, "dailyDays": 30, "weeklyDays": 365 }
+    })
+}
+
+#[test]
+fn settings_are_exported_imported_and_reset_through_the_commands() {
+    let app = app_with_library();
+    let mut settings = default_ui_settings();
+    settings["theme"] = json!("dark");
+    settings["zoom"] = json!(1.25);
+    settings["keybindings"] = json!({ "palette.show": ["Ctrl+K"] });
+    call(&app, "ui_update_settings", json!({ "settings": settings })).unwrap();
+    call(&app, "library_update_preferences", library_preferences(12)).unwrap();
+
+    // Export into the file the dialog names.
+    let file = app.path("Austausch/meine.pwsettings");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    app.picker.push(Some(file.clone()));
+    assert_eq!(
+        call(&app, "settings_export", json!({ "title": "Exportieren" })).unwrap(),
+        true
+    );
+    let exported: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    assert_eq!(exported["format"], "projectwrite-settings");
+    assert_eq!(exported["formatVersion"], 1);
+    assert_eq!(exported["app"]["zoom"], 1.25);
+    assert_eq!(exported["library"]["trash.retentionDays"], 12);
+    assert!(exported["app"].get("libraryPath").is_none());
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(
+        !text.contains(app.base.to_str().unwrap()),
+        "no path of this computer in the file"
+    );
+    // A cancelled dialog writes nothing.
+    app.picker.push(None);
+    assert_eq!(
+        call(&app, "settings_export", json!({ "title": "Exportieren" })).unwrap(),
+        false
+    );
+
+    // Change something, then import the file again.
+    settings["zoom"] = json!(1.5);
+    call(&app, "ui_update_settings", json!({ "settings": settings })).unwrap();
+    call(&app, "library_update_preferences", library_preferences(40)).unwrap();
+    app.picker.push(Some(file.clone()));
+    let preview = call(
+        &app,
+        "settings_import_preview",
+        json!({ "title": "Importieren" }),
+    )
+    .unwrap();
+    assert_eq!(
+        preview["changes"],
+        json!([
+            { "area": "app", "key": "zoom", "before": 1.5, "after": 1.25 },
+            { "area": "library", "key": "trash.retentionDays", "before": 40, "after": 12 }
+        ]),
+        "{preview}"
+    );
+    assert_eq!(preview["skipped"], json!([]));
+    assert!(preview["exportedAt"].is_string());
+    // Nothing changes before "Übernehmen".
+    let state = call(&app, "ui_state", json!({})).unwrap();
+    assert_eq!(state["settings"]["zoom"], 1.5);
+
+    let applied = call(
+        &app,
+        "settings_import_apply",
+        json!({ "token": preview["token"] }),
+    )
+    .unwrap();
+    assert_eq!(applied["ui"]["settings"]["zoom"], 1.25);
+    assert_eq!(applied["ui"]["settings"]["theme"], "dark");
+    assert_eq!(applied["libraryChanged"], true);
+    assert_eq!(
+        call(&app, "library_preferences", json!({})).unwrap()["trashRetentionDays"],
+        12
+    );
+    let backups: Vec<PathBuf> = std::fs::read_dir(app.path("config/settings-backups"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert_eq!(backups.len(), 1, "{backups:?}");
+    let error = call(
+        &app,
+        "settings_import_apply",
+        json!({ "token": preview["token"] }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "SETTINGS_IMPORT_EXPIRED");
+
+    // Reset, each part on its own.
+    let applied = call(&app, "settings_reset", json!({ "area": "app" })).unwrap();
+    assert_eq!(applied["ui"]["settings"], default_ui_settings());
+    assert_eq!(applied["libraryChanged"], false);
+    assert_eq!(
+        call(&app, "library_preferences", json!({})).unwrap()["trashRetentionDays"],
+        12
+    );
+    let applied = call(&app, "settings_reset", json!({ "area": "library" })).unwrap();
+    assert_eq!(applied["libraryChanged"], true);
+    assert_eq!(
+        call(&app, "library_preferences", json!({})).unwrap()["trashRetentionDays"],
+        30
+    );
+    let file: Value =
+        serde_json::from_slice(&std::fs::read(app.path("config/settings.json")).unwrap()).unwrap();
+    assert!(
+        file["libraryPath"].is_string(),
+        "the library stays configured"
+    );
+    assert_eq!(
+        std::fs::read_dir(app.path("config/settings-backups"))
+            .unwrap()
+            .count(),
+        3
+    );
+    app.shut_down();
+}
+
+#[test]
+fn settings_files_that_do_not_fit_are_refused_uniformly() {
+    let app = app();
+    let write = |name: &str, content: &str| {
+        let path = app.path(name);
+        std::fs::write(&path, content).unwrap();
+        path
+    };
+    let cases = [
+        (write("a.pwsettings", "kein JSON"), "SETTINGS_FILE_INVALID"),
+        (
+            write("b.pwsettings", r#"{"format": "other", "formatVersion": 1}"#),
+            "SETTINGS_FILE_INVALID",
+        ),
+        (
+            write(
+                "c.pwsettings",
+                r#"{"format": "projectwrite-settings", "formatVersion": 2}"#,
+            ),
+            "SETTINGS_FILE_NEWER",
+        ),
+        (
+            write(
+                "d.pwsettings",
+                r#"{"format": "projectwrite-settings", "formatVersion": 1, "app": {"zoom": 7}}"#,
+            ),
+            "SETTINGS_VALUE_INVALID",
+        ),
+    ];
+    for (path, code) in cases {
+        app.picker.push(Some(path));
+        let error = call(
+            &app,
+            "settings_import_preview",
+            json!({ "title": "Importieren" }),
+        )
+        .unwrap_err();
+        assert_error_code(&error, code);
+        if code == "SETTINGS_VALUE_INVALID" {
+            assert_eq!(error["details"]["key"], "app.zoom");
+        }
+    }
+    assert!(!app.path("config/settings-backups").exists());
+
+    // Without a library the library part is named, not applied.
+    let file = write(
+        "e.pwsettings",
+        r#"{"format": "projectwrite-settings", "formatVersion": 1,
+            "app": {"zoom": 1.1}, "library": {"trash.retentionDays": 5}}"#,
+    );
+    app.picker.push(Some(file));
+    let preview = call(
+        &app,
+        "settings_import_preview",
+        json!({ "title": "Importieren" }),
+    )
+    .unwrap();
+    assert_eq!(
+        preview["skipped"],
+        json!([{ "key": "library.trash.retentionDays", "reason": "noLibrary" }])
+    );
+    app.picker.push(None);
+    assert_eq!(
+        call(
+            &app,
+            "settings_import_preview",
+            json!({ "title": "Importieren" })
+        )
+        .unwrap(),
+        Value::Null
+    );
+    let error = call(&app, "settings_reset", json!({ "area": "library" })).unwrap_err();
+    assert_error_code(&error, "LIBRARY_NOT_OPEN");
+
+    for (command, request, field) in [
+        ("settings_export", json!({ "title": "" }), "title"),
+        (
+            "settings_export",
+            json!({ "title": "x", "path": "/tmp/a.pwsettings" }),
+            "request",
+        ),
+        ("settings_import_preview", json!({}), "request"),
+        ("settings_import_apply", json!({ "token": "x" }), "token"),
+        (
+            "settings_import_apply",
+            json!({ "token": preview["token"], "values": { "zoom": 2 } }),
+            "request",
+        ),
+        ("settings_reset", json!({ "area": "everything" }), "request"),
+        (
+            "system_open_location",
+            json!({ "location": "/etc" }),
+            "request",
+        ),
+        ("system_open_location", json!({ "path": "/etc" }), "request"),
+        ("system_locations", json!({ "x": 1 }), "request"),
+    ] {
+        let error = call(&app, command, request).unwrap_err();
+        assert_uniform_error(&error, field);
+    }
+    app.shut_down();
+}
+
+#[test]
+fn storage_locations_are_shown_and_opened_by_name() {
+    let app = app();
+    let locations = call(&app, "system_locations", json!({})).unwrap();
+    assert!(locations["config"].as_str().unwrap().ends_with("config"));
+    assert!(locations["logs"].as_str().unwrap().ends_with("logs"));
+    assert_eq!(locations["library"], Value::Null);
+    assert_eq!(
+        call(
+            &app,
+            "system_open_location",
+            json!({ "location": "config" })
+        )
+        .unwrap(),
+        Value::Null
+    );
+    assert!(app.path("config").is_dir(), "created to be shown");
+    let error = call(
+        &app,
+        "system_open_location",
+        json!({ "location": "library" }),
+    )
+    .unwrap_err();
+    assert_error_code(&error, "LIBRARY_NOT_OPEN");
+    assert_eq!(
+        app.links.opened(),
+        [app.path("config").to_str().unwrap().to_owned()]
+    );
+    app.shut_down();
+
+    let app = app_with_library();
+    let library = library_folder(&app);
+    let locations = call(&app, "system_locations", json!({})).unwrap();
+    assert_eq!(locations["library"], json!(library.to_str().unwrap()));
+    call(
+        &app,
+        "system_open_location",
+        json!({ "location": "library" }),
+    )
+    .unwrap();
+    call(&app, "system_open_location", json!({ "location": "logs" })).unwrap();
+    assert_eq!(
+        app.links.opened(),
+        [
+            library.to_str().unwrap().to_owned(),
+            app.path("logs").to_str().unwrap().to_owned()
+        ]
+    );
+    app.shut_down();
+}

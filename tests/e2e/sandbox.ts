@@ -75,6 +75,16 @@ export const pickedExport = {
   restoreFolder: restoreParent,
 };
 
+/** Settings files (Phase 13, ADR 0027), outside the library. */
+export const settingsDir = path.join(sandbox, 'Einstellungen');
+
+/** Answers of the settings dialogs (`PW_E2E_PICK_SETTINGS`), in this order. */
+export const pickedSettings = {
+  export: path.join(settingsDir, 'meine.pwsettings'),
+  import: path.join(settingsDir, 'meine.pwsettings'),
+  restore: path.join(settingsDir, 'meine.pwsettings'),
+};
+
 /** A document printed to PDF by the engine of the webview (export-backup.e2e.ts). */
 export const printedPdf = path.join(sandbox, 'Drucken', 'Druckprobe.pdf');
 

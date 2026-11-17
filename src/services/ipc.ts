@@ -153,6 +153,12 @@ import type { MeshRestoreRequest } from '@/types/generated/MeshRestoreRequest';
 import type { UiEvent } from '@/types/generated/UiEvent';
 import type { UiState } from '@/types/generated/UiState';
 import type { UpdateUiSettingsRequest } from '@/types/generated/UpdateUiSettingsRequest';
+import type { OpenLocationRequest } from '@/types/generated/OpenLocationRequest';
+import type { SettingsApplied } from '@/types/generated/SettingsApplied';
+import type { SettingsApplyRequest } from '@/types/generated/SettingsApplyRequest';
+import type { SettingsImportPreview } from '@/types/generated/SettingsImportPreview';
+import type { SettingsResetRequest } from '@/types/generated/SettingsResetRequest';
+import type { StorageLocations } from '@/types/generated/StorageLocations';
 
 /** Every app command with its request and response type. */
 export interface Commands {
@@ -313,6 +319,12 @@ export interface Commands {
   external_open_recent: { request: ExternalFileRequest; response: ExternalFileInfo };
   external_forget_recent: { request: ExternalFileRequest; response: RecentFileEntry[] };
   open_requests_take: { request: EmptyRequest; response: OpenTarget[] };
+  settings_export: { request: DialogTitleRequest; response: boolean };
+  settings_import_preview: { request: DialogTitleRequest; response: SettingsImportPreview | null };
+  settings_import_apply: { request: SettingsApplyRequest; response: SettingsApplied };
+  settings_reset: { request: SettingsResetRequest; response: SettingsApplied };
+  system_locations: { request: EmptyRequest; response: StorageLocations };
+  system_open_location: { request: OpenLocationRequest; response: null };
 }
 
 /** Commands that report progress through a channel argument `onProgress`. */
@@ -410,6 +422,11 @@ const errorCodes: Record<ErrorCode, true> = {
   LANGUAGE_DICTIONARY_INVALID: true,
   LANGUAGE_DICTIONARY_BUNDLED: true,
   LANGUAGE_TOOL_NOT_FOUND: true,
+  SETTINGS_FILE_INVALID: true,
+  SETTINGS_FILE_NEWER: true,
+  SETTINGS_VALUE_INVALID: true,
+  SETTINGS_IMPORT_EXPIRED: true,
+  FOLDER_OPEN_FAILED: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };
