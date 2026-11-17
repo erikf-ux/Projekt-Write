@@ -84,6 +84,29 @@ pub struct DictionaryStore {
     bundled: Option<PathBuf>,
     added: PathBuf,
     loaded: Mutex<HashMap<String, Arc<Dictionary>>>,
+    /// The letters of each loaded language (`TRY` of the affix file).
+    alphabets: Mutex<HashMap<String, Arc<Vec<char>>>>,
+}
+
+/// The letters of a language from the `TRY` line of its affix file, with
+/// their capitals; a–z and A–Z without one.
+fn alphabet_of(aff: &str) -> Vec<char> {
+    let declared = aff
+        .lines()
+        .find_map(|line| line.strip_prefix("TRY "))
+        .unwrap_or("abcdefghijklmnopqrstuvwxyz");
+    let mut letters: Vec<char> = Vec::new();
+    for c in declared.chars().filter(|c| c.is_alphabetic()) {
+        for variant in std::iter::once(c)
+            .chain(c.to_uppercase())
+            .chain(c.to_lowercase())
+        {
+            if !letters.contains(&variant) {
+                letters.push(variant);
+            }
+        }
+    }
+    letters
 }
 
 impl DictionaryStore {
@@ -94,6 +117,7 @@ impl DictionaryStore {
             bundled,
             added,
             loaded: Mutex::new(HashMap::new()),
+            alphabets: Mutex::new(HashMap::new()),
         }
     }
 
@@ -186,9 +210,17 @@ impl DictionaryStore {
             fs::read_to_string(path)
                 .map_err(|error| EngineError::BadDictionary(tag.to_owned(), error.to_string()))
         };
-        let dictionary = Dictionary::new(&read(&aff)?, &read(&dic)?)
+        let aff_text = read(&aff)?;
+        let dictionary = Dictionary::new(&aff_text, &read(&dic)?)
             .map_err(|error| EngineError::BadDictionary(tag.to_owned(), error.to_string()))?;
         let dictionary = Arc::new(dictionary);
+        {
+            let mut alphabets = self
+                .alphabets
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            alphabets.insert(tag.to_owned(), Arc::new(alphabet_of(&aff_text)));
+        }
         let mut loaded = self
             .loaded
             .lock()
@@ -196,6 +228,19 @@ impl DictionaryStore {
         Ok(Arc::clone(
             loaded.entry(tag.to_owned()).or_insert(dictionary),
         ))
+    }
+
+    /// The letters of a language (loads its dictionary if needed).
+    pub fn alphabet(&self, tag: &str) -> Result<Arc<Vec<char>>, EngineError> {
+        self.get(tag)?;
+        let alphabets = self
+            .alphabets
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Ok(alphabets
+            .get(tag)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(alphabet_of(""))))
     }
 
     fn cached(&self, tag: &str) -> Option<Arc<Dictionary>> {

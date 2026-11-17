@@ -669,7 +669,15 @@ fn default_ui_settings() -> Value {
         "limitLineWidth": true,
         "readingTime": { "visible": false, "wordsPerMinute": 200 },
         "autosaveExternal": false,
-        "keybindings": {}
+        "keybindings": {},
+        "languageCheck": {
+            "enabled": true,
+            "rules": true,
+            "autocorrect": false,
+            "autocorrectAsked": false,
+            "defaultLanguage": null,
+            "detect": true
+        }
     })
 }
 
@@ -708,6 +716,8 @@ fn ui_settings_are_saved_and_used_after_a_restart() {
     settings["limitLineWidth"] = json!(false);
     settings["readingTime"] = json!({ "visible": true, "wordsPerMinute": 250 });
     settings["keybindings"] = json!({ "palette.show": ["Ctrl+K"], "focus.toggle": [] });
+    settings["languageCheck"]["autocorrect"] = json!(true);
+    settings["languageCheck"]["defaultLanguage"] = json!("de-CH");
     let state = call(
         &app,
         "ui_update_settings",

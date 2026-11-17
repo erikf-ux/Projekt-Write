@@ -82,6 +82,7 @@ export const config: WebdriverIO.Config = {
     path.join(specs, 'media.e2e.ts'),
     path.join(specs, 'search.e2e.ts'),
     path.join(specs, 'mesh.e2e.ts'),
+    path.join(specs, 'language.e2e.ts'),
     path.join(specs, 'session-quit.e2e.ts'),
     path.join(specs, 'session-restored.e2e.ts'),
     path.join(specs, 'crash.e2e.ts'),

@@ -62,7 +62,7 @@ export function StartScreen() {
   return (
     <main
       aria-labelledby="app-title"
-      className="flex min-h-full flex-col items-center justify-center bg-surface px-6 py-10 text-fg"
+      className="flex min-h-full flex-col items-center justify-center bg-surface px-6 py-6 text-fg"
     >
       <div className="w-full max-w-[560px]">
         <header className="mb-8 flex items-center gap-4">
@@ -77,7 +77,6 @@ export function StartScreen() {
 
         <LibraryPanel />
         <LanguageChoice />
-        <AutocorrectChoice />
 
         <section
           aria-labelledby="checks-title"
@@ -163,39 +162,31 @@ function AutocorrectChoice() {
   const choose = (autocorrect: boolean) =>
     void update({ languageCheck: { ...check, autocorrect, autocorrectAsked: true } });
   return (
-    <section
+    <div
+      role="radiogroup"
       aria-labelledby="first-start-autocorrect"
-      className="mb-4 rounded-pw bg-sidebar p-4"
+      className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1"
       data-testid="first-start-autocorrect"
+      title={t('start.autocorrect.text')}
     >
-      <h2
-        id="first-start-autocorrect"
-        className="text-ui mb-1 font-semibold tracking-wide text-muted uppercase"
-      >
+      <span id="first-start-autocorrect" className="text-ui font-medium">
         {t('start.autocorrect.title')}
-      </h2>
-      <p className="text-ui mb-2 text-muted">{t('start.autocorrect.text')}</p>
-      <div
-        role="radiogroup"
-        aria-labelledby="first-start-autocorrect"
-        className="flex flex-wrap gap-x-4 gap-y-1"
-      >
-        {[false, true].map((value) => (
-          <label key={String(value)} className="text-ui flex items-center gap-2">
-            <input
-              type="radio"
-              name="first-start-autocorrect"
-              checked={check.autocorrect === value}
-              data-testid={`first-start-autocorrect-${value ? 'on' : 'off'}`}
-              onChange={() => {
-                choose(value);
-              }}
-            />
-            {t(value ? 'start.autocorrect.on' : 'start.autocorrect.off')}
-          </label>
-        ))}
-      </div>
-    </section>
+      </span>
+      {[false, true].map((value) => (
+        <label key={String(value)} className="text-ui flex items-center gap-2">
+          <input
+            type="radio"
+            name="first-start-autocorrect"
+            checked={check.autocorrect === value}
+            data-testid={`first-start-autocorrect-${value ? 'on' : 'off'}`}
+            onChange={() => {
+              choose(value);
+            }}
+          />
+          {t(value ? 'start.autocorrect.on' : 'start.autocorrect.off')}
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -239,6 +230,7 @@ function LanguageChoice() {
           </label>
         ))}
       </div>
+      <AutocorrectChoice />
     </section>
   );
 }

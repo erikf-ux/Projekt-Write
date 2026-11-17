@@ -95,7 +95,7 @@ async fn a_document_gets_the_union_of_its_dictionaries() {
 
     let listed = data.dictionaries().await.unwrap();
     let fach = listed.iter().find(|d| d.name == "Fachbegriffe").unwrap();
-    assert_eq!(fach.subnets, [wissen.clone()]);
+    assert_eq!(fach.subnets, std::slice::from_ref(&wissen));
     assert_eq!(fach.words, 1);
     // A subnet deleted takes its targets with it.
     assert!(matches!(

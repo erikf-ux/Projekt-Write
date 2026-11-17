@@ -119,13 +119,23 @@ impl Lexicon for Words<'_> {
         })
     }
 
+    /// The candidates one step away, found deterministically (not the
+    /// suggestion list of the engine, which can differ between runs).
     fn suggestions(&self, word: &str) -> Vec<String> {
         let Some(language) = self.languages.first() else {
             return Vec::new();
         };
-        self.service
-            .all_suggestions(word, language, self.own)
-            .unwrap_or_default()
+        let Some(tag) = self.service.store.resolve(language) else {
+            return Vec::new();
+        };
+        let (Ok(dictionary), Ok(alphabet)) = (
+            self.service.store.get(&tag),
+            self.service.store.alphabet(&tag),
+        ) else {
+            return Vec::new();
+        };
+        let german = dictionaries::base_language(&tag) == "de";
+        spelling::close_words(&dictionary, self.own, word, &alphabet, german)
     }
 }
 

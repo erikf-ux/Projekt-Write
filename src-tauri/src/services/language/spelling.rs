@@ -83,6 +83,70 @@ fn umlaut_variants(word: &str) -> Vec<String> {
     all
 }
 
+/// The words one step away that the dictionary or the own words accept:
+/// a letter deleted, two neighbours swapped, a letter replaced or inserted
+/// (letters of the language), and in German one umlaut or ß written out
+/// (`ue` for `ü`). Deterministic, unlike the suggestion lists of the
+/// engine, whose order and cut-off can differ between runs: the autocorrect
+/// decides on this (condition 3).
+pub fn close_words(
+    dictionary: &Dictionary,
+    own: &OwnWords,
+    word: &str,
+    alphabet: &[char],
+    german: bool,
+) -> Vec<String> {
+    let chars: Vec<char> = word.chars().collect();
+    let mut candidates: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let collect = |chars: Vec<char>| chars.into_iter().collect::<String>();
+    for i in 0..chars.len() {
+        let mut deleted = chars.clone();
+        deleted.remove(i);
+        candidates.insert(collect(deleted));
+        if i + 1 < chars.len() {
+            let mut swapped = chars.clone();
+            swapped.swap(i, i + 1);
+            candidates.insert(collect(swapped));
+        }
+        for &letter in alphabet {
+            if letter != chars[i] {
+                let mut replaced = chars.clone();
+                replaced[i] = letter;
+                candidates.insert(collect(replaced));
+            }
+        }
+    }
+    for i in 0..=chars.len() {
+        for &letter in alphabet {
+            let mut inserted = chars.clone();
+            inserted.insert(i, letter);
+            candidates.insert(collect(inserted));
+        }
+    }
+    if german {
+        for (from, to) in [
+            ("ae", "ä"),
+            ("oe", "ö"),
+            ("ue", "ü"),
+            ("Ae", "Ä"),
+            ("Oe", "Ö"),
+            ("Ue", "Ü"),
+            ("ss", "ß"),
+        ] {
+            for (at, _) in word.match_indices(from) {
+                candidates.insert(format!("{}{}{}", &word[..at], to, &word[at + from.len()..]));
+            }
+        }
+    }
+    candidates.remove(word);
+    candidates
+        .into_iter()
+        .filter(|candidate| {
+            !candidate.is_empty() && (own.contains(candidate) || dictionary.check(candidate))
+        })
+        .collect()
+}
+
 fn capitalised_like(word: &str, suggestion: &str) -> String {
     let starts_upper = word.chars().next().is_some_and(char::is_uppercase);
     let mut chars = suggestion.chars();
@@ -303,6 +367,33 @@ mod tests {
             );
             assert!(suggestions.len() <= MAX_SUGGESTIONS);
         }
+    }
+
+    #[test]
+    fn close_words_are_found_without_the_suggestion_engine() {
+        let store = engine();
+        let dictionary = store.store.get("de-DE").unwrap();
+        let alphabet = store.store.alphabet("de-DE").unwrap();
+        let none = OwnWords::default();
+        // Swapped letters or one deleted: two words, no unique correction.
+        assert_eq!(
+            close_words(&dictionary, &none, "Fesnter", &alphabet, true),
+            ["Fenster", "Fester"]
+        );
+        assert_eq!(
+            close_words(&dictionary, &none, "Zimemr", &alphabet, true),
+            ["Zimmer"]
+        );
+        let mutter = close_words(&dictionary, &none, "Muetter", &alphabet, true);
+        assert!(
+            mutter.contains(&"Mütter".to_owned()) && mutter.contains(&"Mutter".to_owned()),
+            "{mutter:?}"
+        );
+        let own = OwnWords::new(["Tauri".to_owned()]);
+        assert_eq!(
+            close_words(&dictionary, &own, "Tuari", &alphabet, true),
+            ["Tauri"]
+        );
     }
 
     #[test]

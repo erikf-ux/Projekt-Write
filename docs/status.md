@@ -8,7 +8,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 11 – Mesh** (Abschnitte 6, 15): freigegeben („Setze fort“), umgesetzt und lokal geprüft; abgeschlossen, CI-Lauf 117 grün; Bericht in `docs/bericht-phase-11.md`. Wartet auf die Freigabe von Phase 12.
 
-**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): angehalten („Fange noch nicht mit Phase 12 an“). Vorgezogen und behalten ist nur der Vergleich der Prüfwerke (ADR 0023, Korpus, `tools/spell-compare`). Ein Entwurf von Satzsegmentierung und Autokorrektur-Regel wurde wieder herausgenommen, ungeprüft; er liegt in Commit `9d47f7c`.
+**Phase 12 – Sprachprüfung** (Abschnitte 7, 14): freigegeben („Setze fort“), in Arbeit. Rechtschreibung, Regeln, Autokorrektur, eigene Wörterbücher und Profile stehen; Spracherkennung, Sprachabschnitte und LanguageTool folgen.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
@@ -18,16 +18,16 @@ CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot 
 
 ## Stand Phase 12
 
-| Schritt | Inhalt                                                                                                     | Stand                                          |
-| ------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1       | Vergleich `spellbook` und Hunspell mit Korpus (1.198 richtige Wörter, 212 Fehler), ADR 0023                | erledigt; `spellbook` gewählt                  |
-| 2       | Satzsegmentierung mit Ausnahmelisten je Sprache, Testdaten Satzende                                        | offen (Entwurf in Commit `9d47f7c`, ungeprüft) |
-| 3       | Eindeutigkeitsregel der Autokorrektur, je Bedingung ein Test                                               | offen (Entwurf in Commit `9d47f7c`, ungeprüft) |
-| 4       | `LanguageEngine` mit `spellbook`, Wörterbücher (Bezug und Auslieferung per ADR), neu sortierte Vorschläge  | offen, nach Freigabe                           |
-| 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Autokorrektur mit Undo, Tippverzögerung            | offen                                          |
-| 6       | Eigene Wörterbücher, Zuweisung, Import und Export; Sprachprofile, Spracherkennung, mehrsprachige Dokumente | offen                                          |
-| 7       | LanguageTool als Zusatzpaket (Sidecar, nur `127.0.0.1`)                                                    | offen                                          |
-| 8       | E2E, Doku, CI, Bericht                                                                                     | offen                                          |
+| Schritt | Inhalt                                                                                                                                                         | Stand                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1       | Vergleich `spellbook` und Hunspell mit Korpus, ADR 0023                                                                                                        | erledigt                                                                                                             |
+| 2       | Wörterbücher als Datenpakete (de-DE, de-AT, de-CH, en-US, en-GB), Lizenzen, Quelltext von igerman98, ADR 0024                                                  | erledigt                                                                                                             |
+| 3       | `LanguageEngine`, Rechtschreibung mit `spellbook`, einfache Regeln, Satzsegmentierung, Vorschläge nach Abschnitt 14, Eindeutigkeitsregel; Korpus-Abnahme       | erledigt (0 von 1.198 richtigen Wörtern markiert, 209 von 212 Fehlern erkannt, Autokorrektur ohne falsche Korrektur) |
+| 4       | Migration 0011: eigene Wörterbücher, Zuweisung, abgelehnte Korrekturen, Sprachprofile; Befehle                                                                 | erledigt                                                                                                             |
+| 5       | Editor: Unterstreichung, Prüfung absatzweise mit Cache, Kontextmenü, Autokorrektur mit eigenem Undo-Schritt, Einstellungen, Erststart-Frage (D5), Statusleiste | erledigt; E2E `language.e2e.ts`; Tippverzögerung lokal 95 % 34 ms                                                    |
+| 6       | Spracherkennung je Absatz, Sprachabschnitte, mehrsprachige Dokumente                                                                                           | offen                                                                                                                |
+| 7       | LanguageTool als Zusatzpaket                                                                                                                                   | offen                                                                                                                |
+| 8       | Doku, ADR 0025, CI, Bericht                                                                                                                                    | offen                                                                                                                |
 
 ## Stand Phase 11
 
