@@ -179,11 +179,24 @@ pub enum ErrorCode {
     LanguageDictionaryBundled,
     /// The chosen folder holds no LanguageTool server.
     LanguageToolNotFound,
+    /// Not a settings file of Project Write, or not readable
+    /// (`details.reason`: `size`, `json`, `format`, `formatVersion` …).
+    SettingsFileInvalid,
+    /// A settings file of a newer format version (`details.version`).
+    SettingsFileNewer,
+    /// A value in a settings file fails its check (`details.key`,
+    /// `details.reason`); nothing was changed.
+    SettingsValueInvalid,
+    /// The previewed settings import is no longer waiting (applied,
+    /// cancelled, replaced, or another library was opened).
+    SettingsImportExpired,
+    /// The system could not show a folder in the file manager.
+    FolderOpenFailed,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 79] = [
+    pub const ALL: [ErrorCode; 84] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -263,6 +276,11 @@ impl ErrorCode {
         ErrorCode::LanguageDictionaryInvalid,
         ErrorCode::LanguageDictionaryBundled,
         ErrorCode::LanguageToolNotFound,
+        ErrorCode::SettingsFileInvalid,
+        ErrorCode::SettingsFileNewer,
+        ErrorCode::SettingsValueInvalid,
+        ErrorCode::SettingsImportExpired,
+        ErrorCode::FolderOpenFailed,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -347,6 +365,11 @@ impl ErrorCode {
             ErrorCode::LanguageDictionaryInvalid => "error.languageDictionaryInvalid",
             ErrorCode::LanguageDictionaryBundled => "error.languageDictionaryBundled",
             ErrorCode::LanguageToolNotFound => "error.languageToolNotFound",
+            ErrorCode::SettingsFileInvalid => "error.settingsFileInvalid",
+            ErrorCode::SettingsFileNewer => "error.settingsFileNewer",
+            ErrorCode::SettingsValueInvalid => "error.settingsValueInvalid",
+            ErrorCode::SettingsImportExpired => "error.settingsImportExpired",
+            ErrorCode::FolderOpenFailed => "error.folderOpenFailed",
         }
     }
 }

@@ -10,6 +10,7 @@ use ts_rs::TS;
 
 use crate::commands::input::{EmptyRequest, Input, Validate};
 use crate::error::CommandError;
+use crate::services::locale::Locale;
 use crate::services::session::lock;
 use crate::services::settings::ui::{UiSettings, is_theme_id};
 use crate::services::themes::MAX_THEME_BYTES;
@@ -52,13 +53,25 @@ pub async fn ui_update_settings<R: Runtime>(
     let request = request.into_inner();
     let previous_locale = state.ui.locale();
     let (ui, previous) = state.ui.update(request.settings)?;
-    if (previous.zoom - ui.settings.zoom).abs() > f64::EPSILON {
-        window::apply_zoom(&window, ui.settings.zoom);
+    apply_changed_settings(&window, &state, Some(&previous), previous_locale, &ui);
+    Ok(ui)
+}
+
+/// Applies what Rust controls after the interface settings changed: the
+/// zoom of the webview and the language of the menu.
+pub(crate) fn apply_changed_settings<R: Runtime>(
+    window: &WebviewWindow<R>,
+    state: &AppState,
+    previous: Option<&UiSettings>,
+    previous_locale: Locale,
+    ui: &UiState,
+) {
+    if previous.is_some_and(|previous| (previous.zoom - ui.settings.zoom).abs() > f64::EPSILON) {
+        window::apply_zoom(window, ui.settings.zoom);
     }
     if previous_locale != ui.locale {
-        refresh_menu(window.app_handle(), &state);
+        refresh_menu(window.app_handle(), state);
     }
-    Ok(ui)
 }
 
 /// Registers the channel for menu clicks and close requests.

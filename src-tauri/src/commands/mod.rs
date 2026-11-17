@@ -18,6 +18,7 @@ pub mod media;
 pub mod mesh;
 pub mod recovery;
 pub mod search;
+pub mod settings;
 pub mod structure;
 pub mod system;
 pub mod ui;
@@ -182,6 +183,12 @@ pub const COMMAND_NAMES: &[&str] = &[
     "theme_import",
     "theme_remove",
     "link_open",
+    "settings_export",
+    "settings_import_preview",
+    "settings_import_apply",
+    "settings_reset",
+    "system_locations",
+    "system_open_location",
 ];
 
 /// The invoke handler with every app command.
@@ -341,5 +348,11 @@ pub fn handler<R: Runtime>() -> impl Fn(Invoke<R>) -> bool + Send + Sync + 'stat
         ui::theme_import,
         ui::theme_remove,
         links::link_open,
+        settings::settings_export,
+        settings::settings_import_preview,
+        settings::settings_import_apply,
+        settings::settings_reset,
+        system::system_locations,
+        system::system_open_location,
     ]
 }

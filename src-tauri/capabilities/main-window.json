@@ -157,6 +157,12 @@
     "allow-media-import-folder",
     "allow-media-import-bytes",
     "allow-media-import-commit",
-    "allow-media-import-cancel"
+    "allow-media-import-cancel",
+    "allow-settings-export",
+    "allow-settings-import-preview",
+    "allow-settings-import-apply",
+    "allow-settings-reset",
+    "allow-system-locations",
+    "allow-system-open-location"
   ]
 }

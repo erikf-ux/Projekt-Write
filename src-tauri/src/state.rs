@@ -14,6 +14,7 @@ use crate::services::locale;
 use crate::services::opening::OpenQueue;
 use crate::services::session::{AppDirs, LibrarySession};
 use crate::services::settings::app::AppSettingsStore;
+use crate::services::settings::transfer::SettingsTransfer;
 use crate::services::ui::UiService;
 
 pub struct AppState {
@@ -45,6 +46,11 @@ pub struct AppState {
     /// The LanguageTool add-on (ADR 0026) and its folder dialog.
     pub language_tool: Arc<LanguageTool>,
     pub language_folders: Arc<dyn FolderPicker>,
+    /// Export, import and reset of the settings (ADR 0027) and their
+    /// dialogs: the system dialogs, in e2e builds the answers of
+    /// `PW_E2E_PICK_SETTINGS`.
+    pub settings_transfer: SettingsTransfer,
+    pub settings_files: Arc<dyn FilePicker>,
     /// In-memory database for the system check while no library is open
     /// (the bundled SQLite is checked either way).
     probe: Database,
@@ -85,6 +91,8 @@ impl AppState {
             language_files: Arc::clone(&files),
             language_tool,
             language_folders: Arc::clone(&picker),
+            settings_transfer: SettingsTransfer::default(),
+            settings_files: Arc::clone(&files),
             language,
             picker,
             files,

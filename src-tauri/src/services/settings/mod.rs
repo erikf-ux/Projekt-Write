@@ -4,7 +4,9 @@
 //!   needed before a library is open.
 //! * [`library`]: library-wide settings in `application_settings`.
 //! * [`ui`]: interface settings and window state (part of `settings.json`).
+//! * [`transfer`]: export, import and reset (`.pwsettings`, ADR 0027).
 
 pub mod app;
 pub mod library;
+pub mod transfer;
 pub mod ui;

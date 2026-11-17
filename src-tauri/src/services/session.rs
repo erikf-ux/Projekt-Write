@@ -541,6 +541,36 @@ impl LibrarySession {
         }
     }
 
+    /// Runs `operation` with the database and the id of the open library,
+    /// or with none while no library is open (export, import and reset of
+    /// the settings, ADR 0027). The library stays locked meanwhile.
+    pub async fn with_library_database<T, F, Fut>(&self, operation: F) -> Result<T, CommandError>
+    where
+        F: FnOnce(Option<(Database, String)>) -> Fut,
+        Fut: std::future::Future<Output = Result<T, CommandError>>,
+    {
+        let slot = self.slot.lock().await;
+        let library = match &*slot {
+            Slot::Open { library, .. } => Some((
+                library.database().clone(),
+                library.manifest().id.hyphenated().to_string(),
+            )),
+            Slot::Moving => return Err(CommandError::new(ErrorCode::LibraryBusy)),
+            Slot::Closed { .. } => None,
+        };
+        let result = operation(library).await;
+        drop(slot);
+        result
+    }
+
+    /// The folder of the open library.
+    pub async fn library_path(&self) -> Option<PathBuf> {
+        match &*self.slot.lock().await {
+            Slot::Open { library, .. } => Some(library.path().to_path_buf()),
+            Slot::Closed { .. } | Slot::Moving => None,
+        }
+    }
+
     /// `Dokumente/ProjectWrite`, if the system has a documents folder.
     pub fn default_location(&self) -> Option<LocationChoice> {
         let documents = self.dirs.documents.as_ref()?;
