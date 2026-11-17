@@ -9,7 +9,7 @@
  * of the node, Entf removes a selected confirmed connection, Backspace or
  * Escape goes back, + and - zoom, 0 fits, Ctrl+Z undoes.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type MessageKey, useT } from '@/i18n';
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/ContextMenu';
 import { useWorkspace } from '@/modules/documents/workspaceStore';
@@ -20,9 +20,8 @@ import type { MeshPosition } from '@/types/generated/MeshPosition';
 import { UNASSIGNED, useMesh } from './meshStore';
 import { SuggestionsPanel } from './SuggestionsPanel';
 import { useSuggestions } from './suggestionStore';
-import type { MeshCanvasControl } from './renderer';
-
-const MeshCanvas = lazy(() => import('./MeshCanvas'));
+import { MESH_RENDERER, type MeshCanvasControl } from './renderer';
+import { registries } from '@/extensions/registries';
 
 type Direction = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight';
 
@@ -76,6 +75,9 @@ function nearestOnSide(
 }
 
 export function MeshPanel({ hidden }: { hidden: boolean }) {
+  // The renderer comes from the registry (ADR 0027); the entry and its
+  // component stay the same for the life of the app.
+  const MeshCanvas = registries.meshRenderers.require(MESH_RENDERER).component;
   const t = useT();
   const mesh = useMesh();
   const { graph, place, selected, selectedEdge } = mesh;

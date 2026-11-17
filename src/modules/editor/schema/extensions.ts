@@ -26,6 +26,7 @@ import {
   MarkdownTaskList,
 } from './markdownRules';
 import { Footnotes, RawBlock, RawInline } from './raw';
+import { schemaExtensions } from '../features';
 
 /** Web links the app may open (section 12). */
 export const LINK_PROTOCOLS = ['http', 'https', 'mailto'] as const;
@@ -51,7 +52,14 @@ export function isWebAddress(text: string): boolean {
   return /^(?:https?:\/\/|mailto:|www\.)\S/i.test(text) || /^[^\s@:/]+@[^\s@:/]+\.[^\s@:/]+$/.test(text);
 }
 
-export function markdownExtensions(): AnyExtension[] {
+/*
+ * The Markdown schema in groups; `src/extensions/builtin.ts` registers them
+ * as editor features in this order (Tiptap and the Markdown tokenizers
+ * depend on it), and `markdownExtensions()` reads them back.
+ */
+
+/** Paragraphs, headings, emphasis, code, quotes and rules. */
+export function coreTextExtensions(): AnyExtension[] {
   return [
     StarterKit.configure({
       // An empty paragraph at the end would change the saved file.
@@ -74,9 +82,16 @@ export function markdownExtensions(): AnyExtension[] {
     MarkdownHardBreak,
     MarkdownCode,
     MarkdownCodeBlock,
-    MarkdownBulletList,
-    MarkdownOrderedList,
-    MarkdownListItem,
+  ];
+}
+
+export function listExtensions(): AnyExtension[] {
+  return [MarkdownBulletList, MarkdownOrderedList, MarkdownListItem];
+}
+
+/** Web and internal links, and images inside links. */
+export function linkExtensions(): AnyExtension[] {
+  return [
     MarkdownLink.configure({
       openOnClick: false,
       autolink: true,
@@ -86,15 +101,37 @@ export function markdownExtensions(): AnyExtension[] {
       HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: null },
     }),
     LinkedImages,
-    Entities,
-    MarkdownTaskList,
-    MarkdownTaskItem.configure({ nested: true }),
-    TableKit.configure({ table: false }),
-    MarkdownTable.configure({ resizable: false }),
-    Image,
-    RawBlock,
-    RawInline,
-    Footnotes,
-    LanguagePart,
   ];
+}
+
+/** Character references such as `&amp;`. */
+export function entityExtensions(): AnyExtension[] {
+  return [Entities];
+}
+
+export function taskListExtensions(): AnyExtension[] {
+  return [MarkdownTaskList, MarkdownTaskItem.configure({ nested: true })];
+}
+
+export function tableExtensions(): AnyExtension[] {
+  return [TableKit.configure({ table: false }), MarkdownTable.configure({ resizable: false })];
+}
+
+export function imageExtensions(): AnyExtension[] {
+  return [Image];
+}
+
+/** Raw HTML and footnotes, kept as atoms. */
+export function rawExtensions(): AnyExtension[] {
+  return [RawBlock, RawInline, Footnotes];
+}
+
+/** Parts of the text in another language (the `lang` mark). */
+export function languagePartExtensions(): AnyExtension[] {
+  return [LanguagePart];
+}
+
+/** The Markdown schema (also the schema of `.pwrite` rich text), from the editor features. */
+export function markdownExtensions(): AnyExtension[] {
+  return schemaExtensions('markdown');
 }

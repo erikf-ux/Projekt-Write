@@ -1,7 +1,8 @@
 /**
  * The app: first start (language and library) until a library is open,
- * then the workbench. Commands, shortcuts, native menu and overlays are
- * set up here once.
+ * then the workbench. Shortcuts, native menu and overlays are set up here
+ * once; the commands are registered in `main.tsx`, after the registries
+ * they are made from.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { create } from 'zustand';
@@ -9,7 +10,7 @@ import { NoticeBar } from '@/components/NoticeBar';
 import { useLocale, useT } from '@/i18n';
 import { CommandPalette, type PaletteEntry } from '@/modules/commands/CommandPalette';
 import { formatChord } from '@/modules/commands/keymap';
-import { availableCommands, findCommand, registerCommands, runCommand } from '@/modules/commands/registry';
+import { availableCommands, findCommand, runCommand } from '@/modules/commands/registry';
 import { installShortcuts } from '@/modules/commands/shortcuts';
 import type { CommandCategory } from '@/modules/commands/types';
 import { DropZone } from '@/modules/documents/DropZone';
@@ -24,13 +25,9 @@ import type { MenuItemState } from '@/types/generated/MenuItemState';
 import { currentBindings } from './bindings';
 import { ClosePrompt } from './ClosePrompt';
 import { PromptDialog } from '@/components/prompt/PromptDialog';
-import { createFormatCommands } from './formatCommands';
-import { createAppCommands } from './commands';
 import { requestQuit } from './lifecycle';
 import { StartScreen } from './StartScreen';
 import { Workbench } from './Workbench';
-
-registerCommands([...createAppCommands(), ...createFormatCommands()]);
 
 /** Whether this session started without an open library (first start). */
 const useFirstStart = create<{ seen: boolean }>(() => ({ seen: false }));
