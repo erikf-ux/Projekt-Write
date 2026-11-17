@@ -21,6 +21,7 @@ use crate::services::external::{
     ExternalError, ExternalFileInfo, ExternalFiles, ExternalText, FileCheck, MAX_FILE_BYTES,
     RecentFileEntry, SaveOutcome, SaveRequest,
 };
+use crate::services::formats::DocumentFormats;
 use crate::services::import;
 use crate::services::locale::Locale;
 use crate::state::AppState;
@@ -168,15 +169,14 @@ pub async fn external_open(
 ) -> Result<Option<ExternalFileInfo>, CommandError> {
     let request = request.into_inner();
     let locale = state.ui.locale();
+    let formats = &state.extensions.document_formats;
     let pick = FilePickRequest {
         title: request.title,
         start_in: last_folder(&state.external),
         file_name: None,
         filters: vec![FileFilter {
-            name: open_filter_name(locale).to_owned(),
-            extensions: ["txt", "md", "markdown", "pwrite"]
-                .map(str::to_owned)
-                .to_vec(),
+            name: open_filter_name(formats, locale),
+            extensions: formats.accepted_extensions().map(str::to_owned).collect(),
         }],
     };
     let answer = state.files.pick_file(FileDialog::Open, pick);
@@ -253,10 +253,7 @@ pub async fn external_save_as(
         file_name: current
             .file_name()
             .map(|name| name.to_string_lossy().into_owned()),
-        filters: vec![FileFilter {
-            name: format_filter_name(format, locale).to_owned(),
-            extensions: extensions(format).iter().map(|e| (*e).to_owned()).collect(),
-        }],
+        filters: vec![format_filter(format, locale)],
     };
     let answer = state.files.pick_file(FileDialog::Save, pick);
     let Ok(Some(target)) = answer.await else {
@@ -433,28 +430,30 @@ fn last_folder(external: &ExternalFiles) -> Option<PathBuf> {
         .and_then(|path| path.parent().map(PathBuf::from))
 }
 
-fn extensions(format: DocumentFormat) -> &'static [&'static str] {
-    match format {
-        DocumentFormat::Txt => &["txt"],
-        DocumentFormat::Md => &["md", "markdown"],
-        DocumentFormat::Pwrite => &["pwrite"],
-    }
+/// "Dokumente (.txt, .md, .pwrite)": the main extension of every
+/// registered format.
+fn open_filter_name(formats: &DocumentFormats, locale: Locale) -> String {
+    let extensions: Vec<String> = formats
+        .iter()
+        .map(|entry| format!(".{}", entry.extension))
+        .collect();
+    let label = match locale {
+        Locale::De => "Dokumente",
+        Locale::En => "Documents",
+    };
+    format!("{label} ({})", extensions.join(", "))
 }
 
-fn open_filter_name(locale: Locale) -> &'static str {
-    match locale {
-        Locale::De => "Dokumente (.txt, .md, .pwrite)",
-        Locale::En => "Documents (.txt, .md, .pwrite)",
-    }
-}
-
-fn format_filter_name(format: DocumentFormat, locale: Locale) -> &'static str {
-    match (format, locale) {
-        (DocumentFormat::Txt, Locale::De) => "Textdatei (.txt)",
-        (DocumentFormat::Txt, Locale::En) => "Text file (.txt)",
-        (DocumentFormat::Md, _) => "Markdown (.md)",
-        (DocumentFormat::Pwrite, Locale::De) => "Rich Text (.pwrite)",
-        (DocumentFormat::Pwrite, Locale::En) => "Rich text (.pwrite)",
+/// The save filter of one format, from its registry entry.
+fn format_filter(format: DocumentFormat, locale: Locale) -> FileFilter {
+    let entry = format.spec();
+    FileFilter {
+        name: entry.filter_name.get(locale).to_owned(),
+        extensions: entry
+            .accepted_extensions
+            .iter()
+            .map(|extension| (*extension).to_owned())
+            .collect(),
     }
 }
 
@@ -482,5 +481,31 @@ pub(crate) fn external_error(error: ExternalError) -> CommandError {
             log::warn!("external file: {error}");
             CommandError::new(ErrorCode::FileSystem)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::extensions;
+
+    /// The dialog filters come from the registry and read as before it.
+    #[test]
+    fn dialog_filters_come_from_the_format_registry() {
+        let formats = &extensions::shared().document_formats;
+        assert_eq!(
+            open_filter_name(formats, Locale::De),
+            "Dokumente (.txt, .md, .pwrite)"
+        );
+        assert_eq!(
+            open_filter_name(formats, Locale::En),
+            "Documents (.txt, .md, .pwrite)"
+        );
+        let markdown = format_filter(DocumentFormat::Md, Locale::De);
+        assert_eq!(markdown.name, "Markdown (.md)");
+        assert_eq!(markdown.extensions, ["md", "markdown"]);
+        let pwrite = format_filter(DocumentFormat::Pwrite, Locale::En);
+        assert_eq!(pwrite.name, "Rich text (.pwrite)");
+        assert_eq!(pwrite.extensions, ["pwrite"]);
     }
 }

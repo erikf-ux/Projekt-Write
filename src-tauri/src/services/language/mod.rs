@@ -2,7 +2,8 @@
 //!
 //! The engines sit behind [`engine::LanguageEngine`]: the spelling check
 //! with Hunspell dictionaries (`spellbook`, ADR 0023), the simple rules and,
-//! as an add-on, LanguageTool. The check runs paragraph by paragraph on the
+//! as an add-on, LanguageTool. A check runs them through their registry
+//! ([`engines`], ADR 0027). The check runs paragraph by paragraph on the
 //! blocking pool, never on the input path; the editor keeps a cache and
 //! maps the findings back to its positions (UTF-16 offsets).
 
@@ -10,6 +11,7 @@ pub mod autocorrect;
 pub mod detect;
 pub mod dictionaries;
 pub mod engine;
+pub mod engines;
 pub mod languagetool;
 pub mod own;
 pub mod rules;
@@ -24,8 +26,10 @@ use ts_rs::TS;
 
 use self::autocorrect::{Blocked, Candidate, Lexicon, Span};
 use self::dictionaries::{DictionaryStore, LanguageDictionary};
-use self::engine::{EngineError, FindingKind, LanguageEngine, OwnWords, RawFinding};
+use self::engine::{EngineError, FindingKind, OwnWords, RawFinding};
+use self::engines::{AddOns, CheckRun};
 use self::spelling::{MAX_SUGGESTIONS, SpellingEngine, is_correct, order_suggestions};
+use crate::services::extensions;
 
 /// A finding as the editor gets it: UTF-16 offsets into the checked text.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -157,9 +161,11 @@ impl LanguageService {
         self.store.languages()
     }
 
-    /// Checks one text in one language. A language without a dictionary
-    /// only gets the rules. A word that is correct in one of `also` (the
-    /// other languages of the document's profile) is not flagged.
+    /// Checks one text in one language with the registered engines, in
+    /// their order. A language without a dictionary only gets the rules. A
+    /// word that is correct in one of `also` (the other languages of the
+    /// document's profile) is not flagged. `add_ons` are the add-on engines
+    /// that run now.
     pub fn check(
         &self,
         text: &str,
@@ -167,40 +173,24 @@ impl LanguageService {
         also: &[String],
         own: &OwnWords,
         parts: CheckParts,
-        addon: Option<&dyn LanguageEngine>,
+        add_ons: &AddOns<'_>,
     ) -> CheckedText {
         let dictionary = self.store.resolve(language);
-        let mut raw = Vec::new();
-        if parts.spelling && dictionary.is_some() {
-            match self.spelling.check(text, language, own) {
-                Ok(found) => raw.extend(found.into_iter().filter(|finding| {
-                    let word = &text[finding.start..finding.end];
-                    !also
-                        .iter()
-                        .filter(|other| other.as_str() != language)
-                        .any(|other| self.is_correct(word, other, own).unwrap_or(false))
-                })),
-                Err(error) => log::warn!("spelling check failed: {error}"),
-            }
+        let mut run = CheckRun {
+            service: self,
+            text,
+            language,
+            also,
+            own,
+            parts,
+            has_dictionary: dictionary.is_some(),
+            add_ons,
+            found: Vec::new(),
+        };
+        for engine in &extensions::shared().language_engines {
+            engine.run(&mut run);
         }
-        if parts.rules {
-            raw.extend(rules::check(text, language));
-        }
-        // The add-on (LanguageTool): grammar, punctuation, context. A place
-        // a simple rule already found is not underlined twice.
-        if let Some(addon) = addon {
-            match addon.check(text, language, own) {
-                Ok(found) => {
-                    let known: Vec<(usize, usize)> = raw.iter().map(|f| (f.start, f.end)).collect();
-                    raw.extend(found.into_iter().filter(|f| {
-                        !known
-                            .iter()
-                            .any(|&(start, end)| f.start < end && start < f.end)
-                    }));
-                }
-                Err(error) => log::warn!("{} failed: {error}", addon.name()),
-            }
-        }
+        let mut raw = run.found;
         raw.sort_by_key(|f| (f.start, f.end));
         CheckedText {
             language: language.to_owned(),
@@ -299,6 +289,7 @@ pub fn span_of(code: bool, link: bool, quote: bool, other_language: bool) -> Spa
 mod tests {
     use std::path::PathBuf;
 
+    use super::engine::LanguageEngine;
     use super::*;
 
     pub(crate) fn service() -> LanguageService {
@@ -317,7 +308,14 @@ mod tests {
     #[test]
     fn findings_come_in_utf_16_offsets() {
         let text = "😀 Größe Fesnter  gut.";
-        let checked = service().check(text, "de-DE", &[], &OwnWords::default(), ALL, None);
+        let checked = service().check(
+            text,
+            "de-DE",
+            &[],
+            &OwnWords::default(),
+            ALL,
+            &AddOns::none(),
+        );
         let units: Vec<u16> = text.encode_utf16().collect();
         let shown: Vec<String> = checked
             .findings
@@ -336,7 +334,7 @@ mod tests {
             &[],
             &OwnWords::default(),
             ALL,
-            None,
+            &AddOns::none(),
         );
         assert_eq!(checked.dictionary, None);
         assert_eq!(checked.findings.len(), 2, "{:?}", checked.findings);
@@ -354,7 +352,7 @@ mod tests {
             &[],
             &OwnWords::default(),
             only_rules,
-            None,
+            &AddOns::none(),
         );
         assert_eq!(
             checked
@@ -370,9 +368,16 @@ mod tests {
     fn a_word_of_another_profile_language_is_not_flagged() {
         let text = "Das Spreadsheet war kurz.";
         let none = OwnWords::default();
-        let alone = service().check(text, "de-DE", &[], &none, ALL, None);
+        let alone = service().check(text, "de-DE", &[], &none, ALL, &AddOns::none());
         assert_eq!(alone.findings.len(), 1);
-        let both = service().check(text, "de-DE", &["en-GB".to_owned()], &none, ALL, None);
+        let both = service().check(
+            text,
+            "de-DE",
+            &["en-GB".to_owned()],
+            &none,
+            ALL,
+            &AddOns::none(),
+        );
         assert!(both.findings.is_empty());
     }
 
@@ -419,7 +424,7 @@ mod tests {
             &[],
             &OwnWords::default(),
             ALL,
-            Some(&Addon),
+            &AddOns::none().with(engines::LANGUAGETOOL, &Addon),
         );
         let rules: Vec<&str> = checked.findings.iter().map(|f| f.rule.as_str()).collect();
         assert_eq!(rules, ["lt:AGREEMENT", "doubleSpace"]);

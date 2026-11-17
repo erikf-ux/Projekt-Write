@@ -30,6 +30,8 @@ use crate::database::Database;
 use crate::database::documents::{self as rows, DocumentRow};
 use crate::filesystem::atomic;
 use crate::security::paths::{PathError, SafeRoot};
+use crate::services::extensions;
+use crate::services::formats::FormatEntry;
 use crate::services::history::{History, HistoryError, VersionKind, VersionSummary};
 use crate::services::pwrite;
 use crate::services::recovery::{self, Drafts};
@@ -54,13 +56,8 @@ pub enum DocumentFormat {
 }
 
 impl DocumentFormat {
-    pub const ALL: [DocumentFormat; 3] = [
-        DocumentFormat::Txt,
-        DocumentFormat::Md,
-        DocumentFormat::Pwrite,
-    ];
-
-    /// Value of the `format` column.
+    /// The id of the format in the registry; also the value of the
+    /// `format` column and the serde name.
     pub const fn as_str(self) -> &'static str {
         match self {
             DocumentFormat::Txt => "txt",
@@ -69,24 +66,38 @@ impl DocumentFormat {
         }
     }
 
+    /// The registered format with this id.
     pub fn parse(value: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|format| format.as_str() == value)
+        extensions::shared().document_formats.by_id(value)
+    }
+
+    /// The registered formats in registration order.
+    pub fn all() -> impl Iterator<Item = DocumentFormat> {
+        extensions::shared().document_formats.formats()
+    }
+
+    /// The registry entry of this format: everything decided by format.
+    pub fn spec(self) -> &'static FormatEntry {
+        extensions::shared().document_formats.spec(self)
     }
 
     /// Folder of the files, relative to the library root.
-    pub const fn directory(self) -> &'static str {
-        match self {
-            DocumentFormat::Txt => "documents/text",
-            DocumentFormat::Md => "documents/markdown",
-            DocumentFormat::Pwrite => "documents/richtext",
-        }
+    pub fn directory(self) -> &'static str {
+        self.spec().directory
     }
 
     /// File extension (equal to the column value).
-    pub const fn extension(self) -> &'static str {
-        self.as_str()
+    pub fn extension(self) -> &'static str {
+        self.spec().extension
+    }
+
+    /// Rich text: editor JSON in a `.pwrite` envelope, not plain UTF-8 text.
+    pub fn is_rich_text(self) -> bool {
+        self.spec().is_rich_text()
+    }
+
+    pub fn is_markdown(self) -> bool {
+        self.spec().is_markdown()
     }
 
     /// `documents/<folder>/<id>.<ext>`.
@@ -271,7 +282,7 @@ impl DocumentRepository {
         content: &[u8],
         original_name: &str,
     ) -> Result<DocumentMeta, DocumentError> {
-        if format != DocumentFormat::Pwrite {
+        if !format.is_rich_text() {
             return self
                 .insert_new(title, format, content, Some(original_name.to_owned()))
                 .await;
@@ -495,7 +506,7 @@ impl DocumentRepository {
         if meta.deleted_at.is_some() {
             return Err(DocumentError::InTrash);
         }
-        if meta.format != DocumentFormat::Pwrite {
+        if !meta.format.is_rich_text() {
             return self.insert_new(title, meta.format, &content, None).await;
         }
         // The envelope of the copy names the copy.
@@ -529,7 +540,7 @@ impl DocumentRepository {
     ) -> Result<SaveOutcome, DocumentError> {
         pwrite::check_content(&content).map_err(|_| DocumentError::InvalidPwrite)?;
         let (meta, stored) = self.read(id).await?;
-        if meta.format != DocumentFormat::Pwrite {
+        if !meta.format.is_rich_text() {
             return Err(DocumentError::InvalidPwrite);
         }
         let pwrite::Parsed::Current(mut file) =
@@ -607,7 +618,7 @@ impl DocumentRepository {
         if meta.format == format {
             return Err(DocumentError::SameFormat);
         }
-        if meta.format == DocumentFormat::Pwrite
+        if meta.format.is_rich_text()
             && matches!(pwrite::parse(&stored), Ok(pwrite::Parsed::Newer { .. }))
         {
             return Err(DocumentError::ReadOnly);
@@ -624,7 +635,7 @@ impl DocumentRepository {
             )
             .await?;
         let now = self.generators.now().to_iso();
-        let data = if format == DocumentFormat::Pwrite {
+        let data = if format.is_rich_text() {
             let value: serde_json::Value =
                 serde_json::from_slice(content).map_err(|_| DocumentError::InvalidPwrite)?;
             pwrite::check_content(&value).map_err(|_| DocumentError::InvalidPwrite)?;
@@ -721,7 +732,7 @@ impl DocumentRepository {
     /// Whether `text` (as the editor holds it) is what the document stores.
     pub async fn matches_stored(&self, id: Uuid, text: &str) -> Result<bool, DocumentError> {
         let (meta, content) = self.read(id).await?;
-        if meta.format != DocumentFormat::Pwrite {
+        if !meta.format.is_rich_text() {
             return Ok(content == text.as_bytes());
         }
         let Ok(draft) = serde_json::from_str::<serde_json::Value>(text) else {
@@ -749,7 +760,7 @@ impl DocumentRepository {
                 &current,
             )
             .await?;
-        let outcome = if meta.format == DocumentFormat::Pwrite {
+        let outcome = if meta.format.is_rich_text() {
             let content: serde_json::Value =
                 serde_json::from_str(text).map_err(|_| DocumentError::InvalidPwrite)?;
             self.save_pwrite(meta.id, content).await?
@@ -830,7 +841,7 @@ impl DocumentRepository {
             }
         };
         if format == meta.format {
-            if format == DocumentFormat::Pwrite {
+            if format.is_rich_text() {
                 return Ok(self
                     .save_pwrite(meta.id, pwrite_content()?)
                     .await?
@@ -839,7 +850,7 @@ impl DocumentRepository {
             }
             return Ok(self.save(meta.id, content).await?.meta().clone());
         }
-        let converted = if format == DocumentFormat::Pwrite {
+        let converted = if format.is_rich_text() {
             serde_json::to_vec(&pwrite_content()?).map_err(|_| DocumentError::InvalidPwrite)?
         } else {
             content.to_vec()
@@ -853,7 +864,7 @@ impl DocumentRepository {
     pub async fn document_at(&self, path: &Path) -> Option<DocumentMeta> {
         let path = std::fs::canonicalize(path).ok()?;
         let name = path.file_name()?.to_str()?;
-        for format in DocumentFormat::ALL {
+        for format in DocumentFormat::all() {
             let Some(id) = format.id_from_file_name(name) else {
                 continue;
             };
@@ -1062,25 +1073,28 @@ pub fn references_in(format: DocumentFormat, content: &[u8]) -> References {
 }
 
 /// The media a content uses (`pwmedia://<id>`, optionally `#page=<n>`),
-/// sorted and without repeats. Markdown is searched as text, `.pwrite`
-/// through image sources and link marks.
+/// sorted and without repeats, read as the format's registry entry says.
 pub fn media_in(format: DocumentFormat, content: &[u8]) -> Vec<(String, u32)> {
+    (format.spec().media)(content)
+}
+
+/// The media of Markdown, searched as text.
+pub(crate) fn markdown_media(content: &[u8]) -> Vec<(String, u32)> {
     let mut uses = std::collections::BTreeSet::new();
-    match format {
-        DocumentFormat::Txt => {}
-        DocumentFormat::Md => {
-            let text = String::from_utf8_lossy(content);
-            for (index, _) in text.match_indices(MEDIA_PREFIX) {
-                if let Some(found) = media_target(&text[index..]) {
-                    uses.insert(found);
-                }
-            }
+    let text = String::from_utf8_lossy(content);
+    for (index, _) in text.match_indices(MEDIA_PREFIX) {
+        if let Some(found) = media_target(&text[index..]) {
+            uses.insert(found);
         }
-        DocumentFormat::Pwrite => {
-            if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
-                collect_media(&file.content, &mut uses);
-            }
-        }
+    }
+    uses.into_iter().collect()
+}
+
+/// The media of a `.pwrite` file: image sources and link marks.
+pub(crate) fn pwrite_media(content: &[u8]) -> Vec<(String, u32)> {
+    let mut uses = std::collections::BTreeSet::new();
+    if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
+        collect_media(&file.content, &mut uses);
     }
     uses.into_iter().collect()
 }
@@ -1141,25 +1155,28 @@ fn collect_media(node: &serde_json::Value, uses: &mut std::collections::BTreeSet
 }
 
 /// The documents a content links to (`pwrite://<id>`), sorted and without
-/// repeats. Plain text has no links; Markdown is searched as text, `.pwrite`
-/// through the link marks of its content.
+/// repeats, read as the format's registry entry says (plain text has none).
 pub fn links_in(format: DocumentFormat, content: &[u8]) -> Vec<String> {
+    (format.spec().links)(content)
+}
+
+/// The links of Markdown, searched as text.
+pub(crate) fn markdown_links(content: &[u8]) -> Vec<String> {
     let mut targets = std::collections::BTreeSet::new();
-    match format {
-        DocumentFormat::Txt => {}
-        DocumentFormat::Md => {
-            let text = String::from_utf8_lossy(content);
-            for (index, _) in text.match_indices(INTERNAL_LINK_PREFIX) {
-                if let Some(id) = link_target(&text[index..]) {
-                    targets.insert(id);
-                }
-            }
+    let text = String::from_utf8_lossy(content);
+    for (index, _) in text.match_indices(INTERNAL_LINK_PREFIX) {
+        if let Some(id) = link_target(&text[index..]) {
+            targets.insert(id);
         }
-        DocumentFormat::Pwrite => {
-            if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
-                collect_link_marks(&file.content, &mut targets);
-            }
-        }
+    }
+    targets.into_iter().collect()
+}
+
+/// The links of a `.pwrite` file: the link marks of its content.
+pub(crate) fn pwrite_links(content: &[u8]) -> Vec<String> {
+    let mut targets = std::collections::BTreeSet::new();
+    if let Ok(pwrite::Parsed::Current(file)) = pwrite::parse(content) {
+        collect_link_marks(&file.content, &mut targets);
     }
     targets.into_iter().collect()
 }

@@ -338,7 +338,7 @@ fn external_matches(draft: &Draft, path: &Path) -> bool {
     let Ok(data) = std::fs::read(path) else {
         return false;
     };
-    if draft.format == DocumentFormat::Pwrite {
+    if draft.format.is_rich_text() {
         let Ok(text) = serde_json::from_str::<serde_json::Value>(&draft.text) else {
             return false;
         };
@@ -390,7 +390,7 @@ pub async fn recovery_restore(
                         .map(|stem| stem.to_string_lossy().into_owned())
                         .filter(|stem| !stem.trim().is_empty())
                         .unwrap_or_else(|| "Wiederhergestellt".to_owned());
-                    let meta = if draft.format == DocumentFormat::Pwrite {
+                    let meta = if draft.format.is_rich_text() {
                         let content: serde_json::Value = serde_json::from_str(&draft.text)
                             .map_err(|_| CommandError::new(ErrorCode::PwriteInvalid))?;
                         documents.create_pwrite(&title, language, content).await

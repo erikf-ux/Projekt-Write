@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -17,6 +18,7 @@ use crate::services::dialog::{FileDialog, FileFilter, FilePickRequest, PickReque
 use crate::services::language::autocorrect::{Blocked, Candidate, Span};
 use crate::services::language::dictionaries::{ImportError, LanguageDictionary, is_tag};
 use crate::services::language::engine::{LanguageEngine, OwnWords};
+use crate::services::language::engines::{self, AddOns};
 use crate::services::language::languagetool::{LanguageToolStatus, SetupError, ToolState};
 use crate::services::language::own::{
     DocumentLanguage, MAX_NAME_CHARS, MAX_WORD_CHARS, OwnData, OwnDictionary, OwnError, OwnWord,
@@ -24,6 +26,7 @@ use crate::services::language::own::{
 };
 use crate::services::language::{CheckParts, CheckedText, detect};
 use crate::services::locale::Locale;
+use crate::services::registry::RegistryEntry;
 use crate::services::settings::ui::LanguageCheckSettings;
 use crate::state::AppState;
 
@@ -211,6 +214,26 @@ impl Validate for LanguageCheckRequest {
     }
 }
 
+/// The add-on engines of the registry that run now, with their instance:
+/// LanguageTool while the check is on and the add-on runs (ADR 0026).
+fn running_add_ons(
+    state: &AppState,
+    enabled: bool,
+) -> Vec<(&'static str, Arc<dyn LanguageEngine>)> {
+    let mut running: Vec<(&'static str, Arc<dyn LanguageEngine>)> = Vec::new();
+    for entry in state.extensions.language_engines.iter() {
+        if !entry.add_on() || !enabled {
+            continue;
+        }
+        if entry.id() == engines::LANGUAGETOOL
+            && state.language_tool.status().state == ToolState::Running
+        {
+            running.push((entry.id(), state.language_tool.clone()));
+        }
+    }
+    running
+}
+
 /// Checks texts of a document, off the input path (blocking pool).
 #[tauri::command]
 pub async fn language_check(
@@ -228,9 +251,13 @@ pub async fn language_check(
     let service = state.language.clone();
     let default = default_language(&state);
     let detect = settings.detect;
-    let tool = state.language_tool.clone();
-    let use_tool = settings.enabled && tool.status().state == ToolState::Running;
+    let running = running_add_ons(&state, settings.enabled);
     tauri::async_runtime::spawn_blocking(move || {
+        let add_ons = running
+            .iter()
+            .fold(AddOns::none(), |add_ons, (id, engine)| {
+                add_ons.with(id, &**engine)
+            });
         request
             .texts
             .iter()
@@ -243,8 +270,7 @@ pub async fn language_check(
                         None => text.inherit.clone().unwrap_or_else(|| languages[0].clone()),
                     }
                 });
-                let addon: Option<&dyn LanguageEngine> = if use_tool { Some(&*tool) } else { None };
-                service.check(&text.text, &language, &languages, &own, parts, addon)
+                service.check(&text.text, &language, &languages, &own, parts, &add_ons)
             })
             .collect()
     })

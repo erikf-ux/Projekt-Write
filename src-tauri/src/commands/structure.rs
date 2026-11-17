@@ -161,7 +161,7 @@ pub(crate) async fn take_tags(
     format: crate::services::documents::DocumentFormat,
     content: &[u8],
 ) {
-    if format != crate::services::documents::DocumentFormat::Pwrite {
+    if !format.is_rich_text() {
         return;
     }
     let Ok(crate::services::pwrite::Parsed::Current(file)) =

@@ -81,7 +81,7 @@ pub async fn scan_documents(
     let mut scan = DocumentScan::default();
     let mut on_disk: HashSet<(Uuid, DocumentFormat)> = HashSet::new();
 
-    for format in DocumentFormat::ALL {
+    for format in DocumentFormat::all() {
         let folder = format.directory();
         let dir = root.resolve(folder)?;
         let entries = match fs::read_dir(&dir) {

@@ -1,6 +1,10 @@
 //! Exports (Phase 10, section 21, ADR 0021): one document as TXT or
 //! Markdown, the whole library as a folder. The frontend converts `.pwrite`
 //! content; Rust shows the dialogs and writes the files.
+//!
+//! Every export command looks its exporter up in the registry (ADR 0027)
+//! and takes the dialog filter, the suggested name and the writing from
+//! the entry.
 
 use serde::Deserialize;
 use tauri::State;
@@ -11,7 +15,8 @@ use crate::commands::input::{Input, Validate};
 use crate::error::{CommandError, ErrorCode};
 use crate::services::dialog::{FileDialog, FileFilter, FilePickRequest, PickRequest};
 use crate::services::documents::MAX_DOCUMENT_BYTES;
-use crate::services::export::{ExportError, ExportOutcome, ExportPlan, TextKind};
+use crate::services::export::exporters::{self, ExportTarget, Exporter, ExporterError};
+use crate::services::export::{ExportError, ExportOutcome, ExportPlan, Exports};
 use crate::state::AppState;
 
 const MAX_TITLE_CHARS: usize = 200;
@@ -35,6 +40,71 @@ pub(crate) fn export_error(error: ExportError) -> CommandError {
             CommandError::new(ErrorCode::FileSystem)
         }
     }
+}
+
+fn exporter_error(error: ExporterError) -> CommandError {
+    match error {
+        ExporterError::Export(error) => export_error(error),
+        ExporterError::Pack(error) => pack_error(error),
+        ExporterError::WrongTarget(id) => {
+            log::error!("exporter {id} asked for a target it does not write");
+            CommandError::new(ErrorCode::Internal)
+        }
+    }
+}
+
+/// The registered exporter with `id`.
+fn exporter<'a>(state: &'a AppState, id: &str) -> Result<&'a dyn Exporter, CommandError> {
+    state
+        .extensions
+        .exporters
+        .get(id)
+        .map(|exporter| &**exporter)
+        .ok_or_else(|| {
+            log::error!("exporter {id} is not registered");
+            CommandError::new(ErrorCode::Internal)
+        })
+}
+
+/// Asks for the file of a file exporter (the save dialog with its filter
+/// and the document's title as name) and writes `content` to it; `None`
+/// if cancelled.
+async fn export_to_file(
+    state: &AppState,
+    exporter: &dyn Exporter,
+    exports: &Exports,
+    id: Uuid,
+    content: &str,
+    title: String,
+) -> Result<Option<ExportOutcome>, CommandError> {
+    let ExportTarget::File {
+        extension,
+        filter_name,
+    } = exporter.target()
+    else {
+        return Err(exporter_error(ExporterError::WrongTarget(exporter.id())));
+    };
+    let stem = exports.suggested_stem(id).await.map_err(export_error)?;
+    let answer = state.export_files.pick_file(
+        FileDialog::Save,
+        FilePickRequest {
+            title,
+            start_in: None,
+            file_name: Some(exporter.suggested_name(&stem)),
+            filters: vec![FileFilter {
+                name: filter_name.to_owned(),
+                extensions: vec![extension.to_owned()],
+            }],
+        },
+    );
+    let Ok(Some(file)) = answer.await else {
+        return Ok(None);
+    };
+    exporter
+        .export_file(exports, id, content, &file)
+        .await
+        .map(Some)
+        .map_err(exporter_error)
 }
 
 fn parse_uuid(field: &str, id: &str) -> Result<Uuid, CommandError> {
@@ -68,6 +138,16 @@ pub enum ExportFormat {
     Markdown,
 }
 
+impl ExportFormat {
+    /// The id of its exporter in the registry.
+    fn exporter_id(self) -> &'static str {
+        match self {
+            ExportFormat::Txt => exporters::TXT,
+            ExportFormat::Markdown => exporters::MARKDOWN,
+        }
+    }
+}
+
 /// Request of `export_document`: the content as the frontend converted it.
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -96,39 +176,9 @@ pub async fn export_document(
 ) -> Result<Option<ExportOutcome>, CommandError> {
     let request = request.into_inner();
     let id = parse_uuid("id", &request.id)?;
-    let kind = match request.format {
-        ExportFormat::Txt => TextKind::Txt,
-        ExportFormat::Markdown => TextKind::Markdown,
-    };
+    let exporter = exporter(&state, request.format.exporter_id())?;
     let exports = state.session.exports().await?;
-    let suggested = exports
-        .suggested_name(id, kind)
-        .await
-        .map_err(export_error)?;
-    let filter = FileFilter {
-        name: match kind {
-            TextKind::Txt => "Text".to_owned(),
-            TextKind::Markdown => "Markdown".to_owned(),
-        },
-        extensions: vec![kind.extension().to_owned()],
-    };
-    let answer = state.export_files.pick_file(
-        FileDialog::Save,
-        FilePickRequest {
-            title: request.title,
-            start_in: None,
-            file_name: Some(suggested),
-            filters: vec![filter],
-        },
-    );
-    let Ok(Some(file)) = answer.await else {
-        return Ok(None);
-    };
-    exports
-        .export_document(id, &request.text, kind, &file)
-        .await
-        .map(Some)
-        .map_err(export_error)
+    export_to_file(&state, exporter, &exports, id, &request.text, request.title).await
 }
 
 /// A request with the title of the dialog it shows.
@@ -153,6 +203,7 @@ pub async fn export_library_begin(
     request: Input<ExportLibraryRequest>,
 ) -> Result<Option<ExportPlan>, CommandError> {
     let request = request.into_inner();
+    let exporter = exporter(&state, exporters::LIBRARY)?;
     let exports = state.session.exports().await?;
     let answer = state.export_folders.pick_folder(PickRequest {
         title: request.title,
@@ -161,11 +212,11 @@ pub async fn export_library_begin(
     let Ok(Some(parent)) = answer.await else {
         return Ok(None);
     };
-    exports
-        .begin_library_export(&parent)
+    exporter
+        .begin_folder(&exports, &parent)
         .await
         .map(Some)
-        .map_err(export_error)
+        .map_err(exporter_error)
 }
 
 /// Request of `export_library_add`.
@@ -304,35 +355,18 @@ pub async fn export_pack(
 ) -> Result<Option<u32>, CommandError> {
     let request = request.into_inner();
     let id = parse_uuid("id", &request.id)?;
+    let exporter = exporter(&state, exporters::PACK)?;
     let exports = state.session.exports().await?;
-    let suggested = exports
-        .suggested_name(id, TextKind::Markdown)
-        .await
-        .map_err(export_error)?;
-    let stem = suggested.trim_end_matches(".md").to_owned();
-    let answer = state.export_files.pick_file(
-        FileDialog::Save,
-        FilePickRequest {
-            title: request.title,
-            start_in: None,
-            file_name: Some(format!(
-                "{stem}.{}",
-                crate::services::export::pack::EXTENSION
-            )),
-            filters: vec![FileFilter {
-                name: "Project Write Paket".to_owned(),
-                extensions: vec![crate::services::export::pack::EXTENSION.to_owned()],
-            }],
-        },
-    );
-    let Ok(Some(file)) = answer.await else {
-        return Ok(None);
-    };
-    exports
-        .export_pack(request.document.as_bytes(), &file)
-        .await
-        .map(Some)
-        .map_err(pack_error)
+    let outcome = export_to_file(
+        &state,
+        exporter,
+        &exports,
+        id,
+        &request.document,
+        request.title,
+    )
+    .await?;
+    Ok(outcome.map(|outcome| outcome.media))
 }
 
 /// "Paket importieren": a `.pwritepack` from the file dialog; `None` if

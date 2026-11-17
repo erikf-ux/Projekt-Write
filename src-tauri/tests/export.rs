@@ -9,13 +9,20 @@ use std::path::Path;
 
 use project_write_lib::clock::Generators;
 use project_write_lib::services::documents::DocumentFormat;
-use project_write_lib::services::export::{ExportError, TextKind};
+use project_write_lib::services::export::ExportError;
+use project_write_lib::services::export::exporters::{self, Exporter, ExporterError};
+use project_write_lib::services::extensions;
 use project_write_lib::services::library::Library;
 use project_write_lib::services::media::{Decision, SubnetPlacement};
 use project_write_lib::services::pwrite;
 use uuid::Uuid;
 
 const SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="#3a7"/></svg>"##;
+
+/// The registered exporter with `id`: the tests export as the commands do.
+fn exporter(id: &str) -> &'static dyn Exporter {
+    &**extensions::shared().exporters.get(id).unwrap()
+}
 
 async fn create(path: &Path) -> Library {
     Library::create(path, Generators::system()).await.unwrap().0
@@ -95,16 +102,14 @@ async fn a_document_exports_as_markdown_with_its_media() {
         .await
         .unwrap();
     let exports = library.exports();
-    let name = exports
-        .suggested_name(doc.id, TextKind::Markdown)
-        .await
-        .unwrap();
+    let markdown = exporter(exporters::MARKDOWN);
+    let name = markdown.suggested_name(&exports.suggested_stem(doc.id).await.unwrap());
     assert_eq!(name, "Hafen_ Notizen.md");
     let out = dir.path().join("ausgabe");
     fs::create_dir_all(&out).unwrap();
     let file = out.join(&name);
-    let outcome = exports
-        .export_document(doc.id, &text, TextKind::Markdown, &file)
+    let outcome = markdown
+        .export_file(&exports, doc.id, &text, &file)
         .await
         .unwrap();
     assert_eq!(outcome.media, 1);
@@ -125,8 +130,8 @@ async fn a_document_exports_as_markdown_with_its_media() {
 
     // TXT: the text as it is.
     let txt = out.join("Hafen.txt");
-    exports
-        .export_document(doc.id, "Nur Text\n", TextKind::Txt, &txt)
+    exporter(exporters::TXT)
+        .export_file(&exports, doc.id, "Nur Text\n", &txt)
         .await
         .unwrap();
     assert_eq!(fs::read_to_string(&txt).unwrap(), "Nur Text\n");
@@ -134,10 +139,10 @@ async fn a_document_exports_as_markdown_with_its_media() {
     // Inside the library only exports/ is a target.
     let inside = dir.path().join("lib/documents/x.md");
     assert!(matches!(
-        exports
-            .export_document(doc.id, "x", TextKind::Txt, &inside)
+        exporter(exporters::TXT)
+            .export_file(&exports, doc.id, "x", &inside)
             .await,
-        Err(ExportError::TargetInsideLibrary)
+        Err(ExporterError::Export(ExportError::TargetInsideLibrary))
     ));
     library.close().await;
 }
@@ -212,7 +217,10 @@ async fn the_library_exports_as_a_usable_folder() {
     let parent = dir.path().join("exporte");
     fs::create_dir_all(&parent).unwrap();
     let exports = library.exports();
-    let plan = exports.begin_library_export(&parent).await.unwrap();
+    let plan = exporter(exporters::LIBRARY)
+        .begin_folder(&exports, &parent)
+        .await
+        .unwrap();
     assert_eq!(plan.written, 4, "{plan:?}");
     assert_eq!(plan.to_convert.len(), 1);
     assert_eq!(plan.to_convert[0].id, diary.id.to_string());
@@ -278,7 +286,10 @@ async fn the_library_exports_as_a_usable_folder() {
     }
 
     // A cancelled export leaves nothing.
-    let plan = exports.begin_library_export(&parent).await.unwrap();
+    let plan = exporter(exporters::LIBRARY)
+        .begin_folder(&exports, &parent)
+        .await
+        .unwrap();
     assert!(exports.cancel_library_export(Uuid::try_parse(&plan.export_id).unwrap()));
     let hidden: Vec<String> = fs::read_dir(&parent)
         .unwrap()
@@ -287,10 +298,12 @@ async fn the_library_exports_as_a_usable_folder() {
         .collect();
     assert!(hidden.is_empty(), "{hidden:?}");
     assert!(matches!(
-        exports
-            .begin_library_export(&dir.path().join("lib/media"))
+        exporter(exporters::LIBRARY)
+            .begin_folder(&exports, &dir.path().join("lib/media"))
             .await,
-        Err(ExportError::TargetInsideLibrary) | Err(ExportError::Path(_)) | Err(ExportError::Io(_))
+        Err(ExporterError::Export(
+            ExportError::TargetInsideLibrary | ExportError::Path(_) | ExportError::Io(_)
+        ))
     ));
     library.close().await;
 }

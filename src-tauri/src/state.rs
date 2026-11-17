@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::clock::{Generators, Timestamp};
 use crate::database::{Database, DatabaseError};
 use crate::services::dialog::{FilePicker, FolderPicker};
+use crate::services::extensions::{self, Extensions};
 use crate::services::external::ExternalFiles;
 use crate::services::language::LanguageService;
 use crate::services::language::dictionaries::DictionaryStore;
@@ -45,6 +46,9 @@ pub struct AppState {
     /// The LanguageTool add-on (ADR 0026) and its folder dialog.
     pub language_tool: Arc<LanguageTool>,
     pub language_folders: Arc<dyn FolderPicker>,
+    /// The registries of document formats, exporters and checking engines
+    /// (ADR 0027): built once, immutable.
+    pub extensions: Arc<Extensions>,
     /// In-memory database for the system check while no library is open
     /// (the bundled SQLite is checked either way).
     probe: Database,
@@ -59,6 +63,8 @@ impl AppState {
         links: Arc<dyn LinkOpener>,
         generators: Generators,
     ) -> Result<Self, DatabaseError> {
+        // The registries first: everything below may look a format up.
+        let extensions = Arc::clone(extensions::shared());
         let probe = Database::open_in_memory().await?;
         probe.migrate().await?;
         let (settings, outcome) = AppSettingsStore::load(&dirs.config, Timestamp::now());
@@ -91,6 +97,7 @@ impl AppState {
             external,
             opening: OpenQueue::default(),
             links,
+            extensions,
             probe,
         })
     }

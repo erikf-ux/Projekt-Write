@@ -234,7 +234,7 @@ impl Validate for ConvertDocumentRequest {
         if self.text.len() as u64 > MAX_DOCUMENT_BYTES {
             return Err(CommandError::new(ErrorCode::DocumentTooLarge));
         }
-        if self.format == TextFormat::Pwrite {
+        if DocumentFormat::from(self.format).is_rich_text() {
             serde_json::from_str::<serde_json::Value>(&self.text)
                 .map_err(|_| CommandError::invalid_input("text", "not JSON"))?;
         }
@@ -360,7 +360,7 @@ pub async fn document_create(
     state
         .session
         .with_documents(|documents| async move {
-            let meta = if request.format == TextFormat::Pwrite {
+            let meta = if DocumentFormat::from(request.format).is_rich_text() {
                 documents
                     .create_pwrite(&request.title, language, pwrite::empty_content())
                     .await
@@ -392,7 +392,7 @@ pub async fn document_read(
             }
             // Opening in a tab is what "Zuletzt verwendet" lists.
             let meta = documents.mark_opened(id).await.map_err(document_error)?;
-            if meta.format == DocumentFormat::Pwrite {
+            if meta.format.is_rich_text() {
                 let parsed = pwrite::parse(&content)
                     .map_err(|_| CommandError::new(ErrorCode::PwriteInvalid))?;
                 return Ok(DocumentText {
@@ -428,7 +428,7 @@ pub async fn document_save(
                 Some(meta) if meta.deleted_at.is_some() => {
                     return Err(CommandError::new(ErrorCode::DocumentNotFound));
                 }
-                Some(meta) if meta.format == DocumentFormat::Pwrite => {
+                Some(meta) if meta.format.is_rich_text() => {
                     let content: serde_json::Value = serde_json::from_str(&request.text)
                         .map_err(|_| CommandError::invalid_input("text", "not JSON"))?;
                     documents.save_pwrite(id, content).await
@@ -627,7 +627,7 @@ pub async fn document_version_text(
                 .content(id)
                 .await
                 .map_err(history_error)?;
-            let text = if version.format == DocumentFormat::Pwrite {
+            let text = if version.format.is_rich_text() {
                 match pwrite::parse(&content) {
                     Ok(parsed) => serde_json::to_string(parsed.content()).unwrap_or_default(),
                     Err(_) => return Err(CommandError::new(ErrorCode::PwriteInvalid)),

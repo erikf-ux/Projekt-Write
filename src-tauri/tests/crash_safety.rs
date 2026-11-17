@@ -202,7 +202,7 @@ fn spawn_writer(path: &Path, seed: u64) -> (std::process::Child, std::thread::Jo
 /// Every non-temporary file in the document folders is complete.
 fn verify_files_on_disk(path: &Path) -> usize {
     let mut files = 0;
-    for format in DocumentFormat::ALL {
+    for format in DocumentFormat::all() {
         let dir = path.join(format.directory());
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
@@ -296,7 +296,7 @@ fn hard_kills_while_saving_never_damage_the_library() {
             library.close().await;
         });
         // Opening removed every temporary file of the interrupted save.
-        for format in DocumentFormat::ALL {
+        for format in DocumentFormat::all() {
             if let Ok(entries) = fs::read_dir(path.join(format.directory())) {
                 for entry in entries {
                     let name = entry.unwrap().file_name().to_string_lossy().into_owned();

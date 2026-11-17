@@ -10,6 +10,7 @@
 
 use crate::services::documents::{DocumentFormat, validate_title};
 use crate::services::encoding::{self, EncodingError};
+use crate::services::extensions;
 use crate::services::pwrite;
 
 /// Largest file accepted for import (10 MiB; section 9 warns from 10 MB).
@@ -64,7 +65,7 @@ pub fn check(file_name: &str, data: &[u8]) -> Result<CheckedImport, ImportError>
     if data.len() > MAX_IMPORT_BYTES {
         return Err(ImportError::TooLarge);
     }
-    let content = if format == DocumentFormat::Pwrite {
+    let content = if format.is_rich_text() {
         match pwrite::parse(data) {
             Ok(pwrite::Parsed::Current(_)) => data.to_vec(),
             Ok(pwrite::Parsed::Newer { .. }) => return Err(ImportError::NotText("newer .pwrite")),
@@ -80,18 +81,17 @@ pub fn check(file_name: &str, data: &[u8]) -> Result<CheckedImport, ImportError>
     })
 }
 
-/// The positive list: the extension decides the format, the content must
-/// then be text of that kind. Returns the stem and the format.
+/// The positive list: the extension decides the format (looked up in the
+/// registry of document formats), the content must then be text of that
+/// kind. Returns the stem and the format.
 pub fn format_of(file_name: &str) -> Result<(&str, DocumentFormat), ImportError> {
     let (stem, extension) = file_name
         .rsplit_once('.')
         .ok_or(ImportError::UnsupportedType)?;
-    let format = match extension.to_ascii_lowercase().as_str() {
-        "txt" => DocumentFormat::Txt,
-        "md" | "markdown" => DocumentFormat::Md,
-        "pwrite" => DocumentFormat::Pwrite,
-        _ => return Err(ImportError::UnsupportedType),
-    };
+    let format = extensions::shared()
+        .document_formats
+        .by_extension(extension)
+        .ok_or(ImportError::UnsupportedType)?;
     Ok((stem, format))
 }
 
