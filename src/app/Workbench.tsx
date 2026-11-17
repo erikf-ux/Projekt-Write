@@ -48,6 +48,7 @@ import {
   PartLanguageDialog,
 } from '@/modules/language-check/DocumentLanguageDialog';
 import { documentLanguage, useLanguage } from '@/modules/language-check/languageStore';
+import { useLanguageTool } from '@/modules/language-check/languageToolStore';
 import { ImageDialog } from '@/modules/editor/ImageDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
 import { MediaPicker } from '@/modules/editor/MediaPicker';
@@ -98,6 +99,11 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
   const statisticsOpen = useStatistics((state) => state.dialogOpen);
   // Read the profile so the status bar follows a change of it.
   useLanguage((state) => (current ? state.profiles[current.id] : undefined));
+  const toolStatus = useLanguageTool((state) => state.status);
+  // Asks for the add-on once; Rust starts it when it is set up and on.
+  useEffect(() => {
+    void useLanguageTool.getState().refresh();
+  }, []);
   const languageTag = documentLanguage(current && current.external === null ? current.id : null);
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
   const conflicts = useMemo(() => findConflicts(bindings).length, [bindings]);
@@ -392,6 +398,11 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
           language={
             current?.loaded && current.external === null
               ? { tag: languageTag, off: !settings.languageCheck.enabled }
+              : null
+          }
+          languageTool={
+            toolStatus?.configured && toolStatus.enabled && toolStatus.state !== 'off'
+              ? toolStatus.state
               : null
           }
           onLanguage={() => {

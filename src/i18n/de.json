@@ -1029,5 +1029,21 @@
   "language.part.title": "Sprache des markierten Textes",
   "language.part.language": "Sprache",
   "language.part.apply": "Auszeichnen",
-  "language.part.remove": "Auszeichnung entfernen"
+  "language.part.remove": "Auszeichnung entfernen",
+  "error.languageToolNotFound": "Im gewählten Ordner liegt kein LanguageTool-Server (languagetool-server.jar).",
+  "language.tool.title": "LanguageTool (Zusatzpaket)",
+  "language.tool.about": "Grammatik, Zeichensetzung und Kontextfehler über eine vorhandene LanguageTool-Installation (LGPL-2.1, braucht Java 17 und 1 bis 4 GB Arbeitsspeicher). Der Server läuft nur auf diesem Rechner (127.0.0.1); Texte verlassen das Gerät nicht. Ohne LanguageTool funktioniert die App vollständig.",
+  "language.tool.none": "Keine Installation gewählt.",
+  "language.tool.off": "Ausgeschaltet.",
+  "language.tool.starting": "Wird gestartet …",
+  "language.tool.running": "Läuft.",
+  "language.tool.failed": "Der Server ist nicht gestartet oder wurde beendet; die Rechtschreibprüfung läuft weiter.",
+  "language.tool.noJava": "Java 17 oder neuer wurde nicht gefunden (JAVA_HOME oder java im Suchpfad).",
+  "language.tool.choose": "Installation wählen …",
+  "language.tool.chooseTitle": "Ordner der LanguageTool-Installation wählen",
+  "language.tool.enabled": "LanguageTool verwenden",
+  "language.tool.forget": "Installation vergessen",
+  "status.languageTool.starting": "LanguageTool startet …",
+  "status.languageTool.running": "LanguageTool",
+  "status.languageTool.failed": "LanguageTool nicht verfügbar"
 }

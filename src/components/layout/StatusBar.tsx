@@ -51,6 +51,8 @@ interface StatusBarProps {
   external: ExternalStatus | null;
   /** The main language of the active document; `off` when the check is off. */
   language?: { tag: string; off: boolean } | null;
+  /** The LanguageTool add-on, when it is set up and on. */
+  languageTool?: 'starting' | 'running' | 'failed' | null;
   onLanguage?: () => void;
   onShowStatistics: () => void;
   onRetrySave: () => void;
@@ -73,6 +75,7 @@ export function StatusBar({
   statistics,
   external,
   language = null,
+  languageTool = null,
   onLanguage,
   onShowStatistics,
   onRetrySave,
@@ -171,6 +174,15 @@ export function StatusBar({
             <Languages aria-hidden="true" className="size-3.5" />
             {language.off ? t('status.languageOff') : t('status.language', { language: language.tag })}
           </button>
+        ) : null}
+        {languageTool ? (
+          <span
+            className={`${ITEM} ${languageTool === 'failed' ? 'text-danger' : ''}`}
+            data-testid="status-languagetool"
+            data-state={languageTool}
+          >
+            {t(`status.languageTool.${languageTool}`)}
+          </span>
         ) : null}
         {statistics ? (
           <button

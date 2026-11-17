@@ -8,6 +8,7 @@ use crate::services::dialog::{FilePicker, FolderPicker};
 use crate::services::external::ExternalFiles;
 use crate::services::language::LanguageService;
 use crate::services::language::dictionaries::DictionaryStore;
+use crate::services::language::languagetool::LanguageTool;
 use crate::services::links::LinkOpener;
 use crate::services::locale;
 use crate::services::opening::OpenQueue;
@@ -41,6 +42,9 @@ pub struct AppState {
     pub language: Arc<LanguageService>,
     /// Dialogs of the language check (own word lists, Hunspell files).
     pub language_files: Arc<dyn FilePicker>,
+    /// The LanguageTool add-on (ADR 0026) and its folder dialog.
+    pub language_tool: Arc<LanguageTool>,
+    pub language_folders: Arc<dyn FolderPicker>,
     /// In-memory database for the system check while no library is open
     /// (the bundled SQLite is checked either way).
     probe: Database,
@@ -68,6 +72,7 @@ impl AppState {
             dirs.dictionaries.clone(),
             dirs.config.join("dictionaries"),
         ))));
+        let language_tool = Arc::new(LanguageTool::new(Arc::clone(&settings)));
         let session = LibrarySession::new(dirs, generators, settings, &outcome);
         session.open_configured().await;
         Ok(Self {
@@ -78,6 +83,8 @@ impl AppState {
             export_files: Arc::clone(&files),
             export_folders: Arc::clone(&picker),
             language_files: Arc::clone(&files),
+            language_tool,
+            language_folders: Arc::clone(&picker),
             language,
             picker,
             files,

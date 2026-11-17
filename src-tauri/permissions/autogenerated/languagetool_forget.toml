@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-languagetool-forget"
+description = "Enables the languagetool_forget command without any pre-configured scope."
+commands.allow = ["languagetool_forget"]
+
+[[permission]]
+identifier = "deny-languagetool-forget"
+description = "Denies the languagetool_forget command without any pre-configured scope."
+commands.deny = ["languagetool_forget"]

@@ -19,6 +19,8 @@ import type { OwnWord } from '@/types/generated/OwnWord';
 import type { Rejection } from '@/types/generated/Rejection';
 import type { WordCategory } from '@/types/generated/WordCategory';
 import { DEFAULT_CHECK_SETTINGS, useLanguage } from './languageStore';
+import { useLanguageTool } from './languageToolStore';
+import type { LanguageToolStatus } from '@/types/generated/LanguageToolStatus';
 
 const SECONDARY =
   'text-ui inline-flex h-7 items-center gap-2 rounded-pw border border-muted px-3 text-fg disabled:opacity-60';
@@ -208,9 +210,96 @@ export function LanguageSettings() {
         ) : null}
       </fieldset>
 
+      <LanguageToolSection />
       <OwnDictionaries />
       <Rejections />
     </div>
+  );
+}
+
+/** LanguageTool as an add-on: an existing installation, nothing downloaded. */
+function LanguageToolSection() {
+  const t = useT();
+  const status = useLanguageTool((store) => store.status);
+  const [error, setError] = useState<CommandError | null>(null);
+
+  useEffect(() => {
+    void useLanguageTool.getState().refresh();
+  }, []);
+
+  const run = async (
+    action: Promise<{ ok: true; value: LanguageToolStatus | null } | { ok: false; error: CommandError }>,
+  ) => {
+    setError(null);
+    const result = await action;
+    if (!result.ok) {
+      setError(result.error);
+    } else if (result.value) {
+      useLanguageTool.getState().apply(result.value);
+    }
+  };
+
+  const stateText = status
+    ? !status.configured
+      ? t('language.tool.none')
+      : !status.enabled
+        ? t('language.tool.off')
+        : status.state === 'failed'
+          ? t(status.problem === 'java' ? 'language.tool.noJava' : 'language.tool.failed')
+          : t(`language.tool.${status.state}` as MessageKey)
+    : '';
+
+  return (
+    <fieldset className={FIELDSET}>
+      <legend className={LEGEND}>{t('language.tool.title')}</legend>
+      <p className="text-ui mb-2 text-muted">{t('language.tool.about')}</p>
+      <p
+        className="text-ui mb-2 text-fg"
+        role="status"
+        data-testid="languagetool-state"
+        data-state={status?.state}
+      >
+        {stateText}
+        {status?.folder ? <span className="ml-2 text-muted">{status.folder}</span> : null}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={SECONDARY}
+          data-testid="languagetool-choose"
+          onClick={() => void run(call('languagetool_choose', { title: t('language.tool.chooseTitle') }))}
+        >
+          {t('language.tool.choose')}
+        </button>
+        {status?.configured ? (
+          <>
+            <label className="text-ui flex items-center gap-2 text-fg">
+              <input
+                type="checkbox"
+                data-testid="languagetool-enabled"
+                checked={status.enabled}
+                onChange={(event) =>
+                  void run(call('languagetool_set_enabled', { enabled: event.target.checked }))
+                }
+              />
+              {t('language.tool.enabled')}
+            </label>
+            <button
+              type="button"
+              className={SECONDARY}
+              onClick={() => void run(call('languagetool_forget', {}))}
+            >
+              {t('language.tool.forget')}
+            </button>
+          </>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="text-ui mt-2 text-danger">
+          {errorText(t, error)}
+        </p>
+      ) : null}
+    </fieldset>
   );
 }
 

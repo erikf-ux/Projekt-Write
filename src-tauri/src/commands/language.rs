@@ -13,10 +13,11 @@ use uuid::Uuid;
 use crate::commands::input::{EmptyRequest, Input, Validate};
 use crate::error::{CommandError, ErrorCode};
 use crate::filesystem::atomic::{read_limited, write_atomic};
-use crate::services::dialog::{FileDialog, FileFilter, FilePickRequest};
+use crate::services::dialog::{FileDialog, FileFilter, FilePickRequest, PickRequest};
 use crate::services::language::autocorrect::{Blocked, Candidate, Span};
 use crate::services::language::dictionaries::{ImportError, LanguageDictionary, is_tag};
-use crate::services::language::engine::OwnWords;
+use crate::services::language::engine::{LanguageEngine, OwnWords};
+use crate::services::language::languagetool::{LanguageToolStatus, SetupError, ToolState};
 use crate::services::language::own::{
     DocumentLanguage, MAX_NAME_CHARS, MAX_WORD_CHARS, OwnData, OwnDictionary, OwnError, OwnWord,
     WordCategory, WordImport,
@@ -227,6 +228,8 @@ pub async fn language_check(
     let service = state.language.clone();
     let default = default_language(&state);
     let detect = settings.detect;
+    let tool = state.language_tool.clone();
+    let use_tool = settings.enabled && tool.status().state == ToolState::Running;
     tauri::async_runtime::spawn_blocking(move || {
         request
             .texts
@@ -240,7 +243,8 @@ pub async fn language_check(
                         None => text.inherit.clone().unwrap_or_else(|| languages[0].clone()),
                     }
                 });
-                service.check(&text.text, &language, &languages, &own, parts)
+                let addon: Option<&dyn LanguageEngine> = if use_tool { Some(&*tool) } else { None };
+                service.check(&text.text, &language, &languages, &own, parts, addon)
             })
             .collect()
     })
@@ -1032,6 +1036,94 @@ pub async fn language_dictionary_remove(
             CommandError::new(ErrorCode::FileSystem)
         }
     })
+}
+
+fn tool_error(error: SetupError) -> CommandError {
+    match error {
+        SetupError::NotLanguageTool => CommandError::new(ErrorCode::LanguageToolNotFound),
+        SetupError::NotSaved => CommandError::new(ErrorCode::SettingsNotSaved),
+    }
+}
+
+/// The state of the LanguageTool add-on; starts it when it is set up and
+/// switched on ("bei Bedarf").
+#[tauri::command]
+pub async fn languagetool_status(
+    state: State<'_, AppState>,
+    _request: Input<EmptyRequest>,
+) -> Result<LanguageToolStatus, CommandError> {
+    state.language_tool.ensure_started();
+    Ok(state.language_tool.status())
+}
+
+/// Request of `languagetool_choose`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct LanguageToolChooseRequest {
+    pub title: String,
+}
+
+impl Validate for LanguageToolChooseRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        check_title(&self.title)
+    }
+}
+
+/// Lets the user choose an existing LanguageTool installation (the folder
+/// with `languagetool-server.jar`); none when the dialog was cancelled.
+#[tauri::command]
+pub async fn languagetool_choose(
+    state: State<'_, AppState>,
+    request: Input<LanguageToolChooseRequest>,
+) -> Result<Option<LanguageToolStatus>, CommandError> {
+    let answer = state.language_folders.pick_folder(PickRequest {
+        title: request.into_inner().title,
+        start_in: None,
+    });
+    let Ok(Some(folder)) = answer.await else {
+        return Ok(None);
+    };
+    let status = state.language_tool.configure(&folder).map_err(tool_error)?;
+    state.language_tool.ensure_started();
+    Ok(Some(status))
+}
+
+/// Request of `languagetool_set_enabled`.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct LanguageToolEnabledRequest {
+    pub enabled: bool,
+}
+
+impl Validate for LanguageToolEnabledRequest {
+    fn validate(&self) -> Result<(), CommandError> {
+        Ok(())
+    }
+}
+
+#[tauri::command]
+pub async fn languagetool_set_enabled(
+    state: State<'_, AppState>,
+    request: Input<LanguageToolEnabledRequest>,
+) -> Result<LanguageToolStatus, CommandError> {
+    let status = state
+        .language_tool
+        .set_enabled(request.into_inner().enabled)
+        .map_err(tool_error)?;
+    state.language_tool.ensure_started();
+    let _ = status;
+    Ok(state.language_tool.status())
+}
+
+/// Forgets the installation; its files stay.
+#[tauri::command]
+pub async fn languagetool_forget(
+    state: State<'_, AppState>,
+    _request: Input<EmptyRequest>,
+) -> Result<LanguageToolStatus, CommandError> {
+    state.language_tool.forget().map_err(tool_error)
 }
 
 #[cfg(test)]

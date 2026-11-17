@@ -10,6 +10,7 @@ pub mod autocorrect;
 pub mod detect;
 pub mod dictionaries;
 pub mod engine;
+pub mod languagetool;
 pub mod own;
 pub mod rules;
 pub mod sentences;
@@ -166,6 +167,7 @@ impl LanguageService {
         also: &[String],
         own: &OwnWords,
         parts: CheckParts,
+        addon: Option<&dyn LanguageEngine>,
     ) -> CheckedText {
         let dictionary = self.store.resolve(language);
         let mut raw = Vec::new();
@@ -183,6 +185,21 @@ impl LanguageService {
         }
         if parts.rules {
             raw.extend(rules::check(text, language));
+        }
+        // The add-on (LanguageTool): grammar, punctuation, context. A place
+        // a simple rule already found is not underlined twice.
+        if let Some(addon) = addon {
+            match addon.check(text, language, own) {
+                Ok(found) => {
+                    let known: Vec<(usize, usize)> = raw.iter().map(|f| (f.start, f.end)).collect();
+                    raw.extend(found.into_iter().filter(|f| {
+                        !known
+                            .iter()
+                            .any(|&(start, end)| f.start < end && start < f.end)
+                    }));
+                }
+                Err(error) => log::warn!("{} failed: {error}", addon.name()),
+            }
         }
         raw.sort_by_key(|f| (f.start, f.end));
         CheckedText {
@@ -300,7 +317,7 @@ mod tests {
     #[test]
     fn findings_come_in_utf_16_offsets() {
         let text = "😀 Größe Fesnter  gut.";
-        let checked = service().check(text, "de-DE", &[], &OwnWords::default(), ALL);
+        let checked = service().check(text, "de-DE", &[], &OwnWords::default(), ALL, None);
         let units: Vec<u16> = text.encode_utf16().collect();
         let shown: Vec<String> = checked
             .findings
@@ -313,7 +330,14 @@ mod tests {
 
     #[test]
     fn a_language_without_dictionary_gets_the_rules_only() {
-        let checked = service().check("bonjour  le monde", "fr-FR", &[], &OwnWords::default(), ALL);
+        let checked = service().check(
+            "bonjour  le monde",
+            "fr-FR",
+            &[],
+            &OwnWords::default(),
+            ALL,
+            None,
+        );
         assert_eq!(checked.dictionary, None);
         assert_eq!(checked.findings.len(), 2, "{:?}", checked.findings);
     }
@@ -330,6 +354,7 @@ mod tests {
             &[],
             &OwnWords::default(),
             only_rules,
+            None,
         );
         assert_eq!(
             checked
@@ -345,10 +370,60 @@ mod tests {
     fn a_word_of_another_profile_language_is_not_flagged() {
         let text = "Das Spreadsheet war kurz.";
         let none = OwnWords::default();
-        let alone = service().check(text, "de-DE", &[], &none, ALL);
+        let alone = service().check(text, "de-DE", &[], &none, ALL, None);
         assert_eq!(alone.findings.len(), 1);
-        let both = service().check(text, "de-DE", &["en-GB".to_owned()], &none, ALL);
+        let both = service().check(text, "de-DE", &["en-GB".to_owned()], &none, ALL, None);
         assert!(both.findings.is_empty());
+    }
+
+    /// Stands in for LanguageTool: one grammar finding and one on a double
+    /// space the rules already have.
+    struct Addon;
+
+    impl LanguageEngine for Addon {
+        fn name(&self) -> &'static str {
+            "test"
+        }
+        fn check(
+            &self,
+            _text: &str,
+            _language: &str,
+            _own: &OwnWords,
+        ) -> Result<Vec<RawFinding>, EngineError> {
+            Ok(vec![
+                RawFinding {
+                    start: 4,
+                    end: 9,
+                    kind: FindingKind::Grammar,
+                    rule: "lt:AGREEMENT".to_owned(),
+                    message: Some("Kongruenz".to_owned()),
+                    replacements: vec!["geht".to_owned()],
+                },
+                RawFinding {
+                    start: 9,
+                    end: 11,
+                    kind: FindingKind::Punctuation,
+                    rule: "lt:WHITESPACE".to_owned(),
+                    message: None,
+                    replacements: vec![" ".to_owned()],
+                },
+            ])
+        }
+    }
+
+    #[test]
+    fn the_add_on_adds_findings_but_none_twice() {
+        let checked = service().check(
+            "Ich gehen  heim.",
+            "de-DE",
+            &[],
+            &OwnWords::default(),
+            ALL,
+            Some(&Addon),
+        );
+        let rules: Vec<&str> = checked.findings.iter().map(|f| f.rule.as_str()).collect();
+        assert_eq!(rules, ["lt:AGREEMENT", "doubleSpace"]);
+        assert_eq!(checked.findings[0].message.as_deref(), Some("Kongruenz"));
     }
 
     #[test]

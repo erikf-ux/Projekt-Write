@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-languagetool-choose"
+description = "Enables the languagetool_choose command without any pre-configured scope."
+commands.allow = ["languagetool_choose"]
+
+[[permission]]
+identifier = "deny-languagetool-choose"
+description = "Denies the languagetool_choose command without any pre-configured scope."
+commands.deny = ["languagetool_choose"]

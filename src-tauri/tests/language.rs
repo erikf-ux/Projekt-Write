@@ -55,7 +55,7 @@ const SPELLING: CheckParts = CheckParts {
 
 fn flagged(service: &LanguageService, word: &str) -> bool {
     service
-        .check(word, "de-DE", &[], &OwnWords::default(), SPELLING)
+        .check(word, "de-DE", &[], &OwnWords::default(), SPELLING, None)
         .findings
         .iter()
         .any(|f| f.kind == FindingKind::Spelling)

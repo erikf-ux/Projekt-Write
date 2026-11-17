@@ -1029,5 +1029,21 @@
   "language.part.title": "Language of the selected text",
   "language.part.language": "Language",
   "language.part.apply": "Mark",
-  "language.part.remove": "Remove the mark"
+  "language.part.remove": "Remove the mark",
+  "error.languageToolNotFound": "The chosen folder holds no LanguageTool server (languagetool-server.jar).",
+  "language.tool.title": "LanguageTool (add-on)",
+  "language.tool.about": "Grammar, punctuation and context errors through an existing LanguageTool installation (LGPL-2.1, needs Java 17 and 1 to 4 GB of memory). The server runs on this computer only (127.0.0.1); no text leaves the device. The app works fully without LanguageTool.",
+  "language.tool.none": "No installation chosen.",
+  "language.tool.off": "Switched off.",
+  "language.tool.starting": "Starting …",
+  "language.tool.running": "Running.",
+  "language.tool.failed": "The server did not start or has ended; the spelling check goes on.",
+  "language.tool.noJava": "Java 17 or newer was not found (JAVA_HOME or java on the path).",
+  "language.tool.choose": "Choose installation …",
+  "language.tool.chooseTitle": "Choose the folder of the LanguageTool installation",
+  "language.tool.enabled": "Use LanguageTool",
+  "language.tool.forget": "Forget installation",
+  "status.languageTool.starting": "LanguageTool starting …",
+  "status.languageTool.running": "LanguageTool",
+  "status.languageTool.failed": "LanguageTool unavailable"
 }

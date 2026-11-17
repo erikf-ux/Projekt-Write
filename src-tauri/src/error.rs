@@ -177,11 +177,13 @@ pub enum ErrorCode {
     LanguageDictionaryInvalid,
     /// A dictionary shipped with the app cannot be removed.
     LanguageDictionaryBundled,
+    /// The chosen folder holds no LanguageTool server.
+    LanguageToolNotFound,
 }
 
 impl ErrorCode {
     /// All codes, used by tests to verify that every message key is translated.
-    pub const ALL: [ErrorCode; 78] = [
+    pub const ALL: [ErrorCode; 79] = [
         ErrorCode::InvalidInput,
         ErrorCode::Database,
         ErrorCode::SchemaTooNew,
@@ -260,6 +262,7 @@ impl ErrorCode {
         ErrorCode::LanguageNoDictionary,
         ErrorCode::LanguageDictionaryInvalid,
         ErrorCode::LanguageDictionaryBundled,
+        ErrorCode::LanguageToolNotFound,
     ];
 
     /// Translation key for the user-facing message (see `src/i18n/*.json`).
@@ -343,6 +346,7 @@ impl ErrorCode {
             ErrorCode::LanguageNoDictionary => "error.languageNoDictionary",
             ErrorCode::LanguageDictionaryInvalid => "error.languageDictionaryInvalid",
             ErrorCode::LanguageDictionaryBundled => "error.languageDictionaryBundled",
+            ErrorCode::LanguageToolNotFound => "error.languageToolNotFound",
         }
     }
 }

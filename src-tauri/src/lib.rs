@@ -163,6 +163,7 @@ pub fn run() {
         if let tauri::RunEvent::Exit = event {
             // Close the database cleanly and release library.lock.
             if let Some(state) = handle.try_state::<AppState>() {
+                state.language_tool.stop();
                 tauri::async_runtime::block_on(state.session.close());
             }
             log::info!("Project Write stopped");

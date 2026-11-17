@@ -120,6 +120,9 @@ import type { MeshThresholdRequest } from '@/types/generated/MeshThresholdReques
 import type { MeshConnectionRequest } from '@/types/generated/MeshConnectionRequest';
 import type { MeshConnectRequest } from '@/types/generated/MeshConnectRequest';
 import type { MeshGraph } from '@/types/generated/MeshGraph';
+import type { LanguageToolStatus } from '@/types/generated/LanguageToolStatus';
+import type { LanguageToolChooseRequest } from '@/types/generated/LanguageToolChooseRequest';
+import type { LanguageToolEnabledRequest } from '@/types/generated/LanguageToolEnabledRequest';
 import type { AddWordRequest } from '@/types/generated/AddWordRequest';
 import type { AutocorrectAnswer } from '@/types/generated/AutocorrectAnswer';
 import type { AutocorrectRequest } from '@/types/generated/AutocorrectRequest';
@@ -251,6 +254,10 @@ export interface Commands {
     response: LanguageDictionary | null;
   };
   language_dictionary_remove: { request: LanguageTagRequest; response: null };
+  languagetool_status: { request: EmptyRequest; response: LanguageToolStatus };
+  languagetool_choose: { request: LanguageToolChooseRequest; response: LanguageToolStatus | null };
+  languagetool_set_enabled: { request: LanguageToolEnabledRequest; response: LanguageToolStatus };
+  languagetool_forget: { request: EmptyRequest; response: LanguageToolStatus };
   structure_undo: { request: EmptyRequest; response: StructureUpdate | null };
   structure_redo: { request: EmptyRequest; response: StructureUpdate | null };
   subnet_create: { request: CreateSubnetRequest; response: StructureUpdate };
@@ -400,6 +407,7 @@ const errorCodes: Record<ErrorCode, true> = {
   LANGUAGE_NO_DICTIONARY: true,
   LANGUAGE_DICTIONARY_INVALID: true,
   LANGUAGE_DICTIONARY_BUNDLED: true,
+  LANGUAGE_TOOL_NOT_FOUND: true,
 };
 
 export const IPC_REJECTED: CommandError = { code: 'IPC_REJECTED', messageKey: 'error.ipcRejected' };
