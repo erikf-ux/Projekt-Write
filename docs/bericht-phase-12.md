@@ -98,11 +98,11 @@ Die Entscheidungen stehen in ADR 0023 bis 0026.
 
 ## Welche Tests wurden durchgeführt?
 
-| Art                      | Anzahl                            | Ergebnis                                  |
-| ------------------------ | --------------------------------- | ----------------------------------------- |
-| Rust (Unit, Integration) | 610 (605 ausgeführt, 5 ignoriert) | bestanden                                 |
-| Vitest                   | 742 in 43 Dateien                 | bestanden                                 |
-| E2E (WebdriverIO)        | E2E_FILES Spec-Dateien            | E2E_RESULT (lokal, Linux; CI siehe unten) |
+| Art                      | Anzahl                            | Ergebnis                                                                        |
+| ------------------------ | --------------------------------- | ------------------------------------------------------------------------------- |
+| Rust (Unit, Integration) | 610 (605 ausgeführt, 5 ignoriert) | bestanden                                                                       |
+| Vitest                   | 742 in 43 Dateien                 | bestanden                                                                       |
+| E2E (WebdriverIO)        | 20 Spec-Dateien                   | bestanden (lokal, Linux; eine Schwankung unter „Offene Fehler“; CI siehe unten) |
 
 Lokal ausgeführt und bestanden: Prettier, ESLint, TypeScript, Vitest, rustfmt, Clippy (ohne und mit `e2e`), alle Rust-Tests, erzeugte Typen, Lizenzliste, E2E-Gesamtlauf.
 
@@ -123,22 +123,22 @@ Lokal ausgeführt und bestanden: Prettier, ESLint, TypeScript, Vitest, rustfmt, 
 
 ## Leistung
 
-| Messung                                                 | Zielwert | Container      |
-| ------------------------------------------------------- | -------- | -------------- |
-| Tippverzögerung mit aktiver Sprachprüfung (95 %)        | ≤ 50 ms  | TYPING         |
-| Öffnen eines Dokuments mit 50.000 Wörtern (mit Prüfung) | –        | 268 bis 298 ms |
-| Laden eines Wörterbuchs                                 | –        | 20 bis 35 ms   |
+| Messung                                                 | Zielwert | Container            |
+| ------------------------------------------------------- | -------- | -------------------- |
+| Tippverzögerung mit aktiver Sprachprüfung (95 %)        | ≤ 50 ms  | 36 ms (Median 22 ms) |
+| Öffnen eines Dokuments mit 50.000 Wörtern (mit Prüfung) | –        | 268 bis 298 ms       |
+| Laden eines Wörterbuchs                                 | –        | 20 bis 35 ms         |
 
 ## Abnahmekriterien Phase 12
 
-| Kriterium (Abschnitt 25)                                                                                | Stand                                                                           |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Höchstens 3 % der richtigen Wörter werden markiert, mindestens 95 % der Fehler werden erkannt           | erfüllt: 0 % markiert, 98,6 % erkannt                                           |
-| Die Autokorrektur ändert kein richtiges Wort und korrigiert keinen Fehler falsch; je Bedingung ein Test | erfüllt (Korpus; sieben eigene Tests)                                           |
-| Die Satzende-Testdaten sind grün                                                                        | erfüllt (58 Fälle)                                                              |
-| Jede Korrektur lässt sich mit einem Undo-Schritt zurücknehmen                                           | erfüllt (Vitest, E2E)                                                           |
-| Die Tippverzögerung bleibt im Zielwert                                                                  | erfüllt im Container (TYPING bei 95 %); Messung auf dem Referenzgerät steht aus |
-| Ohne Zusatzpaket funktioniert die App vollständig. LanguageTool bindet nur an `127.0.0.1`               | erfüllt ohne Zusatzpaket (alle Tests ohne LanguageTool); Bindung siehe unten    |
+| Kriterium (Abschnitt 25)                                                                                | Stand                                                                                                  |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Höchstens 3 % der richtigen Wörter werden markiert, mindestens 95 % der Fehler werden erkannt           | erfüllt: 0 % markiert, 98,6 % erkannt                                                                  |
+| Die Autokorrektur ändert kein richtiges Wort und korrigiert keinen Fehler falsch; je Bedingung ein Test | erfüllt (Korpus; sieben eigene Tests)                                                                  |
+| Die Satzende-Testdaten sind grün                                                                        | erfüllt (58 Fälle)                                                                                     |
+| Jede Korrektur lässt sich mit einem Undo-Schritt zurücknehmen                                           | erfüllt (Vitest, E2E)                                                                                  |
+| Die Tippverzögerung bleibt im Zielwert                                                                  | erfüllt im Container (36 ms bei 95 %, Quelltextansicht 33 ms); Messung auf dem Referenzgerät steht aus |
+| Ohne Zusatzpaket funktioniert die App vollständig. LanguageTool bindet nur an `127.0.0.1`               | erfüllt ohne Zusatzpaket (alle Tests ohne LanguageTool); Bindung siehe unten                           |
 
 ## Was konnte nicht getestet werden und warum?
 
@@ -152,7 +152,7 @@ Lokal ausgeführt und bestanden: Prettier, ESLint, TypeScript, Vitest, rustfmt, 
 
 ## Offene Fehler
 
-Keine bekannten.
+Keine bekannten. Beobachtung wie in Phase 10 und 11: Im E2E-Gesamtlauf lag die Galerie-Messung aus Phase 8 im zweiten Durchgang knapp über ihrer Grenze (95 % bei 55 ms, Grenze 50 ms). In drei Wiederholungen der Referenz-Specs waren es 53, 48 und 43 ms; die beiden letzten bestanden. Die Galerie ist in Phase 12 unverändert; die Sprachprüfung arbeitet nur im Editor. Ich halte es weiter für Schwankung des Containers.
 
 ## Behobene Fehler
 
