@@ -5,7 +5,7 @@ Das Rich-Text-Format von Project Write (Abschnitt 10). Eine `.pwrite`-Datei ist 
 ```json
 {
   "format": "pwrite",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "id": "0b8f8f4e-6d0e-4f3e-9a3c-2a1d3c4b5e6f",
   "title": "Kapitel 1",
   "createdAt": "2026-11-04T10:00:00Z",
@@ -22,18 +22,18 @@ Das Rich-Text-Format von Project Write (Abschnitt 10). Eine `.pwrite`-Datei ist 
 
 ## Hülle
 
-| Feld            | Typ                | Regeln                                                                 |
-| --------------- | ------------------ | ---------------------------------------------------------------------- |
-| `format`        | Text               | genau `pwrite`                                                         |
-| `formatVersion` | ganze Zahl         | `1`; höher: Datei öffnet schreibgeschützt mit Hinweis                  |
-| `id`            | Text               | UUID in Kleinbuchstaben; in der Bibliothek die ID des Dokuments        |
-| `title`         | Text               | 1–300 Zeichen                                                          |
-| `createdAt`     | Text               | ISO 8601 UTC                                                           |
-| `updatedAt`     | Text               | ISO 8601 UTC                                                           |
-| `language`      | Text               | BCP-47-Sprachkennung, etwa `de-DE`                                     |
-| `tags`          | Liste von Texten   | ab Phase 7; bis dahin leer                                             |
-| `content`       | Objekt             | Dokument im Schema unten                                               |
-| `media`         | Liste von Objekten | `id`, `sha256`, `originalName`, `mimeType`; ab Phase 8, bis dahin leer |
+| Feld            | Typ                | Regeln                                                                         |
+| --------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `format`        | Text               | genau `pwrite`                                                                 |
+| `formatVersion` | ganze Zahl         | `2` (Version 1 wird gelesen); höher: Datei öffnet schreibgeschützt mit Hinweis |
+| `id`            | Text               | UUID in Kleinbuchstaben; in der Bibliothek die ID des Dokuments                |
+| `title`         | Text               | 1–300 Zeichen                                                                  |
+| `createdAt`     | Text               | ISO 8601 UTC                                                                   |
+| `updatedAt`     | Text               | ISO 8601 UTC                                                                   |
+| `language`      | Text               | BCP-47-Sprachkennung, etwa `de-DE`                                             |
+| `tags`          | Liste von Texten   | ab Phase 7; bis dahin leer                                                     |
+| `content`       | Objekt             | Dokument im Schema unten                                                       |
+| `media`         | Liste von Objekten | `id`, `sha256`, `originalName`, `mimeType`; ab Phase 8, bis dahin leer         |
 
 Unbekannte Felder bleiben beim Laden und Speichern erhalten, auf oberster Ebene und in Einträgen von `media`. In der Bibliothek sind Titel und Zeitstempel der Datenbank maßgeblich; Project Write schreibt sie beim Speichern in die Hülle.
 
