@@ -5,3 +5,5 @@
 *.icns binary
 # Markdown round-trip inputs stay byte for byte, CRLF included.
 tests/fixtures/markdown/** -text
+# Dictionaries stay byte for byte (checksums in SHA256SUMS).
+src-tauri/dictionaries/** -text

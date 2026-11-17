@@ -44,6 +44,9 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 zip = { version = "9.5.0", default-features = false, features = ["deflate-flate2"] }
 time = "0.3.55"
 tokio = { version = "1", features = ["sync", "rt"] }
+# Spelling (Phase 12, ADR 0023): Hunspell dictionaries in pure Rust; pinned
+# exactly while it is an alpha, the corpus in tests/data/language decides.
+spellbook = "=0.4.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.191"
@@ -71,6 +74,10 @@ debug = false
 # Debug builds (tests, E2E) hash and query noticeably faster with optimised
 # SHA-256 and SQLite; behaviour is unchanged.
 [profile.dev.package.sha2]
+opt-level = 3
+
+# Loading a dictionary and computing suggestions run in tests and E2E too.
+[profile.dev.package.spellbook]
 opt-level = 3
 
 [profile.dev.package.libsqlite3-sys]

@@ -1,0 +1,327 @@
+//! Language check (section 14, phase 12).
+//!
+//! The engines sit behind [`engine::LanguageEngine`]: the spelling check
+//! with Hunspell dictionaries (`spellbook`, ADR 0023), the simple rules and,
+//! as an add-on, LanguageTool. The check runs paragraph by paragraph on the
+//! blocking pool, never on the input path; the editor keeps a cache and
+//! maps the findings back to its positions (UTF-16 offsets).
+
+pub mod autocorrect;
+pub mod dictionaries;
+pub mod engine;
+pub mod rules;
+pub mod sentences;
+pub mod spelling;
+pub mod tokens;
+
+use std::sync::Arc;
+
+use serde::Serialize;
+use ts_rs::TS;
+
+use self::autocorrect::{Blocked, Candidate, Lexicon, Span};
+use self::dictionaries::{DictionaryStore, LanguageDictionary};
+use self::engine::{EngineError, FindingKind, LanguageEngine, OwnWords, RawFinding};
+use self::spelling::{MAX_SUGGESTIONS, SpellingEngine, is_correct, order_suggestions};
+
+/// A finding as the editor gets it: UTF-16 offsets into the checked text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Finding {
+    pub start: u32,
+    pub end: u32,
+    pub kind: FindingKind,
+    pub rule: String,
+    pub message: Option<String>,
+    pub replacements: Vec<String>,
+}
+
+/// The result for one text: the dictionary used (none when the language has
+/// no dictionary) and the findings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CheckedText {
+    pub language: String,
+    pub dictionary: Option<String>,
+    pub findings: Vec<Finding>,
+}
+
+/// Which parts of the check run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CheckParts {
+    pub spelling: bool,
+    pub rules: bool,
+}
+
+/// UTF-16 offsets of byte offsets in `text` (any order).
+fn to_utf16(text: &str, offsets: &[usize]) -> Vec<u32> {
+    let mut sorted: Vec<(usize, usize)> = offsets
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(i, o)| (o, i))
+        .collect();
+    sorted.sort_unstable();
+    let mut result = vec![0u32; offsets.len()];
+    let mut units = 0u32;
+    let mut chars = text.char_indices().peekable();
+    for (offset, index) in sorted {
+        while let Some(&(at, c)) = chars.peek() {
+            if at >= offset {
+                break;
+            }
+            units += u32::try_from(c.len_utf16()).unwrap_or(2);
+            chars.next();
+        }
+        result[index] = units;
+    }
+    result
+}
+
+fn convert(text: &str, raw: Vec<RawFinding>) -> Vec<Finding> {
+    let offsets: Vec<usize> = raw.iter().flat_map(|f| [f.start, f.end]).collect();
+    let units = to_utf16(text, &offsets);
+    raw.into_iter()
+        .enumerate()
+        .map(|(i, f)| Finding {
+            start: units[2 * i],
+            end: units[2 * i + 1],
+            kind: f.kind,
+            rule: f.rule,
+            message: f.message,
+            replacements: f.replacements,
+        })
+        .collect()
+}
+
+pub struct LanguageService {
+    store: Arc<DictionaryStore>,
+    spelling: SpellingEngine,
+}
+
+/// The dictionaries and own words of one check, for the autocorrect rule.
+struct Words<'a> {
+    service: &'a LanguageService,
+    languages: &'a [String],
+    own: &'a OwnWords,
+}
+
+impl Lexicon for Words<'_> {
+    fn is_correct(&self, word: &str) -> bool {
+        self.languages.iter().any(|language| {
+            self.service
+                .spelling
+                .check_word(word, language, self.own)
+                .unwrap_or(true)
+        })
+    }
+
+    fn suggestions(&self, word: &str) -> Vec<String> {
+        let Some(language) = self.languages.first() else {
+            return Vec::new();
+        };
+        self.service
+            .all_suggestions(word, language, self.own)
+            .unwrap_or_default()
+    }
+}
+
+impl LanguageService {
+    pub fn new(store: Arc<DictionaryStore>) -> Self {
+        Self {
+            spelling: SpellingEngine::new(Arc::clone(&store)),
+            store,
+        }
+    }
+
+    pub fn store(&self) -> &Arc<DictionaryStore> {
+        &self.store
+    }
+
+    pub fn languages(&self) -> Vec<LanguageDictionary> {
+        self.store.languages()
+    }
+
+    /// Checks one text in one language. A language without a dictionary
+    /// only gets the rules.
+    pub fn check(
+        &self,
+        text: &str,
+        language: &str,
+        own: &OwnWords,
+        parts: CheckParts,
+    ) -> CheckedText {
+        let dictionary = self.store.resolve(language);
+        let mut raw = Vec::new();
+        if parts.spelling && dictionary.is_some() {
+            match self.spelling.check(text, language, own) {
+                Ok(found) => raw.extend(found),
+                Err(error) => log::warn!("spelling check failed: {error}"),
+            }
+        }
+        if parts.rules {
+            raw.extend(rules::check(text, language));
+        }
+        raw.sort_by_key(|f| (f.start, f.end));
+        CheckedText {
+            language: language.to_owned(),
+            dictionary,
+            findings: convert(text, raw),
+        }
+    }
+
+    /// All suggestions in the order of section 14, not cut to five.
+    fn all_suggestions(
+        &self,
+        word: &str,
+        language: &str,
+        own: &OwnWords,
+    ) -> Result<Vec<String>, EngineError> {
+        let tag = self
+            .store
+            .resolve(language)
+            .ok_or_else(|| EngineError::NoDictionary(language.to_owned()))?;
+        let dictionary = self.store.get(&tag)?;
+        let word = engine::normalize(word);
+        let mut found = Vec::new();
+        dictionary.suggest(&word, &mut found);
+        Ok(order_suggestions(&word, &tag, &dictionary, own, found))
+    }
+
+    /// At most five suggestions for a word (section 14).
+    pub fn suggest(
+        &self,
+        word: &str,
+        language: &str,
+        own: &OwnWords,
+    ) -> Result<Vec<String>, EngineError> {
+        let mut all = self.all_suggestions(word, language, own)?;
+        all.truncate(MAX_SUGGESTIONS);
+        Ok(all)
+    }
+
+    /// Whether a word is correct in a language.
+    pub fn is_correct(
+        &self,
+        word: &str,
+        language: &str,
+        own: &OwnWords,
+    ) -> Result<bool, EngineError> {
+        let tag = self
+            .store
+            .resolve(language)
+            .ok_or_else(|| EngineError::NoDictionary(language.to_owned()))?;
+        let dictionary = self.store.get(&tag)?;
+        Ok(is_correct(&dictionary, own, word, false))
+    }
+
+    /// The uniqueness rule of the autocorrect for a finished word.
+    /// `languages`: the active languages of the section, the first one
+    /// suggests; `rejected(word, correction)` answers condition 7.
+    pub fn autocorrect(
+        &self,
+        candidate: Candidate<'_>,
+        languages: &[String],
+        own: &OwnWords,
+        rejected: &dyn Fn(&str, &str) -> bool,
+    ) -> Result<String, Blocked> {
+        if languages
+            .iter()
+            .all(|language| self.store.resolve(language).is_none())
+        {
+            // No dictionary: nothing is known to be wrong.
+            return Err(Blocked::Correct);
+        }
+        let words = Words {
+            service: self,
+            languages,
+            own,
+        };
+        autocorrect::correction(candidate, &words, rejected)
+    }
+}
+
+/// Where a word stands, as the editor tells it (condition 6).
+pub fn span_of(code: bool, link: bool, quote: bool, other_language: bool) -> Span {
+    if code {
+        Span::Code
+    } else if link {
+        Span::Link
+    } else if quote {
+        Span::Quote
+    } else if other_language {
+        Span::OtherLanguage
+    } else {
+        Span::Text
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    pub(crate) fn service() -> LanguageService {
+        let bundled = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dictionaries");
+        LanguageService::new(Arc::new(DictionaryStore::new(
+            Some(bundled),
+            PathBuf::from("/nonexistent"),
+        )))
+    }
+
+    const ALL: CheckParts = CheckParts {
+        spelling: true,
+        rules: true,
+    };
+
+    #[test]
+    fn findings_come_in_utf_16_offsets() {
+        let text = "😀 Größe Fesnter  gut.";
+        let checked = service().check(text, "de-DE", &OwnWords::default(), ALL);
+        let units: Vec<u16> = text.encode_utf16().collect();
+        let shown: Vec<String> = checked
+            .findings
+            .iter()
+            .map(|f| String::from_utf16_lossy(&units[f.start as usize..f.end as usize]))
+            .collect();
+        assert_eq!(shown, ["Fesnter", "  "]);
+        assert_eq!(checked.dictionary.as_deref(), Some("de-DE"));
+    }
+
+    #[test]
+    fn a_language_without_dictionary_gets_the_rules_only() {
+        let checked = service().check("bonjour  le monde", "fr-FR", &OwnWords::default(), ALL);
+        assert_eq!(checked.dictionary, None);
+        assert_eq!(checked.findings.len(), 2, "{:?}", checked.findings);
+    }
+
+    #[test]
+    fn parts_can_be_switched_off() {
+        let only_rules = CheckParts {
+            spelling: false,
+            rules: true,
+        };
+        let checked = service().check(
+            "Das Fesnter  ist offen.",
+            "de-DE",
+            &OwnWords::default(),
+            only_rules,
+        );
+        assert_eq!(
+            checked
+                .findings
+                .iter()
+                .map(|f| f.rule.as_str())
+                .collect::<Vec<_>>(),
+            ["doubleSpace"]
+        );
+    }
+
+    #[test]
+    fn utf_16_offsets_of_unordered_byte_offsets() {
+        assert_eq!(to_utf16("a😀b", &[5, 0, 1, 6]), [3, 0, 1, 4]);
+    }
+}
