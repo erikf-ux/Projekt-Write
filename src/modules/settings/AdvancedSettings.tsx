@@ -10,11 +10,13 @@ import { useLocale, useT, type MessageKey } from '@/i18n';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { call } from '@/services/ipc';
 import type { CommandError } from '@/types/generated/CommandError';
+import type { CustomTheme } from '@/types/generated/CustomTheme';
 import type { SettingsArea } from '@/types/generated/SettingsArea';
 import type { SettingsImportPreview } from '@/types/generated/SettingsImportPreview';
 import type { StorageFolder } from '@/types/generated/StorageFolder';
 import type { StorageLocations } from '@/types/generated/StorageLocations';
 import { applySettingsResult, formatSettingValue, settingLabel, SKIP_REASONS } from './settingsTransfer';
+import { useUi } from './uiStore';
 
 const FIELDSET = 'mb-4 rounded-pw bg-sidebar p-4';
 const LEGEND = 'text-ui font-semibold tracking-wide text-muted uppercase';
@@ -22,6 +24,8 @@ const BUTTON =
   'text-ui inline-flex h-7 items-center rounded-pw border border-muted px-3 text-fg hover:bg-surface disabled:opacity-50';
 const PRIMARY =
   'text-ui inline-flex h-7 items-center rounded-pw bg-accent px-3 font-medium text-surface disabled:opacity-50';
+
+const NO_THEMES: readonly CustomTheme[] = [];
 
 const LOCATIONS: { id: StorageFolder; labelKey: MessageKey }[] = [
   { id: 'config', labelKey: 'settings.locations.config' },
@@ -264,6 +268,7 @@ interface ImportPreviewDialogProps {
 export function ImportPreviewDialog({ preview, busy, onApply, onCancel }: ImportPreviewDialogProps) {
   const t = useT();
   const locale = useLocale((state) => state.locale);
+  const customThemes = useUi((state) => state.state?.customThemes ?? NO_THEMES);
   const areas: SettingsArea[] = ['app', 'library'];
   return (
     <Dialog title={t('settings.transfer.preview.title')} onClose={onCancel} testId="settings-import-preview">
@@ -313,10 +318,10 @@ export function ImportPreviewDialog({ preview, busy, onApply, onCancel }: Import
                       {settingLabel(t, area, change.key)}
                     </th>
                     <td className="py-1 pr-2 break-all text-muted">
-                      {formatSettingValue(t, locale, change.key, change.before)}
+                      {formatSettingValue(t, locale, change.key, change.before, customThemes)}
                     </td>
                     <td className="py-1 break-all">
-                      {formatSettingValue(t, locale, change.key, change.after)}
+                      {formatSettingValue(t, locale, change.key, change.after, customThemes)}
                     </td>
                   </tr>
                 ))}

@@ -113,7 +113,13 @@ describe('formatSettingValue', () => {
     expect(formatSettingValue(t, 'de', 'backup.automatic', true)).toBe('an');
     expect(formatSettingValue(t, 'de', 'mesh.suggestionThreshold', 0.35)).toBe('0,35');
     expect(formatSettingValue(t, 'en', 'mesh.suggestionThreshold', 0.35)).toBe('0.35');
-    expect(formatSettingValue(t, 'de', 'theme', 'dark')).toBe('dark');
+    expect(formatSettingValue(t, 'de', 'theme', 'dark')).toBe('Dunkel');
+    expect(formatSettingValue(t, 'de', 'language', 'system')).toBe('Wie das System');
+    expect(formatSettingValue(t, 'de', 'language', 'en')).toBe('English');
+    const id = '0123456789abcdef0123456789abcdef';
+    const theme = { id, name: 'Nacht', base: 'dark' as const, colors: {} as never };
+    expect(formatSettingValue(t, 'de', 'theme', `custom:${id}`, [theme])).toBe('Nacht');
+    expect(formatSettingValue(t, 'de', 'theme', `custom:${id}`)).toBe(`custom:${id}`);
     expect(formatSettingValue(t, 'de', 'sidebar', { visible: true, width: 300 })).toBe(
       'visible: an; width: 300',
     );

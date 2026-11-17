@@ -7,6 +7,7 @@
 import type { Locale, MessageKey } from '@/i18n';
 import { useBackup } from '@/modules/backup/backupStore';
 import { useSuggestions } from '@/modules/mesh/suggestionStore';
+import type { CustomTheme } from '@/types/generated/CustomTheme';
 import type { SettingsApplied } from '@/types/generated/SettingsApplied';
 import type { SettingsArea } from '@/types/generated/SettingsArea';
 import type { SettingsSkipReason } from '@/types/generated/SettingsSkipReason';
@@ -51,10 +52,37 @@ export const SKIP_REASONS: Record<SettingsSkipReason, MessageKey> = {
   noLibrary: 'settings.transfer.skip.noLibrary',
 };
 
-/** A value of the preview as text: on/off, numbers in the interface language, objects as `name: value`. */
-export function formatSettingValue(t: Translate, locale: Locale, key: string, value: unknown): string {
+const THEMES: Record<string, MessageKey> = {
+  system: 'settings.theme.system',
+  light: 'settings.theme.light',
+  dark: 'settings.theme.dark',
+};
+
+const LANGUAGES: Record<string, string> = { de: 'Deutsch', en: 'English' };
+
+/**
+ * A value of the preview as text: zoom in percent, themes and languages by
+ * name, on/off, numbers in the interface language, objects as `name: value`.
+ */
+export function formatSettingValue(
+  t: Translate,
+  locale: Locale,
+  key: string,
+  value: unknown,
+  customThemes: readonly CustomTheme[] = [],
+): string {
   if (key === 'zoom' && typeof value === 'number') {
     return `${String(Math.round(value * 100))} %`;
+  }
+  if (key === 'theme' && typeof value === 'string') {
+    const builtIn = THEMES[value];
+    if (builtIn) {
+      return t(builtIn);
+    }
+    return customThemes.find((theme) => `custom:${theme.id}` === value)?.name ?? value;
+  }
+  if (key === 'language' && typeof value === 'string') {
+    return value === 'system' ? t('settings.language.system') : (LANGUAGES[value] ?? value);
   }
   return formatValue(t, locale, value);
 }
