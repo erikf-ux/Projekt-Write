@@ -17,7 +17,9 @@ export async function pinMainWindow(): Promise<void> {
 }
 
 /** Opens the settings dialog on one of its sections (from the toolbar). */
-export async function openSettings(section: 'general' | 'language' | 'shortcuts' | 'library'): Promise<void> {
+export async function openSettings(
+  section: 'general' | 'language' | 'shortcuts' | 'library' | 'advanced',
+): Promise<void> {
   const dialog = $('[data-testid="settings-dialog"]');
   if (!(await dialog.isExisting())) {
     await $('[data-testid="toolbar"] [data-command="settings.open"]').click();

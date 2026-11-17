@@ -16,7 +16,7 @@ export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 
-export type SettingsSection = 'general' | 'language' | 'shortcuts' | 'library';
+export type SettingsSection = 'general' | 'language' | 'shortcuts' | 'library' | 'advanced';
 
 /** A short message at the bottom of the window. */
 export interface Notice {
