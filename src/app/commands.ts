@@ -19,7 +19,7 @@ import { useFind } from '@/modules/editor/find/findStore';
 import { useHistory } from '@/modules/history/HistoryDialog';
 import { getSession } from '@/modules/editor/session';
 import { useStatistics } from '@/modules/editor/statisticsStore';
-import { openProfileDialog } from '@/modules/language-check/DocumentLanguageDialog';
+import { openPartDialog, openProfileDialog } from '@/modules/language-check/DocumentLanguageDialog';
 import { useLibrary } from '@/modules/library/libraryStore';
 import { useMedia } from '@/modules/media/mediaStore';
 import { useMesh } from '@/modules/mesh/meshStore';
@@ -811,6 +811,25 @@ export function createAppCommands(): CommandDefinition[] {
         if (current) {
           openProfileDialog(current.id);
         }
+      },
+    },
+    {
+      id: 'language.part',
+      category: 'edit',
+      titleKey: 'command.language.part',
+      isAvailable: () => {
+        const session = activeSession();
+        return session?.view === 'rich' && !session.editor.state.selection.empty;
+      },
+      run: () => {
+        const session = activeSession();
+        if (!session) {
+          return;
+        }
+        openPartDialog((lang) => {
+          const chain = session.editor.chain().focus();
+          void (lang ? chain.setLanguagePart(lang) : chain.unsetLanguagePart()).run();
+        });
       },
     },
     {

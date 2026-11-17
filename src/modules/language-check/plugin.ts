@@ -101,8 +101,59 @@ export function clearCheckCache(): void {
   cache.clear();
 }
 
-function cacheKey(documentKey: string, epoch: number, part: CheckPart): string {
-  return `${documentKey}\u0001${String(epoch)}\u0001${part.language ?? ''}\u0001${part.text}`;
+function cacheKey(documentKey: string, epoch: number, part: CheckPart, inherit: string | null): string {
+  return `${documentKey}\u0001${String(epoch)}\u0001${part.language ?? ''}\u0001${inherit ?? ''}\u0001${part.text}`;
+}
+
+/** Rust detects paragraphs from this many letters on (`detect.rs`). */
+const DETECT_LETTERS = 40;
+
+/** A paragraph too short to be detected: it inherits a language. */
+function isShort(text: string): boolean {
+  return (text.match(/\p{L}/gu) ?? []).length < DETECT_LETTERS;
+}
+
+interface VisitedPart {
+  part: CheckPart;
+  /** Position of the paragraph. */
+  position: number;
+  node: ProseMirrorNode;
+  key: string;
+  /** The language of the paragraph before, for a short paragraph. */
+  inherit: string | null;
+  checked: CheckedText | undefined;
+}
+
+/**
+ * Walks the checked parts of a document in order. A short unmarked part
+ * inherits the language its predecessor was checked in (section 14: "Sehr
+ * kurze Absätze erben die Sprache"); it is part of the cache key, so the
+ * result is the same for the same text after the same language. Longer
+ * parts are detected by Rust and need no predecessor.
+ */
+function walkParts(
+  doc: ProseMirrorNode,
+  documentKey: string,
+  epoch: number,
+  visit: (visited: VisitedPart) => void,
+): void {
+  const detect = checkSettings().detect;
+  let previous: string | null = null;
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) {
+      return true;
+    }
+    for (const part of blockText(node)?.parts ?? []) {
+      const inherit = detect && !part.language && isShort(part.text) ? previous : null;
+      const key = cacheKey(documentKey, epoch, part, inherit);
+      const checked = cache.get(key);
+      if (checked && !part.language) {
+        previous = checked.language;
+      }
+      visit({ part, position: pos, node, key, inherit, checked });
+    }
+    return false;
+  });
 }
 
 const KIND_CLASS: Record<Finding['kind'], string> = {
@@ -116,41 +167,30 @@ const KIND_CLASS: Record<Finding['kind'], string> = {
 function buildDecorations(doc: ProseMirrorNode, documentKey: string, epoch: number): DecorationSet {
   const ignored = useLanguage.getState().ignored;
   const decorations: Decoration[] = [];
-  doc.descendants((node, pos) => {
-    if (!node.isTextblock) {
-      return true;
+  walkParts(doc, documentKey, epoch, ({ part, position: pos, node, checked }) => {
+    if (!checked) {
+      return;
     }
-    const block = blockText(node);
-    if (!block) {
-      return false;
-    }
-    for (const part of block.parts) {
-      const checked = cache.get(cacheKey(documentKey, epoch, part));
-      if (!checked) {
+    const base = pos + 1 + part.offset;
+    for (const finding of checked.findings) {
+      const from = base + finding.start;
+      const to = base + finding.end;
+      if (to <= from || to > pos + node.nodeSize - 1) {
         continue;
       }
-      const base = pos + 1 + part.offset;
-      for (const finding of checked.findings) {
-        const from = base + finding.start;
-        const to = base + finding.end;
-        if (to <= from || to > pos + node.nodeSize - 1) {
-          continue;
-        }
-        if (finding.kind === 'spelling' && ignored.has(doc.textBetween(from, to))) {
-          continue;
-        }
-        const spec: FindingSpec = { finding, language: checked.language, from, to };
-        decorations.push(
-          Decoration.inline(
-            from,
-            to,
-            { class: KIND_CLASS[finding.kind], 'data-check-rule': finding.rule },
-            { ...spec, inclusiveStart: false, inclusiveEnd: false },
-          ),
-        );
+      if (finding.kind === 'spelling' && ignored.has(doc.textBetween(from, to))) {
+        continue;
       }
+      const spec: FindingSpec = { finding, language: checked.language, from, to };
+      decorations.push(
+        Decoration.inline(
+          from,
+          to,
+          { class: KIND_CLASS[finding.kind], 'data-check-rule': finding.rule },
+          { ...spec, inclusiveStart: false, inclusiveEnd: false },
+        ),
+      );
     }
-    return false;
   });
   return DecorationSet.create(doc, decorations);
 }
@@ -386,21 +426,13 @@ class Checker {
     }
     const epoch = useLanguage.getState().epoch;
     const { doc, selection } = this.view.state;
-    const missing: { key: string; part: CheckPart; position: number }[] = [];
+    const missing: { key: string; part: CheckPart; position: number; inherit: string | null }[] = [];
     const seen = new Set<string>();
-    doc.descendants((node, pos) => {
-      if (!node.isTextblock) {
-        return true;
+    walkParts(doc, this.documentKey, epoch, ({ key, part, position, inherit, checked }) => {
+      if (!checked && !seen.has(key)) {
+        seen.add(key);
+        missing.push({ key, part, position, inherit });
       }
-      const block = blockText(node);
-      for (const part of block?.parts ?? []) {
-        const key = cacheKey(this.documentKey, epoch, part);
-        if (!cache.has(key) && !seen.has(key)) {
-          seen.add(key);
-          missing.push({ key, part, position: pos });
-        }
-      }
-      return false;
     });
     if (missing.length === 0) {
       this.refresh();
@@ -420,11 +452,11 @@ class Checker {
     try {
       const result = await call('language_check', {
         ...(this.options.documentId ? { documentId: this.options.documentId } : {}),
-        texts: batch.map((item) =>
-          item.part.language
-            ? { text: item.part.text, language: item.part.language }
-            : { text: item.part.text },
-        ),
+        texts: batch.map((item) => ({
+          text: item.part.text,
+          ...(item.part.language ? { language: item.part.language } : {}),
+          ...(item.inherit ? { inherit: item.inherit } : {}),
+        })),
       });
       // An answer of another shape (a test double) counts as none.
       const values: unknown = result.ok ? result.value : null;
@@ -441,9 +473,9 @@ class Checker {
       this.running = false;
     }
     this.refresh();
-    if (missing.length > batch.length) {
-      this.schedule(0);
-    }
+    // More to check, or short paragraphs whose predecessor is now known:
+    // the next run finds them, or nothing and stops.
+    this.schedule(0);
   }
 
   /** A word was finished at `end` (before the typed character). */

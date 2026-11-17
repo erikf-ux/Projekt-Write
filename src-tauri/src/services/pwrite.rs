@@ -13,8 +13,10 @@ use crate::services::locale::Locale;
 
 /// The value of `format`.
 pub const FORMAT: &str = "pwrite";
-/// The format version this build reads and writes.
-pub const FORMAT_VERSION: u64 = 1;
+/// The format version this build reads and writes. Version 2 (Phase 12)
+/// adds the mark `lang` for parts of a text in another language; a
+/// version-1 file is a valid version-2 file and is written as version 2.
+pub const FORMAT_VERSION: u64 = 2;
 
 /// One medium the document refers to (Phase 8).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -143,9 +145,16 @@ pub fn new_file(id: &str, title: &str, now: &str, language: &str, content: Value
     }
 }
 
-/// The bytes of a file: compact UTF-8 JSON with a final line feed.
+/// The bytes of a file: compact UTF-8 JSON with a final line feed, always in
+/// the current format version (newer files are never written).
 pub fn to_bytes(file: &PwriteFile) -> Vec<u8> {
-    let mut data = serde_json::to_vec(file).unwrap_or_default();
+    let mut data = if file.format_version == FORMAT_VERSION {
+        serde_json::to_vec(file).unwrap_or_default()
+    } else {
+        let mut current = file.clone();
+        current.format_version = FORMAT_VERSION;
+        serde_json::to_vec(&current).unwrap_or_default()
+    };
     data.push(b'\n');
     data
 }
@@ -179,10 +188,10 @@ mod tests {
     }
 
     #[test]
-    fn version_1_round_trips_with_unknown_fields() {
+    fn version_1_round_trips_with_unknown_fields_as_version_2() {
         let data = serde_json::to_vec(&sample()).unwrap();
         let Parsed::Current(file) = parse(&data).unwrap() else {
-            panic!("version 1 is current");
+            panic!("version 1 is read as current");
         };
         assert_eq!(
             file.unknown["future"],
@@ -190,13 +199,15 @@ mod tests {
         );
         assert_eq!(file.media[0].unknown["caption"], "neu");
         let again: Value = serde_json::from_slice(&to_bytes(&file)).unwrap();
-        assert_eq!(again, sample());
+        let mut expected = sample();
+        expected["formatVersion"] = serde_json::json!(2);
+        assert_eq!(again, expected);
     }
 
     #[test]
     fn newer_versions_open_read_only() {
         let mut value = sample();
-        value["formatVersion"] = serde_json::json!(2);
+        value["formatVersion"] = serde_json::json!(FORMAT_VERSION + 1);
         value["renamedField"] = serde_json::json!(true);
         let parsed = parse(&serde_json::to_vec(&value).unwrap()).unwrap();
         assert!(parsed.read_only());
@@ -232,7 +243,7 @@ mod tests {
         );
         let value: Value = serde_json::from_slice(&to_bytes(&file)).unwrap();
         assert_eq!(value["format"], "pwrite");
-        assert_eq!(value["formatVersion"], 1);
+        assert_eq!(value["formatVersion"], 2);
         assert_eq!(value["language"], "de-DE");
         assert_eq!(value["tags"], serde_json::json!([]));
         assert_eq!(value["media"], serde_json::json!([]));

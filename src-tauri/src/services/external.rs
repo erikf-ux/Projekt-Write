@@ -1054,7 +1054,7 @@ mod tests {
         ));
 
         let mut newer = stored.clone();
-        newer["formatVersion"] = serde_json::json!(2);
+        newer["formatVersion"] = serde_json::json!(pwrite::FORMAT_VERSION + 1);
         let bytes = serde_json::to_vec(&newer).unwrap();
         let newer_path = f.write("neu.pwrite", &bytes);
         let info = f.files.register(&newer_path).unwrap();

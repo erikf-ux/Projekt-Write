@@ -37,7 +37,7 @@ Das Rich-Text-Format von Project Write (Abschnitt 10). Eine `.pwrite`-Datei ist 
 
 Unbekannte Felder bleiben beim Laden und Speichern erhalten, auf oberster Ebene und in Einträgen von `media`. In der Bibliothek sind Titel und Zeitstempel der Datenbank maßgeblich; Project Write schreibt sie beim Speichern in die Hülle.
 
-## Schema von `content`, Version 1
+## Schema von `content`, Version 2
 
 Knoten haben `type`, wo nötig `attrs` und `content`; Text-Knoten haben `text` und optional `marks`. Fehlt ein Attribut, gilt der Standardwert.
 
@@ -65,8 +65,15 @@ Knoten haben `type`, wo nötig `attrs` und `content`; Text-Knoten haben `text` u
 
 Marks: `bold`, `italic`, `underline`, `strike`, `code`, `link` mit `href` (`http`, `https`, `mailto`, relative Adressen und `pwrite://<id>` für interne Links) und `title`. Die Attribute `target`, `rel` und `class` des Links schreibt der Editor mit; sie haben keine Bedeutung.
 
+Seit Version 2 (Phase 12) zusätzlich: `lang` mit `lang` (Sprach-Tag wie `en-GB`) für einen Textabschnitt in einer anderen Sprache (Abschnitt 14). In Markdown steht derselbe Abschnitt als `<span lang="en-GB">…</span>`.
+
 Bilder werden nie geladen (Abschnitt 12); sie erscheinen als Hinweis mit Adresse, bis die Medien kommen (Phase 8).
 
 ## Versionen
 
 Jede Änderung an Hülle oder Schema erhöht `formatVersion` und bringt eine Migration mit (Abschnitt 10). Eine Datei mit unbekannter höherer Version öffnet schreibgeschützt; Project Write schreibt sie nie.
+
+| Version | Änderung                | Migration                                                                                                              |
+| ------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1       | erste Fassung (Phase 5) | –                                                                                                                      |
+| 2       | Mark `lang` (Phase 12)  | keine: eine Datei der Version 1 ist eine gültige Datei der Version 2; beim nächsten Speichern steht `formatVersion: 2` |

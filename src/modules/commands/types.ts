@@ -68,6 +68,7 @@ export type CommandId =
   | 'editor.toggleSource'
   | 'statistics.show'
   | 'language.document'
+  | 'language.part'
   | 'language.toggle'
   | 'find.show'
   | 'replace.show'

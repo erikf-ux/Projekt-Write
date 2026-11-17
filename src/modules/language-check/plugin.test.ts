@@ -129,6 +129,16 @@ describe('check text of a paragraph', () => {
     target.destroy();
   });
 
+  it('makes a part marked with a language a text of its own', () => {
+    const target = editor('<p>Er sagte <span lang="en-GB">good morning</span> und ging.</p>');
+    expect(blockText(target.state.doc.child(0))?.parts).toEqual([
+      { offset: 0, text: 'Er sagte ', language: null },
+      { offset: 9, text: 'good morning', language: 'en-GB' },
+      { offset: 21, text: ' und ging.', language: null },
+    ]);
+    target.destroy();
+  });
+
   it('skips code blocks and finds the word before a position', () => {
     const target = editor('<pre><code>Fesnter</code></pre>');
     expect(blockText(target.state.doc.child(0))).toBeNull();
@@ -168,17 +178,14 @@ describe('language check in the editor', () => {
     const target = editor('<p>Das Fesnter ist offen.</p><p>Fesnter zwei.</p>');
     await vi.advanceTimersByTimeAsync(500);
     expect(underlined(target)).toEqual(['Fesnter', 'Fesnter']);
+    const before = calls.checked.length;
     target.commands.setTextSelection(2);
     type(target, 'x');
     expect(underlined(target)).toEqual(['Fesnter']);
     await vi.advanceTimersByTimeAsync(500);
     expect(underlined(target)).toEqual(['Fesnter', 'Fesnter']);
-    // Unchanged paragraphs come from the cache.
-    expect(calls.checked.map((c) => c.text)).toEqual([
-      'Das Fesnter ist offen.',
-      'Fesnter zwei.',
-      'Dxas Fesnter ist offen.',
-    ]);
+    // Only the edited paragraph is checked again; the other comes from the cache.
+    expect(calls.checked.slice(before).map((c) => c.text)).toEqual(['Dxas Fesnter ist offen.']);
     target.destroy();
   });
 

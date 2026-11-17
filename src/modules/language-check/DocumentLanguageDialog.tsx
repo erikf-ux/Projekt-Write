@@ -136,3 +136,85 @@ function ProfileForm({ documentId }: { documentId: string }) {
     </Dialog>
   );
 }
+
+/** The language of the selected text (section 14, "Textabschnitt"). */
+export const usePartDialog = create<{ open: boolean; apply: ((lang: string | null) => void) | null }>(() => ({
+  open: false,
+  apply: null,
+}));
+
+/** Opens the choice for the selection; `apply(null)` removes the mark. */
+export function openPartDialog(apply: (lang: string | null) => void): void {
+  void useLanguage.getState().loadDictionaries();
+  usePartDialog.setState({ open: true, apply });
+}
+
+export function PartLanguageDialog() {
+  const open = usePartDialog((state) => state.open);
+  if (!open) {
+    return null;
+  }
+  return <PartForm />;
+}
+
+function PartForm() {
+  const t = useT();
+  const dictionaries = useLanguage((state) => state.dictionaries);
+  const apply = usePartDialog((state) => state.apply);
+  const [tag, setTag] = useState('');
+  const id = useId();
+  const close = () => {
+    usePartDialog.setState({ open: false, apply: null });
+  };
+  const choose = (lang: string | null) => {
+    close();
+    apply?.(lang);
+  };
+  const chosen = tag || dictionaries[0]?.tag || '';
+  return (
+    <Dialog title={t('language.part.title')} onClose={close} testId="language-part">
+      <label htmlFor={id} className="text-ui mr-2 text-fg">
+        {t('language.part.language')}
+      </label>
+      <select
+        id={id}
+        className={INPUT}
+        data-testid="language-part-select"
+        data-autofocus
+        value={chosen}
+        onChange={(event) => {
+          setTag(event.target.value);
+        }}
+      >
+        {dictionaries.map((dictionary) => (
+          <option key={dictionary.tag} value={dictionary.tag}>
+            {dictionary.tag}
+          </option>
+        ))}
+      </select>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          className={SECONDARY}
+          data-testid="language-part-remove"
+          onClick={() => {
+            choose(null);
+          }}
+        >
+          {t('language.part.remove')}
+        </button>
+        <button
+          type="button"
+          className={PRIMARY}
+          data-testid="language-part-apply"
+          disabled={chosen === ''}
+          onClick={() => {
+            choose(chosen);
+          }}
+        >
+          {t('language.part.apply')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}

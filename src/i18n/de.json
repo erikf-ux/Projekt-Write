@@ -1024,5 +1024,10 @@
   "language.profile.cancel": "Abbrechen",
   "language.profile.save": "Speichern",
   "status.language": "Sprache: {language}",
-  "status.languageOff": "Sprachprüfung aus"
+  "status.languageOff": "Sprachprüfung aus",
+  "command.language.part": "Sprache des Abschnitts …",
+  "language.part.title": "Sprache des markierten Textes",
+  "language.part.language": "Sprache",
+  "language.part.apply": "Auszeichnen",
+  "language.part.remove": "Auszeichnung entfernen"
 }

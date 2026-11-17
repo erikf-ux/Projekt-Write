@@ -121,7 +121,7 @@ export async function exportPackActive(): Promise<boolean> {
   const summary = useWorkspace.getState().documents.find((entry) => entry.id === document.id);
   const envelope = {
     format: 'pwrite',
-    formatVersion: 1,
+    formatVersion: 2,
     id: document.id,
     title: document.title,
     createdAt: summary?.createdAt ?? new Date().toISOString(),

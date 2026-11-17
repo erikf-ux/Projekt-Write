@@ -13,6 +13,7 @@
  */
 import { Extension, Node, type JSONContent } from '@tiptap/core';
 import { stringAttribute } from './attributes';
+import { opensLanguagePart } from './lang';
 import { startInParagraph } from './tokenizers';
 
 /** Raw inline HTML as CommonMark defines it: tags, comments, declarations. */
@@ -64,7 +65,8 @@ function opensUnderline(src: string): boolean {
 
 /**
  * Inline HTML the editor understands itself (section 10): a `<u>…</u>` pair,
- * `<br>` and `<img>` of the allowed subset. Everything else stays raw.
+ * `<br>`, `<img>` of the allowed subset and a language part
+ * `<span lang="…">…</span>` (Phase 12). Everything else stays raw.
  */
 function isAllowedInlineHtml(tag: string | undefined, html: string, src: string): boolean {
   switch (tag) {
@@ -74,6 +76,9 @@ function isAllowedInlineHtml(tag: string | undefined, html: string, src: string)
       return /^<br\s*\/?>$/i.test(html);
     case 'img':
       return isAllowedImageHtml(html);
+    case 'span':
+      // `<span lang="…">…</span>` is a language part (lang.ts).
+      return opensLanguagePart(src);
     default:
       return false;
   }

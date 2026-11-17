@@ -1024,5 +1024,10 @@
   "language.profile.cancel": "Cancel",
   "language.profile.save": "Save",
   "status.language": "Language: {language}",
-  "status.languageOff": "Language check off"
+  "status.languageOff": "Language check off",
+  "command.language.part": "Language of the selection …",
+  "language.part.title": "Language of the selected text",
+  "language.part.language": "Language",
+  "language.part.apply": "Mark",
+  "language.part.remove": "Remove the mark"
 }

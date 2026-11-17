@@ -21,7 +21,7 @@ use crate::services::language::own::{
     DocumentLanguage, MAX_NAME_CHARS, MAX_WORD_CHARS, OwnData, OwnDictionary, OwnError, OwnWord,
     WordCategory, WordImport,
 };
-use crate::services::language::{CheckParts, CheckedText};
+use crate::services::language::{CheckParts, CheckedText, detect};
 use crate::services::locale::Locale;
 use crate::services::settings::ui::LanguageCheckSettings;
 use crate::state::AppState;
@@ -168,6 +168,11 @@ pub struct CheckTextRequest {
     #[serde(default)]
     #[ts(optional)]
     pub language: Option<String>,
+    /// The language of the paragraph before, for a paragraph too short to
+    /// be detected.
+    #[serde(default)]
+    #[ts(optional)]
+    pub inherit: Option<String>,
 }
 
 /// Request of `language_check`.
@@ -196,6 +201,7 @@ impl Validate for LanguageCheckRequest {
             }
             total += count;
             check_language("language", text.language.as_ref())?;
+            check_language("inherit", text.inherit.as_ref())?;
         }
         if total > MAX_REQUEST_CHARS {
             return Err(CommandError::invalid_input("texts", "too long together"));
@@ -219,15 +225,21 @@ pub async fn language_check(
         rules: settings.enabled && settings.rules,
     };
     let service = state.language.clone();
+    let default = default_language(&state);
+    let detect = settings.detect;
     tauri::async_runtime::spawn_blocking(move || {
         request
             .texts
             .iter()
             .map(|text| {
-                let language = text
-                    .language
-                    .clone()
-                    .unwrap_or_else(|| languages[0].clone());
+                // Section 14: a marked part, the detection, the paragraph
+                // before (short paragraphs), the profile, the default.
+                let language = text.language.clone().unwrap_or_else(|| {
+                    match detect.then(|| detect::detect(&text.text)).flatten() {
+                        Some(found) => detect::choose(found, &languages, &default, service.store()),
+                        None => text.inherit.clone().unwrap_or_else(|| languages[0].clone()),
+                    }
+                });
                 service.check(&text.text, &language, &languages, &own, parts)
             })
             .collect()
@@ -1061,6 +1073,7 @@ mod tests {
             texts: vec![CheckTextRequest {
                 text: "Text".to_owned(),
                 language: Some("../de".to_owned()),
+                inherit: None,
             }],
         };
         assert!(request.validate().is_err());
@@ -1069,6 +1082,7 @@ mod tests {
             texts: vec![CheckTextRequest {
                 text: "x".repeat(MAX_TEXT_CHARS + 1),
                 language: None,
+                inherit: None,
             }],
         };
         assert!(request.validate().is_err());

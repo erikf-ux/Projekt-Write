@@ -8,4 +8,9 @@ export type CheckTextRequest = { text: string,
 /**
  * A language the text is marked with; none: the document's.
  */
-language?: string, };
+language?: string, 
+/**
+ * The language of the paragraph before, for a paragraph too short to
+ * be detected.
+ */
+inherit?: string, };

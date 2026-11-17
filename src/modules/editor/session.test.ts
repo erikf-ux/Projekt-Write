@@ -39,6 +39,23 @@ describe('editor session', () => {
     expect(markdown.text()).toBe(text);
   });
 
+  it('reads and writes parts in another language as <span lang>', () => {
+    const text = 'Er sagte <span lang="en-GB">good *morning*</span> und ging.\n';
+    const markdown = session('md', text);
+    expect(markdown.view).toBe('rich');
+    expect(markdown.root.querySelector('[data-view="rich"] span.pw-lang')?.getAttribute('lang')).toBe(
+      'en-GB',
+    );
+    expect(markdown.text()).toBe(text);
+    // Marked from the editor and saved as such.
+    markdown.editor.commands.setTextSelection({ from: 1, to: 3 });
+    markdown.editor.commands.setLanguagePart('de-CH');
+    expect(markdown.text()).toBe(
+      '<span lang="de-CH">Er</span> sagte <span lang="en-GB">good *morning*</span> und ging.\n',
+    );
+    expect(markdown.editor.commands.setLanguagePart('../x')).toBe(false);
+  });
+
   it('keeps plain text exactly, spaces and tabs included', () => {
     const text = '  eingerückt\n\tTab\n\nzwei Leerzeilen davor  \n';
     const plain = session('txt', text);

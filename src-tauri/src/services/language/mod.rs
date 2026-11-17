@@ -7,6 +7,7 @@
 //! maps the findings back to its positions (UTF-16 offsets).
 
 pub mod autocorrect;
+pub mod detect;
 pub mod dictionaries;
 pub mod engine;
 pub mod own;

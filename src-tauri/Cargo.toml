@@ -47,6 +47,7 @@ tokio = { version = "1", features = ["sync", "rt"] }
 # Spelling (Phase 12, ADR 0023): Hunspell dictionaries in pure Rust; pinned
 # exactly while it is an alpha, the corpus in tests/data/language decides.
 spellbook = "=0.4.2"
+whatlang = "0.18.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.191"

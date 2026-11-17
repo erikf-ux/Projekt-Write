@@ -42,7 +42,11 @@ import { InternalLinkPicker } from '@/modules/editor/InternalLinkPicker';
 import { HistoryDialog, VersionNameDialog } from '@/modules/history/HistoryDialog';
 import { offerRecovery, RecoveryDialog } from '@/modules/recovery/RecoveryDialog';
 import { CheckMenu } from '@/modules/language-check/CheckMenu';
-import { DocumentLanguageDialog, openProfileDialog } from '@/modules/language-check/DocumentLanguageDialog';
+import {
+  DocumentLanguageDialog,
+  openProfileDialog,
+  PartLanguageDialog,
+} from '@/modules/language-check/DocumentLanguageDialog';
 import { documentLanguage, useLanguage } from '@/modules/language-check/languageStore';
 import { ImageDialog } from '@/modules/editor/ImageDialog';
 import { LinkDialog } from '@/modules/editor/LinkDialog';
@@ -421,6 +425,7 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
       <RecoveryDialog />
       <CheckMenu />
       <DocumentLanguageDialog />
+      <PartLanguageDialog />
       <VersionNameDialog />
       <SubnetDialog />
       <SubnetPicker />

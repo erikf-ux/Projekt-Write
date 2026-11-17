@@ -291,6 +291,13 @@
   background: color-mix(in srgb, #2f6fe0 25%, transparent);
 }
 
+/* A part in another language (lang mark): a faint dotted frame below,
+   the language as a tooltip is not needed – the status bar names it. */
+.pw-surface .pw-lang {
+  background: color-mix(in srgb, var(--pw-color-accent) 7%, transparent);
+  border-bottom: 1px dotted color-mix(in srgb, var(--pw-color-accent) 60%, transparent);
+}
+
 /* A correction of the autocorrect, briefly. */
 .pw-surface .pw-check-corrected {
   background: color-mix(in srgb, var(--pw-color-success) 30%, transparent);
@@ -304,10 +311,12 @@
 }
 
 @media print {
+  .pw-lang,
   .pw-check,
   .pw-check-corrected {
     text-decoration: none !important;
     background: none !important;
+    border: 0 !important;
   }
 }
 

@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(checked.content, data);
         let newer = String::from_utf8(data)
             .unwrap()
-            .replace("\"formatVersion\":1", "\"formatVersion\":2");
+            .replace("\"formatVersion\":2", "\"formatVersion\":3");
         assert_eq!(
             check("Neu.pwrite", newer.as_bytes()),
             Err(ImportError::NotText("newer .pwrite"))

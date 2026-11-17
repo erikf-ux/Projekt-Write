@@ -3,6 +3,7 @@
  * hold, nothing more, so saving never has to drop formatting. Raw HTML and
  * footnotes are kept as atoms (`raw.ts`), images as notes (`image.ts`).
  */
+import { LanguagePart } from './lang';
 import type { AnyExtension } from '@tiptap/core';
 import { TableKit } from '@tiptap/extension-table';
 import StarterKit from '@tiptap/starter-kit';
@@ -94,5 +95,6 @@ export function markdownExtensions(): AnyExtension[] {
     RawBlock,
     RawInline,
     Footnotes,
+    LanguagePart,
   ];
 }
