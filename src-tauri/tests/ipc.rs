@@ -1084,7 +1084,7 @@ fn pwrite_documents_keep_their_envelope_and_unknown_fields() {
     ));
     let envelope: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
     assert_eq!(envelope["format"], "pwrite");
-    assert_eq!(envelope["formatVersion"], 1);
+    assert_eq!(envelope["formatVersion"], 2);
     assert_eq!(envelope["id"], id.as_str());
     assert_eq!(envelope["title"], "Roman");
 
@@ -1147,7 +1147,7 @@ fn pwrite_documents_keep_their_envelope_and_unknown_fields() {
 
     // A newer format version opens read only and is never written.
     let mut newer = after.clone();
-    newer["formatVersion"] = json!(2);
+    newer["formatVersion"] = json!(3);
     std::fs::write(&file, serde_json::to_vec(&newer).unwrap()).unwrap();
     let read = call(&app, "document_read", json!({ "id": id })).unwrap();
     assert_eq!(read["readOnly"], true);
