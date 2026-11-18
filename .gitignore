@@ -15,7 +15,7 @@ tests/e2e/logs/
 *.log
 
 # Worktrees of parallel agent sessions
-.claude/worktrees/
+.claude/
 
 # Editors and OS
 .vscode/*
