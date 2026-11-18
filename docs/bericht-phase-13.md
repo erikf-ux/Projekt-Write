@@ -163,7 +163,7 @@ Keine bekannten.
 | Lauf | Ergebnis      | Inhalt                                                                                                                      |
 | ---- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | 121  | rot (Windows) | E2E „kein fremder Code“: WebView2 nimmt eingeschleusten Testcode von der eval-Regel aus (siehe Behobene Fehler); Linux grün |
-| 122  | LAUF122       | Abschluss Phase 13                                                                                                          |
+| 122  | grün          | Abschluss Phase 13                                                                                                          |
 
 ## Nächster Schritt
 

@@ -10,13 +10,13 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 12 – Sprachprüfung** (Abschnitte 7, 14): freigegeben („Setze fort“), abgeschlossen, CI-Lauf 120 grün. LanguageTool nach Entscheidung des Auftraggebers als Variante 2 (vorhandene Installation, kein Download). Bericht in `docs/bericht-phase-12.md`.
 
-**Phase 13 – Erweiterungen** (Abschnitt 22): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Register in Rust, Register im Frontend, Einstellungen übertragen), zusammengeführt und geprüft; Bericht in `docs/bericht-phase-13.md`.
+**Phase 13 – Erweiterungen** (Abschnitt 22): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Register in Rust, Register im Frontend, Einstellungen übertragen), abgeschlossen, CI-Lauf 122 grün; Bericht in `docs/bericht-phase-13.md`. Wartet auf die Freigabe von Phase 14.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
 Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh), ADR 0023 (Prüfwerk `spellbook`), ADR 0024 (Wörterbücher), ADR 0025 (Sprachprüfung), ADR 0026 (LanguageTool über eine vorhandene Installation), ADR 0027 (Erweiterungen: Register, kein fremder Code, Einstellungen übertragen).
 
-CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Phase 12: Lauf 118 grün (Zwischenstand), 119 rot (F-58), **120 grün** (Abschluss Phase 12). Phase 13: Lauf 121 rot (Windows, E2E-Test zu `eval`, siehe Bericht), Abschluss siehe Bericht. Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Phase 12: Lauf 118 grün (Zwischenstand), 119 rot (F-58), **120 grün** (Abschluss Phase 12). Phase 13: Lauf 121 rot (Windows, E2E-Test zu `eval`, siehe Bericht), **122 grün** (Abschluss Phase 13). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 13
 
