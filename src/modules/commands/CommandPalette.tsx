@@ -3,7 +3,8 @@
  * work right now, filtered by what the user types.
  *
  * ARIA combobox pattern: the input keeps the focus, arrow keys move the
- * active option (`aria-activedescendant`), Enter runs it, Escape closes.
+ * active option (`aria-activedescendant`), Enter runs it, Escape closes
+ * and gives the focus back.
  */
 import { Search } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
@@ -56,8 +57,17 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
   const matches = useMemo(() => filterEntries(entries, query), [entries, query]);
   const current = matches[Math.min(active, matches.length - 1)];
 
+  // The focus returns to where it was when the palette closes, unless the
+  // command moved it (a dialog takes it from there and gives it back).
   useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     input.current?.focus();
+    return () => {
+      const current = document.activeElement;
+      if (previous?.isConnected && (current === null || current === document.body)) {
+        previous.focus();
+      }
+    };
   }, []);
 
   useEffect(() => {

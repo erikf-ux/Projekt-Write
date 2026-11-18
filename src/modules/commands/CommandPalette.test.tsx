@@ -58,4 +58,15 @@ describe('CommandPalette', () => {
     fireEvent.click(screen.getByText('Vergrößern'));
     expect(onRun).toHaveBeenCalledWith('zoom.in');
   });
+
+  it('gives the focus back to where it was when it closes', () => {
+    const origin = document.createElement('button');
+    document.body.append(origin);
+    origin.focus();
+    const { unmount } = render(<CommandPalette entries={entries} onRun={vi.fn()} onClose={vi.fn()} />);
+    expect(document.activeElement).toBe(screen.getByRole('combobox'));
+    unmount();
+    expect(document.activeElement).toBe(origin);
+    origin.remove();
+  });
 });

@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import { $, browser, expect } from '@wdio/globals';
 import { activeDocumentId, activeEditor, documentFile, draftFile } from '../editing';
+import { measured } from '../measurements';
 import { handover } from '../sandbox';
 import { pinMainWindow } from '../session';
 
@@ -42,8 +43,8 @@ describe('Recovery after a hard kill (stage 2)', () => {
     const kept = restored.length;
     const firstLost = crash.typed[kept];
     const lostMs = firstLost === undefined ? 0 : crash.killedAt - firstLost;
-    console.log(
-      `Kept ${String(kept)} of ${String(crash.typed.length)} typed characters; lost the last ${String(lostMs)} ms.`,
+    measured(
+      `Recovery draft after a hard kill while typing (${process.platform}): kept ${String(kept)} of ${String(crash.typed.length)} typed characters; lost the last ${String(lostMs)} ms (target ≤ ${String(MAX_LOSS_MS)} ms)`,
     );
     expect(lostMs).toBeLessThanOrEqual(MAX_LOSS_MS);
 

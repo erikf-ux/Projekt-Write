@@ -5,7 +5,8 @@
  *   Explorer until the frame that shows the editable text has been drawn.
  * * "Tippverzögerung bei 50.000 Wörtern": 95 % of the key presses ≤ 50 ms,
  *   from the key press until the frame that shows the character has been
- *   drawn. (The language check comes with its own phase.)
+ *   drawn. The language check (Phase 12) is on, as it is by default; the
+ *   log says whether it was.
  *
  * The keys are dispatched in the page the way the embedded WebDriver does it
  * (a `keydown`, then `document.execCommand('insertText')` unless a handler
@@ -20,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { $, browser, expect } from '@wdio/globals';
 import { END_MARKER, longGermanText } from '../longText';
+import { measured } from '../measurements';
 import { pickedFolders, sandbox } from '../sandbox';
 import { closeSettings, pinMainWindow } from '../session';
 
@@ -210,6 +212,7 @@ describe('Project Write – Phase 4 performance', () => {
   const text = longGermanText(TARGET_WORDS);
   let id = '';
   const results: string[] = [];
+  let languageCheck = 'unbekannt';
 
   before(async () => {
     await pinMainWindow();
@@ -217,13 +220,25 @@ describe('Project Write – Phase 4 performance', () => {
     await closeSettings();
     // Typing 200 keys at a human pace takes about half a minute.
     await browser.setTimeout({ script: 180_000 });
+    languageCheck = await browser.execute(async () => {
+      const internals = (
+        window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }
+      ).__TAURI_INTERNALS__;
+      const state = (await internals.invoke('ui_state', { request: {} })) as {
+        settings: { languageCheck: { enabled: boolean } };
+      };
+      return state.settings.languageCheck.enabled ? 'an' : 'aus';
+    });
   });
 
-  // For the report: logged, and kept in the sandbox until the next run.
+  // For the report: logged with the other measurements (measurements.ts),
+  // and kept in the sandbox until the next run.
   after(() => {
-    const report = `Leistung (${process.platform}, ${String(text.words)} Wörter):\n${results.join('\n')}\n`;
-    console.log(`\n${report}`);
-    fs.writeFileSync(path.join(sandbox, 'performance.txt'), report);
+    const heading = `Leistung (${process.platform}, ${String(text.words)} Wörter, Sprachprüfung ${languageCheck})`;
+    for (const line of results) {
+      measured(`${heading}: ${line}`);
+    }
+    fs.writeFileSync(path.join(sandbox, 'performance.txt'), `${heading}:\n${results.join('\n')}\n`);
   });
 
   it('imports a manuscript of 50,000 words and counts them right', async () => {
