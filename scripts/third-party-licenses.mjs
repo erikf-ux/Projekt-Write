@@ -168,7 +168,10 @@ const LICENCE_FILE = /^(licen[cs]e|copying|notice|copyright|unlicense|authors)([
 const STANDARD = ['MIT', 'Apache-2.0', 'BSD-3-Clause', 'MPL-2.0'];
 
 function readNormalized(file) {
-  return readFileSync(file, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+  return readFileSync(file, 'utf8')
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\s+$/, '');
 }
 
 /** The licence files of a package directory, sorted, as normalized text. */
