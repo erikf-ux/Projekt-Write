@@ -21,7 +21,7 @@
  *      AppImage is copied into ~/Applications, it has no installer).
  *   3. The installed files: the program, every dictionary file byte for byte
  *      as in src-tauri/dictionaries (ADR 0024), LICENSE-MIT, LICENSE-APACHE
- *      and THIRD-PARTY-LICENSES byte for byte as in the repository, and no
+ *      THIRD-PARTY-LICENSES and THIRD-PARTY-NOTICES byte for byte as in the repository, and no
  *      test plugin in the installed program (section 20).
  *   4. Smoke start (unless --no-smoke): the installed program starts, is
  *      still running after a few seconds and has written its start line to
@@ -66,7 +66,7 @@ const PRODUCT = config.productName;
 const VERSION = config.version;
 const IDENTIFIER = config.identifier;
 const LIBRARY_FOLDER = 'ProjectWrite';
-const LICENSE_FILES = ['LICENSE-MIT', 'LICENSE-APACHE', 'THIRD-PARTY-LICENSES'];
+const LICENSE_FILES = ['LICENSE-MIT', 'LICENSE-APACHE', 'THIRD-PARTY-LICENSES', 'THIRD-PARTY-NOTICES'];
 const TEST_PLUGIN_MARKERS = ['tauri-plugin-wdio', 'wdio-webdriver', 'tauri_plugin_wdio'];
 const SMOKE_SECONDS = 15;
 const isWindows = process.platform === 'win32';

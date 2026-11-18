@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           node scripts/third-party-licenses.mjs
-          git diff --exit-code -- THIRD-PARTY-LICENSES
+          git diff --exit-code -- THIRD-PARTY-LICENSES THIRD-PARTY-NOTICES
 
       - name: Build debug app with end-to-end support
         run: npm run build:e2e

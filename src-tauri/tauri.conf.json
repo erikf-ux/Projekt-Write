@@ -66,7 +66,8 @@
       "dictionaries/": "dictionaries/",
       "../LICENSE-MIT": "LICENSE-MIT",
       "../LICENSE-APACHE": "LICENSE-APACHE",
-      "../THIRD-PARTY-LICENSES": "THIRD-PARTY-LICENSES"
+      "../THIRD-PARTY-LICENSES": "THIRD-PARTY-LICENSES",
+      "../THIRD-PARTY-NOTICES": "THIRD-PARTY-NOTICES"
     },
     "fileAssociations": [
       {

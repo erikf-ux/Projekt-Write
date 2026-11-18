@@ -13,7 +13,7 @@ Project Write wird für **Windows** (NSIS-Installer und MSI-Paket) und **Linux**
 | Linux     | `Project Write_<Version>_amd64.deb`      | Paket für Debian, Ubuntu und Abkömmlinge                     |
 | Linux     | `Project Write_<Version>_amd64.AppImage` | Einzeldatei ohne Installation, für andere Distributionen     |
 
-Jedes Paket enthält das Programm, die mitgelieferten Wörterbücher (`dictionaries/`, je Sprache mit eigener Lizenzdatei; dazu der Quelltext von igerman98 in `dictionaries/sources/`, ADR 0024) sowie die Lizenztexte `LICENSE-MIT`, `LICENSE-APACHE` und die Liste der Fremdkomponenten `THIRD-PARTY-LICENSES`. Die Lizenzseite der Windows-Installer zeigt `src-tauri/installer/license.txt`: die Wahl zwischen MIT und Apache-2.0 und beide Texte unverändert (erzeugt mit `node scripts/installer-license.mjs`, CI prüft, dass die Datei aktuell ist).
+Jedes Paket enthält das Programm, die mitgelieferten Wörterbücher (`dictionaries/`, je Sprache mit eigener Lizenzdatei; dazu der Quelltext von igerman98 in `dictionaries/sources/`, ADR 0024) sowie die Lizenztexte `LICENSE-MIT`, `LICENSE-APACHE`, die Liste der Fremdkomponenten `THIRD-PARTY-LICENSES` und deren vollständige Lizenztexte und Copyright-Hinweise `THIRD-PARTY-NOTICES`. Die Lizenzseite der Windows-Installer zeigt `src-tauri/installer/license.txt`: die Wahl zwischen MIT und Apache-2.0 und beide Texte unverändert (erzeugt mit `node scripts/installer-license.mjs`, CI prüft, dass die Datei aktuell ist).
 
 Testplugins sind in keinem Paket enthalten (Abschnitt 20): Der Installer-Test sucht im installierten Programm nach dem WebDriver-Plugin und bricht ab, wenn er es findet.
 
