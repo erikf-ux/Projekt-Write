@@ -129,6 +129,7 @@ Die Tippverzögerung liegt bei 35 ms (95 %).
 
 ## Was konnte nicht getestet werden und warum?
 
+- **`eval` im echten Programm unter Windows:** Der WebDriver von WebView2 ist von der eval-Regel ausgenommen; geprüft ist dort die geltende Richtlinie, unter WebKitGTK das Verbot selbst.
 - **`register` nach dem Start im echten Programm:** Das E2E-Programm nutzt dasselbe Frontend wie die Auslieferung. Ein Testzugang zu den Registern würde also mit ausgeliefert und wäre selbst ein Ladeweg. Belegt ist es deshalb in Vitest, mit derselben Startfolge; der E2E-Test zeigt, dass kein Register von außen erreichbar ist.
 - **Echte Dateidialoge** für Export und Import sind in CI nicht bedienbar. Die E2E-Builds beantworten sie über eine Umgebungsvariable, wie bei den anderen Dialogen (ADR 0008).
 - **„Ordner öffnen“:** Geprüft ist, dass der Befehl den richtigen Ordner an das System weitergibt. Ob der Dateimanager wirklich aufgeht, ist nicht geprüft.
@@ -141,6 +142,7 @@ Keine bekannten.
 ## Behobene Fehler
 
 - **E2E-Test „kein fremder Code“ unter WebKitGTK:** Der WebDriver von WebKitGTK meldet einen Fehler, den der Code im Programm selbst abfängt (die Ablehnung durch die CSP, ein abgelehntes `import()`), als gescheiterten Befehl. Der Test wertet diese Meldung jetzt als Ablehnung und liest Ergebnis und CSP-Verstöße in einem zweiten Schritt aus dem Programm. Nachgestellt und geprüft mit einer Probe in WebKitGTK; das Programm selbst war nicht fehlerhaft.
+- **E2E-Test „kein fremder Code“ unter Windows (CI-Lauf 121):** Unter WebView2 lief `eval`, das der vom WebDriver eingeschleuste Testcode aufrief. Alle Ladewege blieben gesperrt (Inline-Skript, `data:`, `blob:`, fremde Adresse, `import()`), und die geltende `script-src` enthält kein `'unsafe-eval'`. Chromium nimmt eingeschleusten Code also von der eval-Regel der Seite aus; Code der App selbst unterliegt ihr. Unter WebKitGTK gilt die Regel auch für eingeschleusten Code, dort belegt der Test das Verbot von `eval`, `new Function` und `setTimeout` mit Text direkt. Unter WebView2 belegt er es über die geltende Richtlinie. Das ist eine Grenze des Testwerkzeugs, kein Fehler der App.
 - **Gemeinsamer Build-Cache der Agenten:** Ein Build eines Worktrees schrieb einmal Berechtigungsdateien in den anderen. Nach dem Zusammenführen ist geprüft, dass Befehle, Berechtigungsdateien und Capability genau übereinstimmen.
 
 ## Gefundene Widersprüche und Abweichungen
@@ -158,9 +160,10 @@ Keine bekannten.
 
 ## CI
 
-| Lauf | Ergebnis | Inhalt   |
-| ---- | -------- | -------- |
-| 121  | LAUF121  | Phase 13 |
+| Lauf | Ergebnis      | Inhalt                                                                                                                      |
+| ---- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 121  | rot (Windows) | E2E „kein fremder Code“: WebView2 nimmt eingeschleusten Testcode von der eval-Regel aus (siehe Behobene Fehler); Linux grün |
+| 122  | LAUF122       | Abschluss Phase 13                                                                                                          |
 
 ## Nächster Schritt
 

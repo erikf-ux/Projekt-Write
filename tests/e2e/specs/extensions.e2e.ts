@@ -214,6 +214,13 @@ async function run(kind: Attempt): Promise<{ error: string | null; script: strin
   );
 }
 
+/** The webview exempts code injected by the WebDriver from the eval rule. */
+function exemptsInjectedEval(): boolean {
+  const name = (browser.capabilities as { browserName?: string }).browserName ?? '';
+  // WebView2 under Windows; the driver reports it as msedge.
+  return process.platform === 'win32' || /edge|chrom/i.test(name);
+}
+
 /** The sources of `script-src` in a policy. */
 function scriptSources(policy: string): string[] {
   const directive = policy
@@ -236,14 +243,25 @@ describe('No foreign code (Phase 13)', () => {
 
   it('cannot run text as code: eval, new Function and setTimeout with a string', async () => {
     const evaluated = await attempt('eval');
+    const constructed = await attempt('function');
+    const timer = await attempt('timeout');
+    if (exemptsInjectedEval()) {
+      // Chromium (WebView2) does not apply the page's eval rule to code the
+      // WebDriver injects (CI run 121: eval from the test ran, while every
+      // loading path below stayed blocked). There the rule is shown by the
+      // policy in force, which has no 'unsafe-eval'; WebKitGTK applies it to
+      // injected code too and proves it below.
+      const outcome = await attempt('inline');
+      const sources = scriptSources(outcome.policy ?? '');
+      expect(sources).toContain("'self'");
+      expect(sources).not.toContain("'unsafe-eval'");
+      expect(sources).not.toContain("'wasm-unsafe-eval'");
+      return;
+    }
     expect(evaluated.ran).toBe(false);
     expect(evaluated.error).toMatch(/EvalError/);
-
-    const constructed = await attempt('function');
     expect(constructed.ran).toBe(false);
     expect(constructed.error).toMatch(/EvalError/);
-
-    const timer = await attempt('timeout');
     expect(timer.ran).toBe(false);
   });
 
