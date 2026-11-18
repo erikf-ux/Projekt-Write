@@ -12,6 +12,8 @@ src-tauri/gen/schemas/
 tests/e2e/.tmp/
 tests/e2e/.cache/
 tests/e2e/logs/
+# Traces and samples of the network test (scripts/network-check.mjs)
+tests/e2e/.network/
 *.log
 
 # Worktrees of parallel agent sessions

@@ -1,0 +1,95 @@
+/*
+ * Network test, Linux (master prompt, sections 2 and 20; ADR 0028):
+ * records in the kernel every socket address the app and the processes it
+ * starts (WebKitWebProcess, WebKitNetworkProcess, ...) connect or send to.
+ * scripts/network-check.mjs evaluates the output.
+ *
+ * Run as root while the app runs; scripts/network-record-linux.sh starts
+ * and stops it. Unlike strace, nothing stops the app: it runs as fast as in
+ * any other E2E run.
+ *
+ * Output, one line per event:
+ *   <pid> exec <file>                       an app start
+ *   <pid> <call> <length> <address> <comm>  connect, sendto, sendmsg or
+ *                                           sendmmsg with an address; the
+ *                                           first bytes of the socket
+ *                                           address in hex (\xNN)
+ */
+
+BEGIN
+{
+  printf("ready\n");
+}
+
+/* The app: every process that executes the binary project-write ... */
+tracepoint:sched:sched_process_exec
+/comm == "project-write"/
+{
+  @app[pid] = 1;
+  printf("%d exec %s\n", pid, str(args->filename));
+}
+
+/* ... and everything it starts, threads included (pid is the parent). */
+tracepoint:sched:sched_process_fork
+/@app[pid]/
+{
+  @app[args->child_pid] = 1;
+}
+
+tracepoint:sched:sched_process_exit
+/@app[tid]/
+{
+  delete(@app[tid]);
+}
+
+tracepoint:syscalls:sys_enter_connect
+/@app[pid]/
+{
+  $length = args->addrlen;
+  if ($length > 64) {
+    $length = 64;
+  }
+  printf("%d connect %d %rx %s\n", pid, $length, buf(args->uservaddr, $length), comm);
+}
+
+tracepoint:syscalls:sys_enter_sendto
+/@app[pid] && args->addr != 0/
+{
+  $length = args->addr_len;
+  if ($length > 64) {
+    $length = 64;
+  }
+  printf("%d sendto %d %rx %s\n", pid, $length, buf(args->addr, $length), comm);
+}
+
+/* Messages on connected sockets carry no address; their connect is above. */
+tracepoint:syscalls:sys_enter_sendmsg
+/@app[pid] && args->msg->msg_name != 0/
+{
+  $length = args->msg->msg_namelen;
+  if ($length > 64) {
+    $length = 64;
+  }
+  printf("%d sendmsg %d %rx %s\n", pid, $length, buf(args->msg->msg_name, $length), comm);
+}
+
+/* The first four messages of a batch (glibc sends DNS queries in pairs). */
+tracepoint:syscalls:sys_enter_sendmmsg
+/@app[pid]/
+{
+  $i = (uint64)0;
+  $count = (uint64)args->vlen;
+  unroll(4) {
+    if ($i < $count) {
+      $header = args->mmsg + $i;
+      if ($header->msg_hdr.msg_name != 0) {
+        $length = $header->msg_hdr.msg_namelen;
+        if ($length > 64) {
+          $length = 64;
+        }
+        printf("%d sendmmsg %d %rx %s\n", pid, $length, buf($header->msg_hdr.msg_name, $length), comm);
+      }
+    }
+    $i++;
+  }
+}

@@ -96,6 +96,8 @@ Stand: 10. November 2026 (Phase 7: SQLite 3.54.1 über eine gepatchte Kopie von 
 
 `libwebkit2gtk-4.1-dev`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`; für E2E zusätzlich `xvfb` und `dbus` (`dbus-run-session`: das Einzelinstanz-Plugin braucht unter Linux einen Sitzungsbus).
 
+Für den Netzwerktest (Phase 14) zusätzlich `bpftrace` 0.20 (Apache-2.0, nur Testwerkzeug, nicht ausgeliefert, braucht root): zeichnet im Kernel jede Socket-Adresse auf, an die die App und ihre Kindprozesse während der E2E-Suite verbinden oder senden, ohne die App anzuhalten (`scripts/network-trace.bt`, `docs/sicherheit.md`; `strace` verlangsamte die Suite so, dass sie scheiterte). Unter Windows nutzt der Netzwerktest nur Bordmittel (PowerShell, DNS-Client-Protokoll).
+
 Optional für Entwickler unter Linux: `mingw-w64` und das Rust-Ziel `x86_64-pc-windows-gnu`, um Windows-Code mit `cargo clippy --target x86_64-pc-windows-gnu` vor dem CI-Lauf zu prüfen (nur Prüfung, kein Auslieferungsbuild).
 
 ## Geprüft und nicht verwendet (Phasen 2 und 5)
@@ -128,6 +130,8 @@ Größte Icongröße ist 256 × 256 px (Vorgabe des Auftraggebers, 2. November 2
 - `cargo deny` erlaubt: MIT, Apache-2.0, Apache-2.0 WITH LLVM-exception, BSD-3-Clause, ISC, Unicode-3.0, Zlib, MPL-2.0 (`src-tauri/deny.toml`).
 
 ## Audit-Stand (10. November 2026)
+
+Aktuelle Auswertung vom 18. November 2026 (CI-Lauf 122 und lokal) mit jeder einzelnen Meldung: `docs/sicherheit.md`, Abschnitt 6. Seither neu: `cargo audit` meldet zusätzlich RUSTSEC-2026-0543 (`chrono` nicht gepflegt; steht nur in `Cargo.lock`, wird nicht gebaut), also 6 erlaubte Warnungen; `npm audit` mit Entwicklungswerkzeugen 33 statt 34 Funde (19 mittel, 14 hoch).
 
 | Prüfung                         | Ergebnis                               | Bewertung                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
