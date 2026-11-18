@@ -96,6 +96,15 @@ Stand: 10. November 2026 (Phase 7: SQLite 3.54.1 über eine gepatchte Kopie von 
 
 `libwebkit2gtk-4.1-dev`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`; für E2E zusätzlich `xvfb` und `dbus` (`dbus-run-session`: das Einzelinstanz-Plugin braucht unter Linux einen Sitzungsbus).
 
+Für die Installer (Phase 14, Job „Installers“): zusätzlich `patchelf` und `file`, die `linuxdeploy` beim Bau des AppImages braucht. `tauri build` lädt seine Bündelwerkzeuge selbst (Linux: `linuxdeploy` mit AppImage-Laufzeit; Windows: NSIS und WiX Toolset); sie landen nicht im Repository.
+
+## CI-Aktionen der Auslieferung (Phase 14)
+
+| Aktion                      | Version | Lizenz | Zweck                                                                                                                                            |
+| --------------------------- | ------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `actions/upload-artifact`   | v6      | MIT    | Lädt die Installer als Artefakt hoch (7 Tage); nötig, damit ein frischer Runner ohne Build-Werkzeuge Installation und Deinstallation prüfen kann |
+| `actions/download-artifact` | v7      | MIT    | Holt diese Installer im Job „Install and uninstall“ auf den frischen Runner                                                                      |
+
 Optional für Entwickler unter Linux: `mingw-w64` und das Rust-Ziel `x86_64-pc-windows-gnu`, um Windows-Code mit `cargo clippy --target x86_64-pc-windows-gnu` vor dem CI-Lauf zu prüfen (nur Prüfung, kein Auslieferungsbuild).
 
 ## Geprüft und nicht verwendet (Phasen 2 und 5)
