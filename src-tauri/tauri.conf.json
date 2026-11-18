@@ -47,9 +47,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi", "deb", "appimage"],
+    "publisher": "The Project Write authors",
+    "copyright": "Copyright (c) 2026 The Project Write authors",
+    "license": "MIT OR Apache-2.0",
+    "licenseFile": "installer/license.txt",
     "category": "Productivity",
     "shortDescription": "Local writing and knowledge management",
+    "longDescription": "Project Write is a local, offline writing and knowledge management app. Documents, media and the knowledge network stay in a library folder on your own disk; nothing is sent over the network.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -58,7 +63,10 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "dictionaries/": "dictionaries/"
+      "dictionaries/": "dictionaries/",
+      "../LICENSE-MIT": "LICENSE-MIT",
+      "../LICENSE-APACHE": "LICENSE-APACHE",
+      "../THIRD-PARTY-LICENSES": "THIRD-PARTY-LICENSES"
     },
     "fileAssociations": [
       {
@@ -69,11 +77,26 @@
         "mimeType": "application/x-project-write"
       }
     ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "German"],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    },
     "linux": {
       "deb": {
         "desktopTemplate": "linux/project-write.desktop",
         "files": {
-          "/usr/share/mime/packages/app.projectwrite.desktop.xml": "linux/project-write-mime.xml"
+          "/usr/share/mime/packages/app.projectwrite.desktop.xml": "linux/project-write-mime.xml",
+          "/usr/share/doc/project-write/copyright": "installer/license.txt"
         }
       },
       "rpm": {
@@ -81,6 +104,9 @@
         "files": {
           "/usr/share/mime/packages/app.projectwrite.desktop.xml": "linux/project-write-mime.xml"
         }
+      },
+      "appimage": {
+        "bundleMediaFramework": false
       }
     }
   }
