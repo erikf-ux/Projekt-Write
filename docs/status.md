@@ -10,7 +10,7 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 12 – Sprachprüfung** (Abschnitte 7, 14): freigegeben („Setze fort“), abgeschlossen, CI-Lauf 120 grün. LanguageTool nach Entscheidung des Auftraggebers als Variante 2 (vorhandene Installation, kein Download). Bericht in `docs/bericht-phase-12.md`.
 
-**Phase 13 – Erweiterungen** (Abschnitt 22): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Register in Rust, Register im Frontend, Einstellungen übertragen), abgeschlossen, CI-Lauf 122 grün; Bericht in `docs/bericht-phase-13.md`. Wartet auf die Freigabe von Phase 14.
+**Phase 13 – Erweiterungen** (Abschnitt 22): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Register in Rust, Register im Frontend, Einstellungen übertragen), abgeschlossen, CI-Lauf 122 grün; Bericht in `docs/bericht-phase-13.md`.
 
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
@@ -281,11 +281,8 @@ CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot 
 - Erledigt: Bundle-Kennung `app.projectwrite.desktop` bestätigt; App-Icon festgelegt (Schreibmaschine, größte Größe 256 × 256 px, erzeugt mit `scripts/app-icons.mjs`).
 - CI-Lauf 22 (Commit `a89afae`, App-Icon): Linux, Windows, Release-Prüfung und Audits grün. Der macOS-Job bekam zweimal keinen Runner zugeteilt und wurde nach 15 Minuten abgebrochen, ohne einen Schritt auszuführen – kein Codefehler. Das Icon (jetzt 256 × 256 px) unter macOS beim nächsten CI-Lauf prüfen.
 
-Noch offen (vor Phase 14):
-
-- D4 Lizenz der App, inkl. Bewertung der MPL-2.0-Crates im Tauri-Baum.
-- D11 Signierung, Apple-Developer-Konto.
+Entschieden am 18. November 2026 (ADR 0028): D4 Lizenz MIT OR Apache-2.0; D11 vorerst unsigniert; keine Update-Funktion; macOS weiter zurückgestellt.
 
 ## Nächster Schritt
 
-Nach Freigabe: Phase 14 (Qualitätssicherung und Auslieferung; vorher D4 und D11 klären).
+Phase 14 (Qualitätssicherung und Auslieferung) läuft.

@@ -32,3 +32,4 @@ Eine ADR wird nicht nachträglich umgeschrieben. Ändert sich eine Entscheidung,
 | [0025](0025-sprachpruefung.md)                    | Sprachprüfung: Ablauf, eigene Wörterbücher, Autokorrektur, Erkennung und Sprachabschnitte    | angenommen                                    |
 | [0026](0026-languagetool.md)                      | LanguageTool als Zusatzpaket über eine vorhandene Installation                               | angenommen                                    |
 | [0027](0027-erweiterungen.md)                     | Erweiterungen: interne Register, kein fremder Code, Einstellungen übertragen                 | angenommen                                    |
+| [0028](0028-lizenz-signierung-auslieferung.md)    | Lizenz MIT OR Apache-2.0, vorerst unsigniert, keine Updates, Windows und Linux (D4, D11)     | angenommen                                    |
