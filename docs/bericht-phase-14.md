@@ -153,7 +153,8 @@ Keine bekannten.
 | Lauf | Ergebnis    | Inhalt                                                                                                                                                                                                                 |
 | ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 123  | rot (Linux) | E2E auf beiden Systemen grün, Installer und Installationstests grün; Netzwerk-Aufzeichnung startete auf dem Runner nicht (Prüfung des Trace-Dateisystems ohne root); Windows-Stichprobe fand Verbindungen von WebView2 |
-| 124  | LAUF124     | Abschluss Phase 14                                                                                                                                                                                                     |
+| 124  | rot (Linux) | Netzwerk-Aufzeichnung lief, keine Verbindung; Windows-Netzwerktest streng und grün; `accessibility.e2e.ts` scheiterte (F-59)                                                                                           |
+| 125  | LAUF125     | Abschluss Phase 14                                                                                                                                                                                                     |
 
 ## Nächster Schritt
 
