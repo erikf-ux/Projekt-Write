@@ -149,21 +149,45 @@ async function runByKeyboard(command: string): Promise<void> {
   await palette.waitForDisplayed();
   const option = $(`[data-testid="command-palette"] [data-command="${command}"]`);
   await option.waitForExist({ timeoutMsg: `${command} is not offered` });
-  // The title without the category ("Dokument: Statistik").
-  const title = await browser.execute(
+  // The start of the title without the category ("Dokument: Statistik"):
+  // it narrows the list, the arrow keys do the rest. Long typed texts and
+  // characters such as "…" arrive unreliably under load (CI run 124).
+  const fullTitle = await browser.execute(
     (id: string) =>
       document.querySelector(`[data-testid="command-palette"] [data-command="${id}"] > span`)?.lastChild
         ?.textContent ?? '',
     command,
   );
-  // The embedded WebDriver now and then loses a synthetic key (F-27): the
-  // query must read exactly the title before the arrow keys look for it.
+  const title = fullTitle.slice(0, 8).trimEnd();
+  // The query must read exactly the title before the arrow keys look for
+  // it. Under the network recorder on the CI runner the keys arrive slowly
+  // (CI run 124: "Sprac" after 2 s), and the embedded WebDriver now and then
+  // loses one (F-27): wait until the query stops changing, retype only when
+  // it then reads something else.
   const query = () =>
     browser.execute(
       () =>
         document.querySelector<HTMLInputElement>('[data-testid="command-palette"] [role="combobox"]')
           ?.value ?? '',
     );
+  const settled = async (): Promise<string> => {
+    const deadline = Date.now() + 15_000;
+    let last = await query();
+    let unchanged = 0;
+    while (Date.now() < deadline) {
+      await browser.pause(250);
+      const now = await query();
+      if (now === title) {
+        return now;
+      }
+      unchanged = now === last ? unchanged + 1 : 0;
+      last = now;
+      if (unchanged >= 8) {
+        return now;
+      }
+    }
+    return query();
+  };
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const typed = await query();
     if (typed === title) {
@@ -174,26 +198,32 @@ async function runByKeyboard(command: string): Promise<void> {
       await browser.keys('Backspace');
     }
     await browser.keys(title.split(''));
-    await browser
-      .waitUntil(async () => (await query()).length >= title.length, {
-        timeout: 2_000,
-        timeoutMsg: 'the typed title did not arrive',
-      })
-      .catch(() => undefined);
+    if ((await settled()) === title) {
+      break;
+    }
   }
   if ((await query()) !== title) {
     throw new Error(`could not type the title of ${command}: ${await query()}`);
   }
-  for (let step = 0; step < 30; step += 1) {
+  for (let step = 0; step < 100; step += 1) {
     const active = await browser.execute(() => {
       const input = document.querySelector('[data-testid="command-palette"] [role="combobox"]');
       const id = input?.getAttribute('aria-activedescendant') ?? '';
       return document.getElementById(id)?.getAttribute('data-command') ?? '';
     });
     if (active === command) {
-      await browser.keys('Enter');
-      await palette.waitForExist({ reverse: true });
-      return;
+      // A lost Enter (F-27) leaves the palette open with the entry chosen.
+      for (let press = 0; press < 3; press += 1) {
+        await browser.keys('Enter');
+        const closed = await palette
+          .waitForExist({ reverse: true, timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (closed) {
+          return;
+        }
+      }
+      throw new Error(`the palette stayed open after Enter on ${command}`);
     }
     await browser.keys('ArrowDown');
   }
