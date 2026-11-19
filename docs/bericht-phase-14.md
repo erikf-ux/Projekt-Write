@@ -74,7 +74,7 @@ Lokal ausgeführt und bestanden:
 - Prettier, ESLint, TypeScript, Vitest;
 - rustfmt, Clippy (ohne und mit `e2e`), alle Rust-Tests;
 - erzeugte Typen, Lizenzliste und Lizenztexte unverändert, Lizenzseite der Installer aktuell;
-- E2E-Gesamtlauf mit Netzwerk-Aufzeichnung.
+- E2E-Gesamtlauf mit Netzwerk-Aufzeichnung, nach F-59 zweimal in Folge grün (23 von 23 Dateien, keine Verbindung).
 
 ## Zielwerte aus Abschnitt 6
 
