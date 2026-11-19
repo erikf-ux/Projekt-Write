@@ -416,13 +416,20 @@ describe('Media (Phase 8)', () => {
     await browser.waitUntil(() => mediaFiles().length === before.length + 1, {
       timeoutMsg: 'the pasted image was not imported',
     });
-    const inserted = await browser.execute(() =>
-      [
-        ...document.querySelectorAll(
-          '[role="tabpanel"]:not([hidden]) [data-testid="editor"] [data-pw-media-image]',
-        ),
-      ].map((element) => element.getAttribute('data-pw-media-image')),
-    );
+    const insertedImages = () =>
+      browser.execute(() =>
+        [
+          ...document.querySelectorAll(
+            '[role="tabpanel"]:not([hidden]) [data-testid="editor"] [data-pw-media-image]',
+          ),
+        ].map((element) => element.getAttribute('data-pw-media-image')),
+      );
+    // The file lands before the image is inserted (Phase 14 run: checked
+    // in between, one image was still missing).
+    await browser
+      .waitUntil(async () => (await insertedImages()).length === 2, { timeout: 5_000 })
+      .catch(() => undefined);
+    const inserted = await insertedImages();
     expect(inserted).toHaveLength(2);
     expect(inserted[0]).toBe(arrival);
     await browser.waitUntil(

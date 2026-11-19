@@ -1,0 +1,165 @@
+# Leistung und Barrierefreiheit (Phase 14)
+
+Stand: 19. November 2026. Bericht zum Abnahmekriterium „Alle Zielwerte aus Abschnitt 6 sind gemessen und in einem Bericht dokumentiert“ und zur „Prüfung der Barrierefreiheit“ (Abschnitt 25, Phase 14).
+
+## Umgebung
+
+| Umgebung          | Beschreibung                                                                                                                                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container (lokal) | Cloud-Container, Ubuntu 24.04, 4 vCPU, 15 GB RAM, **keine GPU**; Xvfb, WebKitGTK (605.1.15)                                                                                                                                                          |
+| CI Linux          | GitHub Actions `ubuntu-24.04`, keine GPU, Xvfb, WebKitGTK                                                                                                                                                                                            |
+| CI Windows        | GitHub Actions `windows-latest`, keine GPU, WebView2                                                                                                                                                                                                 |
+| Referenzgerät     | **nicht verfügbar.** Abschnitt 6 nennt einen vier Jahre alten Mittelklasse-Laptop mit 8 GB RAM und SSD. Ich konnte auf keinem solchen Gerät messen; alle Werte stammen aus dem Container und aus CI. CI-Werte zeigen nach Abschnitt 6 nur den Trend. |
+
+Alle Messungen laufen im echten Programm (Debug-Build mit dem Feature `e2e`, `npm run build:e2e`) über den eingebetteten WebDriver. Ein Release-Build ist schneller als der Debug-Build; die Werte sind also eher zu hoch als zu niedrig. Die E2E-Tests geben alle Messwerte am Ende des Laufs gesammelt aus (`tests/e2e/measurements.ts`, Abschnitt „Measurements“ im Log), unter Windows und Linux in jedem CI-Lauf.
+
+## Zielwerte aus Abschnitt 6
+
+Status: **erfüllt** (im Container und, wo eingetragen, in CI), **nicht erfüllt**, **nur ohne GPU gemessen** (Ziel ohne GPU verfehlt, Messung auf einem Gerät mit GPU steht aus).
+
+| Merkmal                                                                | Zielwert                                                          | Container (Phase 14)                                                                         | CI Linux                  | CI Windows                            | Quelle                                                                        | Status                                                                                                |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Kaltstart bis zur Eingabemöglichkeit                                   | ≤ 2 s                                                             | kleine Bibliothek 0,54–1,02 s; Sitzung mit Tabs 1,85–2,00 s; Referenzbibliothek 1,78–1,90 s  | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `tests/e2e/processes.ts` in `restart`, `session-restored`, `reference.e2e.ts` | erfüllt mit kleiner Bibliothek; mit Tabs und Referenzbibliothek an der Grenze (siehe unten)           |
+| Tippverzögerung bei 50.000 Wörtern, Sprachprüfung aktiv                | 95 % ≤ 50 ms                                                      | 30–35 ms (Median 19–20 ms); Quelltextansicht 25–27 ms                                        | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `performance.e2e.ts`                                                          | erfüllt                                                                                               |
+| Dokument mit 50.000 Wörtern öffnen                                     | ≤ 500 ms                                                          | 210–255 ms; nach dem Speichern 223–232 ms                                                    | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `performance.e2e.ts`                                                          | erfüllt                                                                                               |
+| Recovery-Entwurf nach der letzten Eingabe                              | ≤ 2 s                                                             | Entwurf höchstens 1 s alt; beim harten Abbruch verloren: 872–873 ms                          | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `crash.e2e.ts`, `crash-recovered.e2e.ts`                                      | erfüllt                                                                                               |
+| Globale Suche, erste Treffer                                           | ≤ 300 ms                                                          | 112–146 ms (10 Anfragen, Referenzbibliothek, 60 ms Pause eingerechnet)                       | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `reference.e2e.ts`                                                            | erfüllt                                                                                               |
+| Mesh beim Zoomen und Verschieben                                       | ≥ 30 Bilder/s (95 % der Bilder ≤ 33,3 ms)                         | 1.000 Knoten: Zoomen 128–130 ms, Verschieben 71–72 ms (95 %)                                 | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `reference.e2e.ts`                                                            | nur ohne GPU gemessen: verfehlt (ADR 0022)                                                            |
+| Arbeitsspeicher im Leerlauf, ohne LanguageTool                         | ≤ 500 MB                                                          | kleine Bibliothek 440–449 MB (PSS); Referenzbibliothek 533–535 MB (PSS)                      | _CI-Wert eintragen_       | _CI-Wert eintragen_                   | `tests/e2e/processes.ts` in `restart`, `reference.e2e.ts`                     | erfüllt mit kleiner Bibliothek; mit der Referenzbibliothek knapp verfehlt                             |
+| Installationspaket ohne Zusatzpakete                                   | ≤ 50 MB                                                           | `.deb` 10,3 MB, AppImage 88,7 MB                                                             | siehe CI-Job „Installers“ | siehe CI-Job „Installers“ (NSIS, MSI) | `scripts/installer-test.mjs size`, `docs/installation.md`                     | erfüllt für `.deb`, NSIS und MSI (CI); AppImage verfehlt (Entscheidung offen, `docs/installation.md`) |
+| Datenintegrität bei 100 harten Prozessabbrüchen während des Speicherns | keine beschädigte Datei, `integrity_check` = `ok`                 | 100 von 100 Abbrüchen trafen ein laufendes Speichern (51,7 s); `ok`, keine beschädigte Datei |                           | in jedem CI-Lauf (`cargo test`)       | in jedem CI-Lauf (`cargo test`)                                               | `src-tauri/tests/crash_safety.rs`                                                                     | erfüllt |
+| Barrierefreiheit                                                       | alle Funktionen per Tastatur; Kontrast ≥ 4,5:1 Text, ≥ 3:1 Grafik | siehe Abschnitt „Barrierefreiheit“                                                           | _CI-Ergebnis eintragen_   | _CI-Ergebnis eintragen_               | `accessibility.e2e.ts` und die dort genannten Tests                           | erfüllt im geprüften Umfang; offene Punkte unten                                                      |
+
+CI-Werte: aus dem Abschnitt „Measurements“ am Ende der E2E-Schritte des ersten grünen CI-Laufs mit diesem Stand eintragen (Lauf _Nummer eintragen_).
+
+## Messverfahren und Einordnung
+
+### Kaltstart bis zur Eingabemöglichkeit
+
+- **Gemessen:** vom Anlegen des App-Prozesses durch das Betriebssystem bis zu dem Bild, in dem die Arbeitsfläche Eingaben annimmt. Die App setzt dafür die Marke `pw:ready-for-input` (`src/app/readyMark.ts`): Die Bibliothek ist offen, der Explorer steht, die Tabs der letzten Sitzung sind zurück und die Schreibfläche des aktiven Tabs ist bearbeitbar; gesetzt wird sie nach dem ersten gezeichneten Bild, in dem das gilt.
+- **Startzeit des Prozesses:** Linux aus `/proc/<pid>/stat` (Auflösung 10 ms), Windows aus `Get-Process` (`StartTime`). Die Marke rechnet der Test über `performance.timeOrigin` in dieselbe Uhr um.
+- **Nicht enthalten:** ein leerer Dateicache. Programm, Webview und Bibliothek lagen beim Messen schon im Cache des Systems; ein Start direkt nach dem Hochfahren dauert länger. Ebenso nicht enthalten ist die Zeit, bis der Testdienst die WebDriver-Sitzung aufbaut; die Marke wartet im Programm.
+- **Drei Starts je Lauf:** mit der kleinen Bibliothek der Tests (`restart.e2e.ts`), mit den Tabs der letzten Sitzung (`session-restored.e2e.ts`, die Dokumente, die die vorigen Tests offen ließen, das aktive mit seiner Auswahl) und mit der Referenzbibliothek (10.000 Dokumente, `reference.e2e.ts`).
+- **Aufteilung:** Das Protokoll nennt zusätzlich, wann die Seite zu laden begann (`performance.timeOrigin`) und wann die Bibliothek zu öffnen begann (`pw:library-opening`). Letzter lokaler Lauf:
+
+  | Start                    | Seite lädt ab | Bibliothek öffnet ab | Eingabe möglich |
+  | ------------------------ | ------------- | -------------------- | --------------- |
+  | kleine Bibliothek        | 255 ms        | 454 ms               | 536 ms          |
+  | Tabs der letzten Sitzung | 234 ms        | 398 ms               | 1.852 ms        |
+  | Referenzbibliothek       | 631 ms        | 827 ms               | 1.775 ms        |
+
+  Prozess und Webview brauchen also 0,2–0,6 s, bis die Seite lädt; der Rest ist das Öffnen der Bibliothek und das Wiederherstellen der Tabs. Mit den Tabs der letzten Sitzung kostet das Laden und Anzeigen der wiederhergestellten Dokumente rund 1,4 s; wie viel davon auf welches Dokument entfällt, ist nicht einzeln gemessen.
+
+- **Einordnung:** Mit der kleinen Bibliothek liegt der Start sicher im Ziel. Mit den Tabs der letzten Sitzung (jedes Dokument wird beim Start geladen, das aktive angezeigt und geprüft) und mit der Referenzbibliothek (Integritätsprüfung je Tabelle, ADR 0020, Punkt 14) liegt er im Container an der Grenze von 2 s. Der Test schlägt erst ab 10 s an (nur der Trend zählt in CI). Auf dem Referenzgerät mit Release-Build zu wiederholen. Möglicher Gewinn, falls es dort knapp wird: `restoreSession()` öffnet die Tabs der Sitzung nacheinander und lädt jedes Dokument, bevor die Eingabe möglich ist; das aktive zuerst und die übrigen erst beim Aktivieren zu laden, würde den Start von der Zahl der Tabs lösen.
+
+### Tippverzögerung und Öffnen bei 50.000 Wörtern
+
+`performance.e2e.ts` wie seit Phase 4 (Verfahren in `docs/bericht-phase-4.md`): erzeugtes deutsches Manuskript mit genau 50.000 Wörtern; Öffnen vom Klick im Explorer bis zum gezeichneten, bearbeitbaren Text; Tippen vom Tastendruck bis zum gezeichneten Zeichen im Tempo eines schnellen Schreibers. Die Sprachprüfung ist an (Standard seit Phase 12); das Protokoll nennt jetzt ihren Zustand aus den Einstellungen.
+
+### Recovery-Entwurf
+
+`crash.e2e.ts` tippt, beendet den Prozess hart und prüft, dass ein Entwurf liegt, der höchstens 1 s alt ist (Phase 6: Entwurf höchstens 1 s nach einer ungespeicherten Eingabe). `crash-recovered.e2e.ts` stellt ihn beim nächsten Start wieder her und misst, wie viel Tippzeit verloren ging (Ziel ≤ 2 s).
+
+### Globale Suche und Mesh
+
+Beide in der Referenzbibliothek (`reference.e2e.ts`). Suche: vom Tippen bis zu den Treffern auf dem Bildschirm, die 60 ms Pause des Suchfelds eingerechnet. Mesh: 1.000 Knoten und 531 Kanten, je 120 Bilder Zoomen und Verschieben, 95. Perzentil der Bildzeiten.
+
+**Mesh ohne GPU:** Keine der Umgebungen hat eine GPU; das Zeichnen läuft in Software. Ein leeres Bild braucht schon 16–17 ms. Wie in Phase 11 (ADR 0022) ist das Ziel ohne GPU verfehlt; Windows lag in CI-Lauf 116 beim Verschieben knapp darüber (34,6 ms), Zoomen deutlich (220 ms, Neurastern beim Maßstabswechsel). ADR 0022 sieht vor: auf einem Gerät mit GPU wiederholen; verfehlt das Mesh dort den Zielwert, folgt ein Canvas- oder WebGL-Renderer mit neuer ADR.
+
+### Arbeitsspeicher im Leerlauf
+
+- **Gemessen:** 10 s nach der Eingabemöglichkeit ohne jede Eingabe, die Summe über den App-Prozess und alle Prozesse, die er gestartet hat. Unter Linux sind das `project-write`, `WebKitWebProcess` und `WebKitNetworkProcess`, unter Windows die App und die `msedgewebview2`-Prozesse (Kinder der App und alle, die den WebView2-Ordner der Tests nutzen).
+- **Maß:** Linux PSS (geteilte Seiten anteilig, aus `/proc/<pid>/smaps_rollup`), dazu RSS (geteilte Bibliotheken in jedem Prozess voll gezählt). Windows Private Bytes, dazu der Working Set. Geprüft wird gegen PSS bzw. Private Bytes; 1 MB = 1.000.000 Byte.
+- **LanguageTool:** In keiner Umgebung installiert; kein Java-Prozess im Prozessbaum.
+- **Werte im Container:**
+
+  | Situation                                                                                       | PSS            | RSS            | Verteilung (PSS)                                             |
+  | ----------------------------------------------------------------------------------------------- | -------------- | -------------- | ------------------------------------------------------------ |
+  | kleine Bibliothek, 10 s nach dem Start                                                          | 440–449 MB     | 613–640 MB     | Webview 285 MB, App 134–140 MB, Netzwerkprozess 21–24 MB     |
+  | Referenzbibliothek, 10 s nach dem Start                                                         | 533–535 MB     | 706–708 MB     | Webview 314–318 MB, App 193–200 MB, Netzwerkprozess 21–22 MB |
+  | Referenzbibliothek nach Explorer, Galerie, Suche und Mesh mit 1.000 Knoten (nur zur Einordnung) | 1.531–1.538 MB | 1.705–1.713 MB | Webview 1.251–1.261 MB, App 249–266 MB                       |
+
+- **Einordnung:** Mit kleiner Bibliothek erfüllt, mit der Referenzbibliothek um rund 7 % verfehlt. Gut die Hälfte gehört dem Webprozess von WebKitGTK; unter Windows teilt sich das auf mehrere WebView2-Prozesse auf (CI-Werte eintragen). Nach den Lasttests wächst der Webprozess auf über 1,2 GB, vor allem durch das Mesh mit 1.000 Knoten und die Vorschaubilder der Galerie; das ist kein Leerlauf und kein Zielwert, zeigt aber, wo zu sparen wäre (Mesh-Renderer, ADR 0022; Freigeben der Galerie-Vorschaubilder). Ein Debug-Build braucht mehr Speicher als ein Release-Build. Messung auf dem Referenzgerät mit Release-Build steht aus.
+
+### Installationspaket
+
+Gemessen vom Installer-Agenten: CI-Job „Installers“ mit `scripts/installer-test.mjs size`, Werte und Begründung zum AppImage in `docs/installation.md`.
+
+### Datenintegrität bei 100 harten Abbrüchen
+
+`src-tauri/tests/crash_safety.rs` seit Phase 2: Ein Hilfsprozess speichert ohne Pause und wird 100-mal hart beendet; nach jedem Abbruch meldet `PRAGMA integrity_check` `ok`, jede Datei ist vollständig (alte oder neue Fassung mit passender Prüfsumme), keine Temporärdatei bleibt liegen. Läuft in jedem CI-Lauf unter Windows und Linux mit `cargo test`.
+
+## Verlauf aus den Phasenberichten
+
+| Merkmal                                          | Phase, Umgebung                          | Wert                                                                                                                         |
+| ------------------------------------------------ | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Öffnen 50.000 Wörter                             | Phase 4, Container, 7 Läufe              | 269–547 ms (2 von 20 Messungen über 500 ms vor der Verschiebung der Statistik, danach keine)                                 |
+| Öffnen 50.000 Wörter                             | Phase 4, CI-Lauf 77                      | Linux 365–479 ms, Windows 267–341 ms                                                                                         |
+| Öffnen 50.000 Wörter mit Sprachprüfung           | Phase 12, Container                      | 268–298 ms                                                                                                                   |
+| Tippen, 95 %                                     | Phase 4, Container (ohne Sprachprüfung)  | 30–38 ms, Quelltext 34–40 ms                                                                                                 |
+| Tippen, 95 %                                     | Phase 4, CI-Lauf 77 (ohne Sprachprüfung) | Linux 36 / 42 ms, Windows 18 / 14 ms                                                                                         |
+| Tippen, 95 %, Sprachprüfung aktiv                | Phase 12, Container                      | 36 ms (Median 22 ms), Quelltext 33 ms                                                                                        |
+| Recovery: verlorene Tippzeit beim harten Abbruch | Phase 6, Container                       | 674–908 ms                                                                                                                   |
+| Recovery: verlorene Tippzeit beim harten Abbruch | Phase 6, CI-Lauf 99                      | Linux 869 ms, Windows 508 ms                                                                                                 |
+| Globale Suche, erste Treffer                     | Phase 9, Container                       | 122–180 ms                                                                                                                   |
+| Globale Suche, erste Treffer                     | Phase 9, CI-Lauf 108                     | Linux 97–175 ms, Windows 108–204 ms                                                                                          |
+| Mesh 1.000 Knoten, Zoomen / Verschieben (95 %)   | Phase 11, Container                      | 147–181 ms / 83–91 ms                                                                                                        |
+| Mesh 1.000 Knoten, Zoomen / Verschieben (95 %)   | Phase 11, CI-Lauf 116                    | Linux 124 / 60 ms, Windows 220 / 34,6 ms                                                                                     |
+| 100 harte Abbrüche                               | Phase 2, Container und CI                | 100 von 100 trafen ein laufendes Speichern, `ok`                                                                             |
+| Kaltstart: Prüfung beim Öffnen                   | Phase 9 (F-46, ADR 0020)                 | `quick_check` der ganzen Referenzdatenbank 4,1 s → Prüfung je Tabelle 0,19 s, die ganze Datenbank 10 s später im Hintergrund |
+
+Kaltstart und Arbeitsspeicher wurden vor Phase 14 nicht gemessen.
+
+## Barrierefreiheit
+
+### Vorgehen
+
+Keine neue Abhängigkeit: axe-core (MPL-2.0) hätte einen Teil der Regeln abgedeckt, hätte aber als Quelltext in die Seite gespritzt werden müssen, deren CSP `eval` verbietet und deren Prototypen eingefroren sind. Stattdessen prüft `tests/e2e/a11y.ts` die Regeln aus WCAG 2.2 und WAI-ARIA 1.2, die für diese Oberfläche gelten, an allem, was auf dem Bildschirm ist:
+
+- gültige Rollen und `aria-*`-Attribute mit gültigen Werten, vorhandene Verweisziele (`aria-labelledby`, `aria-controls`, `aria-activedescendant` …), keine doppelten IDs, `lang` am Dokument;
+- ein zugänglicher Name für jedes Bedienelement, Formularfeld, jeden Dialog und jede Schreibfläche; ein Platzhalter allein zählt nicht;
+- Pflichtzustände (Combobox `aria-expanded`, Checkbox `aria-checked`, fokussierbarer Trenner `aria-valuenow`) und der Pflichtkontext (Option in Listbox, Tab in Tablist, Baumeintrag in Baum, Menüeintrag in Menü); eine Tablist, ein Baum, ein Menü oder eine Listbox enthält keine fremden Bedienelemente;
+- kein Bedienelement in einem anderen, nichts Fokussierbares in `aria-hidden`, kein positiver `tabindex`, Bilder mit Textalternative (`alt=""` für schmückende).
+
+Kontrast wird wie seit Phase 1 an den gezeichneten Pixeln gemessen, nicht an berechneten Stilen (ADR 0003): je Textzeile Hintergrund = häufigstes Pixel, Vordergrund = Pixel mit dem höchsten Kontrast; dasselbe für jedes Symbol, jede Checkbox und jedes Optionsfeld (Ziel 3:1). Deaktivierte Bedienelemente sind nach WCAG 1.4.3 und 1.4.11 ausgenommen; einzelne Satzzeichen ebenso, weil ihre dünnen Glyphen den vollen Farbwert nie erreichen.
+
+### Was die Tests belegen
+
+| Prüfung                                                                                                                                                                                                                                                                                                                                                                                      | Test                                             | Ergebnis (Container)                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Startbildschirm: jede Schaltfläche in der Tab-Reihenfolge, sichtbarer Fokusring mit 3:1, Textkontrast in beiden Themes                                                                                                                                                                                                                                                                       | `smoke.e2e.ts` (seit Phase 1)                    | bestanden                                                                                                 |
+| Arbeitsfläche: jede Schaltfläche erreichbar (zusammengesetzte Widgets mit einem Tab-Stopp), sichtbarer Fokus in jedem Bereich, Explorer und Tabs per Tastatur, `Umschalt + F10` im Explorer, Befehlspalette, Kürzelkonflikte                                                                                                                                                                 | `workbench.e2e.ts` (seit Phase 3)                | bestanden                                                                                                 |
+| Subnetze über das Kontextmenü, Suche per Tastatur, Mesh vollständig per Tastatur, Vorschläge der Sprachprüfung über `Umschalt + F10`                                                                                                                                                                                                                                                         | `structure`, `search`, `mesh`, `language.e2e.ts` | bestanden                                                                                                 |
+| Jedes Token-Paar beider Themes (4,5:1 Text, 3:1 Grafik, Cluster-Farben)                                                                                                                                                                                                                                                                                                                      | `tokens.test.ts` (Vitest)                        | bestanden                                                                                                 |
+| **Jeder registrierte Befehl steht in der Befehlspalette** oder ist dort mit Begründung ausgeblendet (wirkt im Zustand des Tests nicht, z. B. „Speichern“ ohne Änderung, Mesh-Befehle außerhalb des Mesh)                                                                                                                                                                                     | `accessibility.e2e.ts`                           | bestanden: 80 von 97 Befehlen gelistet, die übrigen 17 begründet                                          |
+| **Befehlspalette:** Fokus bleibt drin, `Escape` schließt, Fokus kehrt zurück                                                                                                                                                                                                                                                                                                                 | `accessibility.e2e.ts`                           | bestanden (nach Korrektur)                                                                                |
+| **Elf Dialoge per Tastatur geöffnet** (Einstellungen, Statistik, Tags, Tags verwalten, Neues Subnetz, Verschieben nach, Versionen, Version speichern, Link, Bild einfügen, Sprache des Dokuments): Fokus wandert hinein, `Tab` am letzten und `Umschalt + Tab` am ersten Element bleiben drin, Fokus von außen kommt zurück, `Escape` schließt, Fokus kehrt zum Auslöser zurück, ARIA-Regeln | `accessibility.e2e.ts`                           | bestanden (nach Korrektur)                                                                                |
+| **Alle fünf Bereiche der Einstellungen** mit den Pfeiltasten, je mit ARIA-Regeln                                                                                                                                                                                                                                                                                                             | `accessibility.e2e.ts`                           | bestanden                                                                                                 |
+| Explorer (`Strg + Umschalt + E`), Suche (`Strg + Umschalt + F`), Schreibfläche (Befehl) per Tastatur                                                                                                                                                                                                                                                                                         | `accessibility.e2e.ts`                           | bestanden                                                                                                 |
+| **Kontextmenü eines Tabs** mit `Umschalt + F10`, Pfeiltasten, `Escape`, Fokus zurück                                                                                                                                                                                                                                                                                                         | `accessibility.e2e.ts`                           | bestanden                                                                                                 |
+| ARIA-Regeln in Arbeitsfläche, Suchleiste, Befehlspalette, Suche mit Treffern, Galerie und Mesh                                                                                                                                                                                                                                                                                               | `accessibility.e2e.ts`                           | bestanden (nach Korrektur)                                                                                |
+| **Kontrast in beiden Themes** (gezeichnete Pixel): Arbeitsfläche, Befehlspalette, Einstellungen (Allgemein, Sprachprüfung, Tastenkürzel, Erweitert), Kontextmenü                                                                                                                                                                                                                             | `accessibility.e2e.ts`                           | bestanden: Text dunkel ≥ 6,11:1, hell ≥ 5,45:1; Symbole und Bedienelemente dunkel ≥ 5,62:1, hell ≥ 4,83:1 |
+
+### Behobene Befunde
+
+1. **Checkboxen und Optionsfelder im hellen Theme (WCAG 1.4.11):** WebKitGTK zeichnet das leere Kästchen mit einem Rand in `#C3C3C3`, auf Weiß 1,76:1 (Ziel 3:1). Checkboxen und Optionsfelder sind jetzt aus den Tokens gezeichnet (`src/index.css`): Rand in „Gedämpfter Text“ (≥ 4,5:1 auf beiden Flächen), angehakt in der Akzentfarbe mit einem Haken in der Flächenfarbe. Danach hell ≥ 5,45:1.
+2. **Fokus nach dem Schließen der Befehlspalette:** Der Fokus fiel auf die Seite (`body`) statt zurück, z. B. in die Schreibfläche. Die Palette gibt ihn jetzt zurück, wenn der Befehl ihn nicht selbst bewegt (`CommandPalette.tsx`, Vitest).
+3. **Fokus nach dem Schließen eines Dialogs mit `autoFocus`** („Version speichern“): Der Dialog merkte sich das Eingabefeld in sich selbst als Ausgangspunkt, der Fokus fiel nach `Escape` auf die Seite. Der Dialog merkt sich jetzt den letzten Fokus außerhalb aller Dialoge, wenn ein Element in ihm den Fokus schon genommen hat (`Dialog.tsx`, Vitest).
+4. **Tab-Schließen-Schaltfläche in der Tab-Rolle (WAI-ARIA: Tabs enthalten keine weiteren Bedienelemente):** Die Schaltfläche ist eine Abkürzung für die Maus und für Hilfstechnik ausgeblendet (`aria-hidden`, war schon außerhalb der Tab-Reihenfolge). Per Tastatur schließen `Entf`, `Strg + W` und das Kontextmenü den Tab.
+5. **Kontextmenü der Tabs innerhalb der Tablist:** Eine Tablist darf nur Tabs enthalten; das Menü liegt jetzt neben ihr (`TabBar.tsx`).
+6. **`aria-controls` der Einstellungs-Tabs auf nicht vorhandene Bereiche:** Nur der Bereich des gewählten Tabs existiert; nur dieser Tab verweist jetzt auf ihn (`SettingsDialog.tsx`).
+
+### Offene Punkte
+
+- **Kontextmenü der Schreibfläche ohne Prüfbefund:** `Umschalt + F10` öffnet in der Schreibfläche nur dann ein Menü der App, wenn an der Schreibmarke ein Befund der Sprachprüfung liegt. Sonst gibt es kein Kontextmenü der App (Ausschneiden, Kopieren, Einfügen erreicht man über die Kürzel und das Menü „Bearbeiten“). Kein Fehler im Sinne von „alle Funktionen per Tastatur“, aber eine Lücke gegenüber der Maus, falls WebKitGTK oder WebView2 dort ihr eigenes Menü zeigen.
+- **Echte Tab-Navigation:** Der eingebettete WebDriver sendet synthetische Tasten; `Tab` bewegt den Fokus nicht selbst (ADR 0003). Die Tab-Reihenfolge ist strukturell geprüft, die Fokusfalle dort, wo die App `Tab` selbst behandelt. Ein Handtest mit echter Tastatur unter Windows und Linux steht aus.
+- **Screenreader:** Nicht mit Orca oder NVDA geprüft; die ARIA-Regeln sind die Voraussetzung, kein Ersatz.
+- **Landmarken:** Die Arbeitsfläche hat `main`, Werkzeugleiste und Activity Bar sind beschriftete `toolbar`; die Seitenleiste ist ein `aside` ohne Namen. Für eine Desktop-App ohne Seitennavigation nicht verlangt; bei einem Screenreader-Test bewerten.
+- **Importierte Designs:** Rust prüft beim Import jedes Farbpaar (ADR 0013); die gezeichneten Pixel sind nur für die beiden eingebauten Designs gemessen.
+- **macOS:** zurückgestellt (ADR 0028).
+
+## Läufe im Container
+
+Zwei E2E-Gesamtläufe am 19. November 2026 mit diesem Stand (23 Spec-Dateien). Im ersten scheiterten drei Dateien, alle an Test- oder Prüffehlern, die danach behoben wurden: die Prüfregel für schmückende Bilder (`alt=""`), eine Grenze für den Speicher nach den Lasttests (jetzt nur protokolliert) und eine Wettlaufsituation im Medientest (die Datei lag schon vor, das eingefügte Bild noch nicht; der Test wartet jetzt darauf). Der zweite Lauf: **23 von 23 Dateien bestanden**; seine Werte stehen in den Tabellen oben, die Bereiche umfassen beide Läufe und die kürzeren Läufe zur Entwicklung von `accessibility.e2e.ts`.
+
+Dazu im Container: `cargo test --test crash_safety` (100 harte Abbrüche, 51,7 s, bestanden), Vitest 771 Tests in 47 Dateien, Prettier, ESLint und TypeScript ohne Befund.

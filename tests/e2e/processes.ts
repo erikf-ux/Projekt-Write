@@ -204,17 +204,28 @@ export function processTreeMemory(root: number): ProcessMemory[] {
  * Waits for the mark of the first frame that takes input and returns the
  * time from the start of the process to it.
  */
-export async function coldStartMs(): Promise<{ ms: number; process: AppProcess }> {
+export async function coldStartMs(): Promise<{
+  ms: number;
+  /** Of that: until the page began to load, and until the library began to open. */
+  page: number;
+  library: number;
+  process: AppProcess;
+}> {
   await browser.waitUntil(
     () => browser.execute(() => performance.getEntriesByName('pw:ready-for-input').length > 0),
     { timeout: 60_000, timeoutMsg: 'the workbench did not mark that it takes input' },
   );
-  const ready = await browser.execute(() => {
-    const mark = performance.getEntriesByName('pw:ready-for-input')[0];
-    return performance.timeOrigin + (mark?.startTime ?? 0);
+  const times = await browser.execute(() => {
+    const at = (name: string) => performance.getEntriesByName(name)[0]?.startTime ?? Number.NaN;
+    return {
+      origin: performance.timeOrigin,
+      ready: at('pw:ready-for-input'),
+      library: at('pw:library-opening'),
+    };
   });
   const app = appProcess();
-  return { ms: ready - app.startedAt, process: app };
+  const page = times.origin - app.startedAt;
+  return { ms: page + times.ready, page, library: page + times.library, process: app };
 }
 
 /** Sums the memory of the process tree and describes it for the log. */
@@ -254,7 +265,7 @@ export const IDLE_AFTER_START_MS = 10_000;
 export async function measureStartAndIdleMemory(label: string, options = { memory: true }): Promise<void> {
   const start = await coldStartMs();
   measured(
-    `Cold start to input (${process.platform}, ${label}): ${start.ms.toFixed(0)} ms (target ≤ ${String(COLD_START_TARGET_MS)} ms)`,
+    `Cold start to input (${process.platform}, ${label}): ${start.ms.toFixed(0)} ms (target ≤ ${String(COLD_START_TARGET_MS)} ms; page loading from ${start.page.toFixed(0)} ms, library opening from ${start.library.toFixed(0)} ms)`,
   );
   if (!(start.ms > 0 && start.ms < COLD_START_LIMIT_MS)) {
     throw new Error(`cold start ${start.ms.toFixed(0)} ms is outside 0 to ${String(COLD_START_LIMIT_MS)} ms`);
@@ -276,7 +287,8 @@ export async function measureStartAndIdleMemory(label: string, options = { memor
 
 /**
  * The memory of the running app after `idleMs` without input; for the
- * report, e.g. after the load tests (the target is the idle start).
+ * report, e.g. after the load tests. Logged only: the target is the idle
+ * start, measured by `measureStartAndIdleMemory`.
  */
 export async function measureMemory(label: string, idleMs = IDLE_AFTER_START_MS): Promise<void> {
   await browser.pause(idleMs);
@@ -284,7 +296,6 @@ export async function measureMemory(label: string, idleMs = IDLE_AFTER_START_MS)
   measured(
     `Memory without LanguageTool (${process.platform}, ${label}, after ${String(idleMs / 1000)} s without input): ${memory.text}`,
   );
-  checkMemory(memory.ownMB);
 }
 
 function checkMemory(ownMB: number): void {

@@ -250,8 +250,10 @@ async function contrastProblems(
   label: string,
   minimumTexts = 5,
 ): Promise<string[]> {
-  const items = await screenItems(scope);
+  // The frame first: the boxes must describe what it shows (a list that
+  // fills in late would move them).
   const { image, scale } = await settledFrame(theme);
+  const items = await screenItems(scope);
   const problems: string[] = [];
   let texts = 0;
   let graphics = 0;

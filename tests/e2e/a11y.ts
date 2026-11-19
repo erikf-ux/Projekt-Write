@@ -397,7 +397,11 @@ export async function ariaProblems(scope = 'body'): Promise<string[]> {
             }
           }
         }
-        if (exposed(element) && (isInteractive(element) || element.matches('img, [role="img"]'))) {
+        // An image with alt="" is decorative (its text stands next to it).
+        if (
+          exposed(element) &&
+          (isInteractive(element) || element.matches('img:not([alt=""]), [role="img"]'))
+        ) {
           const { name, from } = accessibleName(element);
           if (!name) {
             found.push(`no accessible name: ${where}`);
