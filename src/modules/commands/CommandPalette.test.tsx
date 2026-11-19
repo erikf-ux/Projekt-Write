@@ -82,4 +82,18 @@ describe('CommandPalette', () => {
     expect(document.activeElement).toBe(input);
     outside.remove();
   });
+
+  it('lets a command move the focus once Enter ran it (F-59)', () => {
+    const target = document.createElement('input');
+    document.body.append(target);
+    // As a command that focuses a rename field before the palette is gone.
+    const onRun = vi.fn(() => {
+      target.focus();
+    });
+    render(<CommandPalette entries={entries} onRun={onRun} onClose={vi.fn()} />);
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(onRun).toHaveBeenCalledWith('document.new');
+    expect(document.activeElement).toBe(target);
+    target.remove();
+  });
 });

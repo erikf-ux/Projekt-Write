@@ -52,6 +52,9 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  // Set once the palette runs a command or closes: from then on the command
+  // may move the focus (a rename field, a dialog), the palette lets it.
+  const leaving = useRef(false);
   const listId = useId();
   const titleId = useId();
   const matches = useMemo(() => filterEntries(entries, query), [entries, query]);
@@ -67,7 +70,12 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
     // animation frame) would otherwise send Enter into the text (F-59).
     const onFocusIn = (event: FocusEvent) => {
       const root = input.current?.closest('[role="dialog"]');
-      if (root && event.target instanceof Node && !root.contains(event.target)) {
+      if (
+        !leaving.current &&
+        root?.isConnected === true &&
+        event.target instanceof Node &&
+        !root.contains(event.target)
+      ) {
         input.current?.focus();
       }
     };
@@ -87,8 +95,14 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
     }
   }, [current, listId]);
 
+  const close = () => {
+    leaving.current = true;
+    onClose();
+  };
+
   const run = (entry: PaletteEntry | undefined) => {
     if (entry) {
+      leaving.current = true;
       onClose();
       onRun(entry.id);
     }
@@ -113,7 +127,7 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
         run(current);
         break;
       case 'Escape':
-        onClose();
+        close();
         break;
       case 'Tab':
         // The palette is modal: the focus stays in the input.
@@ -126,7 +140,7 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-center bg-black/30 pt-[12vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-center bg-black/30 pt-[12vh]" onMouseDown={close}>
       <div
         role="dialog"
         aria-modal="true"
