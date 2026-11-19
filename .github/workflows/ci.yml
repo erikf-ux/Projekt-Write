@@ -32,8 +32,7 @@ jobs:
       - name: Install Linux system libraries
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+          bash scripts/apt-install.sh libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
             libayatana-appindicator3-dev librsvg2-dev xvfb dbus bpftrace
 
       - uses: actions/setup-node@v7
@@ -165,8 +164,7 @@ jobs:
 
       - name: Install Linux system libraries
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+          bash scripts/apt-install.sh libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
             libayatana-appindicator3-dev librsvg2-dev
 
       - uses: actions/setup-node@v7
@@ -215,9 +213,9 @@ jobs:
       - name: Install Linux system libraries
         if: runner.os == 'Linux'
         # patchelf and file: linuxdeploy needs them for the AppImage.
+        # scripts/apt-install.sh retries a broken package index (CI run 126).
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+          bash scripts/apt-install.sh libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
             libayatana-appindicator3-dev librsvg2-dev patchelf file
 
       - uses: actions/setup-node@v7
@@ -290,8 +288,7 @@ jobs:
         # (dbus-run-session) only for the smoke start, neither brings
         # WebKitGTK or GTK, which the .deb must declare itself.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb dbus
+          bash scripts/apt-install.sh xvfb dbus
 
       - name: NSIS – install, check, uninstall; the library stays
         if: runner.os == 'Windows'
