@@ -448,12 +448,20 @@ describe('Accessibility (Phase 14)', () => {
         });
       problems.push(...(await trapProblems(selector)));
       problems.push(...(await ariaProblems(selector)).map((problem) => `${dialog}: ${problem}`));
-      await browser.keys('Escape');
-      await $(selector)
-        .waitForExist({ reverse: true, timeout: 5_000 })
-        .catch(() => {
-          problems.push(`${dialog}: Escape did not close it`);
-        });
+      // A lost Escape (F-27) would leave the dialog open, and its focus trap
+      // would then take the keys of the next palette: press it again.
+      let closed = false;
+      for (let press = 0; press < 3 && !closed; press += 1) {
+        await browser.keys('Escape');
+        closed = await $(selector)
+          .waitForExist({ reverse: true, timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+      }
+      if (!closed) {
+        problems.push(`${dialog}: Escape did not close it`);
+        break;
+      }
       const back = await focused();
       if (back !== origin) {
         problems.push(`${dialog}: the focus went to ${back} instead of back to ${origin}`);
