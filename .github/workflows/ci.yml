@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb dbus
+            libayatana-appindicator3-dev librsvg2-dev xvfb dbus bpftrace
 
       - uses: actions/setup-node@v7
         with:
@@ -63,6 +63,9 @@ jobs:
 
       - name: Frontend tests (Vitest)
         run: npm test
+
+      - name: Network test evaluation (node:test)
+        run: node --test scripts/network-check.test.mjs
 
       - name: Format (rustfmt)
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
@@ -106,6 +109,16 @@ jobs:
       - name: Build debug app with end-to-end support
         run: npm run build:e2e
 
+      - name: Start the network recorder (Linux)
+        if: runner.os == 'Linux'
+        # Normal operation makes no network connection (sections 2 and 20,
+        # ADR 0028). bpftrace records in the kernel every address the app
+        # and its child processes connect or send to during the E2E suite;
+        # the app itself runs unchanged (docs/sicherheit.md). If the recorder
+        # cannot start, the E2E tests still run and "Network test" fails.
+        continue-on-error: true
+        run: sh scripts/network-record-linux.sh start tests/e2e/.network/linux.txt
+
       - name: End-to-end tests (Linux)
         if: runner.os == 'Linux'
         # A D-Bus session: tauri-plugin-single-instance finds the running
@@ -115,6 +128,31 @@ jobs:
       - name: End-to-end tests (Windows, macOS)
         if: runner.os != 'Linux'
         run: npm run test:e2e
+
+      - name: Network test (Linux)
+        # Also after a failed E2E run: the recording is evaluated either way.
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: |
+          sh scripts/network-record-linux.sh stop tests/e2e/.network/linux.txt
+          node scripts/network-check.mjs linux tests/e2e/.network/linux.txt
+
+      - name: Network test (Windows, sampled, report only)
+        if: runner.os == 'Windows'
+        # Samples TCP/UDP of the app's process tree and its DNS queries during
+        # a second run of the suite. Sampling misses short connections, so
+        # this step only reports (docs/sicherheit.md).
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $out = 'tests/e2e/.network/windows.jsonl'
+          $stop = Join-Path $env:RUNNER_TEMP 'network-watch.stop'
+          $watch = Start-Process pwsh -PassThru -NoNewWindow -ArgumentList '-NoProfile', '-File', 'scripts/network-watch-windows.ps1', '-Out', $out, '-StopFile', $stop
+          npm run test:e2e
+          $e2e = $LASTEXITCODE
+          New-Item -ItemType File -Path $stop | Out-Null
+          $watch.WaitForExit(120000) | Out-Null
+          node scripts/network-check.mjs windows $out
+          if ($e2e -ne 0) { Write-Output "::warning::the E2E suite failed during the network sampling (exit $e2e)" }
 
   release-check:
     name: Release build contains no test plugins
