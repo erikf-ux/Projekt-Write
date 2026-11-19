@@ -63,7 +63,20 @@ Die ganze E2E-Suite (`tests/e2e/wdio.conf.ts`, 22 Spec-Dateien, mehrere App-Star
 - **CI:** Im Job `checks` (Linux) startet „Start the network recorder (Linux)“ den Rekorder vor dem normalen E2E-Schritt; „Network test (Linux)“ beendet ihn danach und wertet aus, auch wenn die E2E-Tests scheitern. Der E2E-Schritt selbst ist unverändert, die Suite läuft nur einmal. Kann der Rekorder nicht starten, laufen die E2E-Tests trotzdem und „Network test“ scheitert.
 - **Grenzen:** Nicht erfasst wären Verbindungen über `io_uring` (nutzen weder WebKit noch GLib noch der eigene Code). Von `sendmmsg` werden die ersten vier Nachrichten eines Aufrufs gelesen (glibc schickt DNS-Anfragen paarweise). Der Rekorder erkennt die App am Prozessnamen `project-write`; ein umbenanntes Programm würde nicht erfasst.
 
-<!-- network-result -->
+### Ergebnis (Linux, lokal, 19. November 2026)
+
+Ausgeführt und bestanden: ganze E2E-Suite (22 von 22 Spec-Dateien, 4 min 31 s) unter Xvfb und `dbus-run-session`, Ubuntu 24.04, WebKitGTK 2.x, Rekorder bpftrace 0.20.2 von vor dem ersten bis nach dem letzten App-Start.
+
+| Messgröße                            | Wert                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App-Starts aufgezeichnet             | 7 (Suite-Starts, zweite Instanz aus `restart.e2e.ts`, Übergabe aus `external.e2e.ts`, Neustarts nach Beenden und Absturz)                                                |
+| Socket-Adressen insgesamt            | 71, alle `AF_UNIX`                                                                                                                                                       |
+| davon                                | 35 × Sitzungsbus (`/tmp/dbus-…`), 21 × X-Server (`@/tmp/.X11-unix/X110`), 15 × Systembus `/run/dbus/system_bus_socket` (im Container nicht vorhanden, Versuch scheitert) |
+| Prozesse und Threads                 | `project-write` 47, `pool` 10, `blocking-1` 9, `WebKitNetworkPr` 5                                                                                                       |
+| IPv4/IPv6 (auch Loopback), DNS, mDNS | **0**                                                                                                                                                                    |
+| verlorene Ereignisse                 | 0                                                                                                                                                                        |
+
+**Ergebnis: Im Normalbetrieb baut die App keine Netzverbindung auf, auch keine DNS-Anfrage.** Die absichtlichen Ladeversuche von `https://example.org` (`extensions.e2e.ts`) und `https://example.com` (`smoke.e2e.ts`) blockiert die CSP, bevor WebKit einen Namen auflöst; es gab weder eine DNS-Anfrage noch einen Verbindungsversuch. Der eingebettete WebDriver nimmt Verbindungen nur an (`accept`) und taucht deshalb nicht auf.
 
 ### Windows: Stichprobe, nur Bericht
 

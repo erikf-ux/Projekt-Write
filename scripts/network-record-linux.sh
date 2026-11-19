@@ -27,6 +27,10 @@ case "$command" in
   start)
     mkdir -p "$(dirname "$recording")"
     rm -f "$recording" "$recording.pid" "$recording.log"
+    # Tracepoints need tracefs; systemd mounts it, a bare container may not.
+    if [ ! -d /sys/kernel/tracing/events ] && [ ! -d /sys/kernel/debug/tracing/events ]; then
+      as_root mount -t tracefs nodev /sys/kernel/tracing
+    fi
     # Unbuffered, so "ready" and every event reach the file at once.
     # Thread ids are keys of the map of app processes, hence the larger map.
     # No descriptor of the caller stays open (a CI step would wait for it).
