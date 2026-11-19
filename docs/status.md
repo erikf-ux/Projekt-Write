@@ -288,8 +288,8 @@ Entschieden am 18. November 2026 (ADR 0028): D4 Lizenz MIT OR Apache-2.0; D11 vo
 
 ## Nächster Schritt
 
-Phase 14 ist abgeschlossen (CI-Lauf 127 grün); Abschnitt 25 endet damit. Offen beim Auftraggeber:
+Phase 14 ist abgeschlossen (CI-Lauf 127 grün); Abschnitt 25 endet damit.
 
-1. AppImage über 50 MB (88,8 MB): Zielwert für das AppImage nicht anwenden oder AppImage weglassen.
-2. Rechteinhaber in `LICENSE-MIT` und `LICENSE-APACHE` (bisher „The Project Write authors“).
-3. Freigabe der Handtests: Installation unter Windows mit SmartScreen, Tastatur und Screenreader (NVDA, Orca), Messung auf dem Referenzgerät mit Release-Build.
+Entschieden am 19. November 2026 (ADR 0028, Nachtrag): AppImage als Ausnahme vom 50-MB-Ziel; Rechteinhaber bleibt „The Project Write authors“; Handtests freigegeben.
+
+Die Handtests brauchen echte Geräte und eine Person davor; der Container und CI können sie nicht ausführen. Vorgehen und Protokoll: `docs/handtests.md`. Die Ergebnisse trägt der Tester dort ein; Befunde werden als F-Nummern in dieser Datei geführt.

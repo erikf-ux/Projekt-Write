@@ -30,7 +30,7 @@ Zielwert aus Abschnitt 6: Installationspaket ohne Zusatzpakete **≤ 50 MB** (ge
 
 Das Programm selbst ist rund 14 MB groß, die Wörterbücher mit dem Quelltext von igerman98 6 MB.
 
-**Das AppImage überschreitet den Zielwert** und wird in CI nur gemessen, nicht bewertet (`--report-only AppImage`). Ein AppImage muss alles mitbringen, was es nicht vom System erwarten darf: allein WebKitGTK (`libwebkit2gtk-4.1.so`, 91 MB), JavaScriptCore (32 MB) und die ICU-Daten (30 MB) machen ausgepackt rund 150 MB aus, komprimiert den größten Teil der 88,8 MB. Das `.deb` und die Windows-Installer nehmen diese Laufzeit vom System (WebKitGTK aus den Paketquellen, WebView2 von Windows) und bleiben deshalb weit unter 50 MB. Die GStreamer-Medienbibliotheken sind bereits weggelassen (`bundleMediaFramework: false`); kleiner wird ein AppImage mit WebKitGTK nicht. Ob der Zielwert für das AppImage nicht gilt oder das AppImage entfällt, entscheidet der Auftraggeber.
+**Das AppImage überschreitet den Zielwert; der Auftraggeber hat es als Ausnahme zugelassen** (ADR 0028, Nachtrag vom 19. November 2026). CI misst es nur und bewertet es nicht (`--report-only AppImage`). Ein AppImage muss alles mitbringen, was es nicht vom System erwarten darf: allein WebKitGTK (`libwebkit2gtk-4.1.so`, 91 MB), JavaScriptCore (32 MB) und die ICU-Daten (30 MB) machen ausgepackt rund 150 MB aus, komprimiert den größten Teil der 88,8 MB. Das `.deb` und die Windows-Installer nehmen diese Laufzeit vom System (WebKitGTK aus den Paketquellen, WebView2 von Windows) und bleiben deshalb weit unter 50 MB. Die GStreamer-Medienbibliotheken sind bereits weggelassen (`bundleMediaFramework: false`); kleiner wird ein AppImage mit WebKitGTK nicht.
 
 ## Windows
 

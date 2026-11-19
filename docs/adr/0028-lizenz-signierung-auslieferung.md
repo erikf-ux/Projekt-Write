@@ -46,3 +46,12 @@ Der Auftraggeber hat am 18. November 2026 entschieden (Antworten auf die Rückfr
 - Die offenen Punkte D4 und D11 aus `docs/status.md` sind entschieden.
 - Phase 14 baut unsignierte Installer für Windows und Linux in CI. Installation und Deinstallation werden auf frischen CI-Runnern geprüft.
 - Kommt später eine Update-Funktion, braucht sie eine eigene ADR: Endpunkt, Schlüsselverwahrung, Bestätigung durch den Nutzer und Anpassung des Netzwerktests.
+
+## Nachtrag 19. November 2026
+
+Nach dem Bericht zu Phase 14 hat der Auftraggeber zwei offene Punkte entschieden:
+
+1. **AppImage:** Der Zielwert „Installationspaket ≤ 50 MB“ (Abschnitt 6) gilt für das AppImage **nicht**; es ist eine Ausnahme. Ein AppImage muss WebKitGTK, JavaScriptCore und ICU selbst mitbringen und ist deshalb rund 89 MB groß (`docs/installation.md`). Für NSIS, MSI und `.deb` gilt der Zielwert weiter; CI bricht ab, wenn eines davon größer ist, und misst das AppImage nur (`--report-only AppImage`).
+2. **Rechteinhaber:** In `LICENSE-MIT` und `LICENSE-APACHE` bleibt **„The Project Write authors“** stehen.
+
+Außerdem hat er die offenen Handtests freigegeben. Sie brauchen echte Geräte und eine Person davor; die Liste mit Vorgehen und Protokoll steht in `docs/handtests.md`.

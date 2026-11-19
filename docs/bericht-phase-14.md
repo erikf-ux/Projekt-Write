@@ -89,7 +89,7 @@ Werte aus dem letzten lokalen Lauf (Container, Debug-Build mit E2E-Unterstützun
 | Suche, erste Treffer                        | ≤ 300 ms                                      | 111–125 ms                                                                         | 107–169 ms                       | 107–170 ms                   | erfüllt                                                                                                    |
 | Mesh zoomen und verschieben                 | ≥ 30 Bilder/s                                 | Zoomen 98 ms, Verschieben 43 ms (95 %), ohne GPU                                   | 115 / 54 ms                      | 243,5 / 39,8 ms              | nicht erfüllt ohne GPU (ADR 0022)                                                                          |
 | Arbeitsspeicher im Leerlauf                 | ≤ 500 MB                                      | 437 MB (kleine Bibliothek); 522 MB (Referenzbibliothek), jeweils PSS               | 441 / 536 MB (PSS)               | 129 / 175 MB (Private Bytes) | unter Linux mit der Referenzbibliothek knapp verfehlt (Debug-Build); Windows erfüllt                       |
-| Installationspaket                          | ≤ 50 MB                                       | `.deb` 10,3 MB; AppImage 88,7 MB                                                   | `.deb` 10,4 MB; AppImage 88,8 MB | NSIS 7,7 MB; MSI 10,1 MB     | `.deb`, NSIS und MSI erfüllt; AppImage nicht (siehe unten)                                                 |
+| Installationspaket                          | ≤ 50 MB                                       | `.deb` 10,3 MB; AppImage 88,7 MB                                                   | `.deb` 10,4 MB; AppImage 88,8 MB | NSIS 7,7 MB; MSI 10,1 MB     | `.deb`, NSIS und MSI erfüllt; AppImage als Ausnahme zugelassen                                             |
 | 100 harte Abbrüche beim Speichern           | keine beschädigte Datei, `integrity_check` ok | 100 von 100, ok                                                                    | in `cargo test`                  | in `cargo test`              | erfüllt                                                                                                    |
 | Barrierefreiheit                            | Tastatur; Kontrast 4,5:1 / 3:1                | Text ≥ 5,45:1, Grafik ≥ 4,83:1 (hell)                                              | grün, Kontrast wie lokal         | grün, Kontrast wie lokal     | erfüllt im geprüften Umfang                                                                                |
 
@@ -138,7 +138,7 @@ Keine bekannten.
 
 ## Gefundene Widersprüche und Abweichungen
 
-1. **AppImage über 50 MB (88,8 MB in CI, 88,7 MB lokal):** Ein AppImage muss WebKitGTK, JavaScriptCore und ICU mitbringen; das `.deb` und die Windows-Installer nehmen die Laufzeit vom System. CI misst die Größe des AppImage, lässt den Lauf aber nicht daran scheitern. **Entscheidung des Auftraggebers nötig:** Zielwert für das AppImage nicht anwenden oder AppImage weglassen.
+1. **AppImage über 50 MB (88,8 MB in CI, 88,7 MB lokal):** Ein AppImage muss WebKitGTK, JavaScriptCore und ICU mitbringen; das `.deb` und die Windows-Installer nehmen die Laufzeit vom System. CI misst die Größe des AppImage, lässt den Lauf aber nicht daran scheitern. **Entschieden am 19. November 2026:** Das AppImage ist eine Ausnahme vom Zielwert (ADR 0028, Nachtrag).
 2. **Arbeitsspeicher mit der Referenzbibliothek:** 522 bis 535 MB PSS im Debug-Build, Ziel 500 MB. Gut die Hälfte gehört dem Webprozess. Eine Messung mit Release-Build auf dem Referenzgerät steht aus.
 3. **Mesh mit 30 Bildern pro Sekunde:** ohne GPU nicht erreicht. Die Entscheidung zum Renderer steht in ADR 0022; die Messung mit GPU steht weiter aus.
 4. **Kaltstart:** Mit wiederhergestellten Tabs und mit der Referenzbibliothek liegt er bei 1,7 bis 2,0 s, also an der Grenze. In einem Lauf lag er bei 2,003 s. Im ersten Lauf nach einem Neustart des Containers, also mit leerem Datei-Cache, dauerte der Start mit der Referenzbibliothek einmal 35,8 s; die Wiederholung lag bei 1,9 s. Dasselbe trat lokal im jeweils ersten Lauf nach einem Neubau auf (36,8 s; die Seite begann erst nach 35,5 s zu laden, die Zeit vergeht also vor dem Fenster). Die Referenzbibliothek liegt dabei im lokalen Cache und wird von Lauf zu Lauf weiter benutzt; in CI, wo sie frisch entsteht, lag der Wert unter Linux bei 1,9 bis 2,4 s. Unter Windows lag er in CI-Lauf 127 bei 2,40 s (Tabs) und 3,16 s (Referenzbibliothek); dort begann das Öffnen der Bibliothek erst nach 1,84 s. Die Ursache ist nicht geklärt; die Messung auf dem Referenzgerät mit einem echten Neustart steht aus.
@@ -163,8 +163,6 @@ Keine bekannten.
 
 ## Nächster Schritt
 
-Abschnitt 25 endet mit Phase 14. CI-Lauf 127 ist vollständig grün. Ich brauche vom Auftraggeber:
+Abschnitt 25 endet mit Phase 14. CI-Lauf 127 ist vollständig grün.
 
-1. die Entscheidung zum AppImage;
-2. gegebenenfalls einen Namen als Rechteinhaber;
-3. die Freigabe der offenen Handtests: Installation unter Windows, Tastatur und Screenreader, Messung auf dem Referenzgerät.
+Entschieden am 19. November 2026 (ADR 0028, Nachtrag): Das AppImage ist eine Ausnahme vom 50-MB-Ziel; Rechteinhaber bleibt „The Project Write authors“; die Handtests sind freigegeben. Sie brauchen echte Geräte und stehen mit Vorgehen und Protokoll in `docs/handtests.md`.

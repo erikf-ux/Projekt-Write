@@ -40,6 +40,7 @@ Installer für Windows (NSIS, MSI) und Linux (`.deb`, AppImage) entstehen in CI 
 - [Architekturentscheidungen](docs/adr/README.md)
 - [Changelog](CHANGELOG.md)
 - [Installation](docs/installation.md)
+- [Handtests](docs/handtests.md)
 - [Sicherheit](docs/sicherheit.md)
 - [Leistung und Barrierefreiheit](docs/leistung-und-barrierefreiheit.md)
 - [Lizenzen Dritter](THIRD-PARTY-LICENSES) und ihre [Lizenztexte](THIRD-PARTY-NOTICES)

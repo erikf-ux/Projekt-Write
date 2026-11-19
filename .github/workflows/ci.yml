@@ -241,7 +241,8 @@ jobs:
 
       - name: Installer size at most 50 MB (section 6)
         # The AppImage carries WebKitGTK and ICU itself (about 150 MB
-        # unpacked); it is measured and reported only (docs/installation.md).
+        # unpacked); the client accepted it as an exception to the 50 MB
+        # target (ADR 0028, addendum), so it is measured and reported only.
         run: node scripts/installer-test.mjs size src-tauri/target/release/bundle --report-only AppImage
 
       - name: Upload installers
