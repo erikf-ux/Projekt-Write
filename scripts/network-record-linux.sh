@@ -28,8 +28,11 @@ case "$command" in
     mkdir -p "$(dirname "$recording")"
     rm -f "$recording" "$recording.pid" "$recording.log"
     # Tracepoints need tracefs; systemd mounts it, a bare container may not.
-    if [ ! -d /sys/kernel/tracing/events ] && [ ! -d /sys/kernel/debug/tracing/events ]; then
-      as_root mount -t tracefs nodev /sys/kernel/tracing
+    # Only root may look into it (mode 0700 on the GitHub runner, CI run
+    # 123), so the check runs as root too; a failed mount is not fatal,
+    # bpftrace says what is missing.
+    if ! as_root test -d /sys/kernel/tracing/events && ! as_root test -d /sys/kernel/debug/tracing/events; then
+      as_root mount -t tracefs nodev /sys/kernel/tracing || echo "::warning::could not mount tracefs" >&2
     fi
     # Unbuffered, so "ready" and every event reach the file at once.
     # Thread ids are keys of the map of app processes, hence the larger map.

@@ -70,6 +70,21 @@ fn webview_hardening_is_enabled() {
             window["dragDropEnabled"], false,
             "section 11: HTML5 drag and drop"
         );
+        // Section 2: WebView2 makes no connection of its own (CI run 123
+        // saw it reach Microsoft hosts and ask for wpad). The arguments
+        // replace wry's defaults, so those are repeated.
+        let args = window["additionalBrowserArgs"].as_str().unwrap_or_default();
+        for flag in [
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--no-proxy-server",
+        ] {
+            assert!(
+                args.split_whitespace().any(|arg| arg == flag),
+                "{flag} missing"
+            );
+        }
     }
 }
 

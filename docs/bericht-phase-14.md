@@ -128,6 +128,8 @@ Keine bekannten.
 - **Lizenztexte:** Den Installern lag nur die Liste der Fremdkomponenten bei, nicht deren Texte und Copyright-Hinweise. Jetzt liegt `THIRD-PARTY-NOTICES` bei.
 - **E2E `media.e2e.ts`:** Der Test eingefügter Bilder wartete nicht auf das Einfügen; das war eine Wettlaufsituation nur im Test.
 - **E2E `accessibility.e2e.ts`:** Im ersten Gesamtlauf mit Netzwerk-Aufzeichnung verlor der WebDriver eine getippte Taste (wie F-27), und drei Dateien scheiterten in Folge. Der Test prüft jetzt den getippten Titel und tippt bei Abweichung neu. Danach lief die Suite zweimal mit Aufzeichnung grün.
+- **Netzwerk-Aufzeichnung in CI (Lauf 123):** Das Startskript prüfte das Trace-Dateisystem als normaler Nutzer; auf dem GitHub-Runner darf das nur root, der dann versuchte `mount` brach ab. Die Prüfung läuft jetzt mit root-Rechten, ein gescheitertes `mount` bricht nicht mehr ab.
+- **WebView2 unter Windows (Lauf 123):** Verbindungen zu Microsoft und DNS-Anfragen nach `wpad` aus dem Prozessbaum der App. Behoben mit Startschaltern für WebView2 (siehe Abweichung 5).
 - **Netzwerktest mit `strace`:** Er bremste die App so stark, dass 12 bis 13 Spec-Dateien scheiterten und das Tippen 516 ms brauchte. Er misst damit keinen Normalbetrieb mehr und ist durch `bpftrace` im Kernel ersetzt.
 
 ## Gefundene Widersprüche und Abweichungen
@@ -135,8 +137,8 @@ Keine bekannten.
 1. **AppImage über 50 MB (88,7 MB):** Ein AppImage muss WebKitGTK, JavaScriptCore und ICU mitbringen; das `.deb` und die Windows-Installer nehmen die Laufzeit vom System. CI misst die Größe des AppImage, lässt den Lauf aber nicht daran scheitern. **Entscheidung des Auftraggebers nötig:** Zielwert für das AppImage nicht anwenden oder AppImage weglassen.
 2. **Arbeitsspeicher mit der Referenzbibliothek:** 522 bis 535 MB PSS im Debug-Build, Ziel 500 MB. Gut die Hälfte gehört dem Webprozess. Eine Messung mit Release-Build auf dem Referenzgerät steht aus.
 3. **Mesh mit 30 Bildern pro Sekunde:** ohne GPU nicht erreicht. Die Entscheidung zum Renderer steht in ADR 0022; die Messung mit GPU steht weiter aus.
-4. **Kaltstart:** Mit wiederhergestellten Tabs und mit der Referenzbibliothek liegt er bei 1,7 bis 2,0 s, also an der Grenze. In einem Lauf lag er bei 2,003 s.
-5. **Windows-Netzwerktest** nur als Stichprobe (siehe oben). WebView2 startet laut wry bereits ohne SmartScreen-Prüfung. Weitere Schalter (`--disable-background-networking` u. a.) sind vorgeschlagen, aber nicht gesetzt, solange der CI-Bericht keine Verbindung zeigt.
+4. **Kaltstart:** Mit wiederhergestellten Tabs und mit der Referenzbibliothek liegt er bei 1,7 bis 2,0 s, also an der Grenze. In einem Lauf lag er bei 2,003 s. Im ersten Lauf nach einem Neustart des Containers, also mit leerem Datei-Cache, dauerte der Start mit der Referenzbibliothek einmal 35,8 s; die Wiederholung lag bei 1,9 s. Ob das an der Platte des Containers liegt, die nach dem Neustart erst nachgeladen wird, oder an der App, muss die Messung auf dem Referenzgerät mit einem echten Neustart zeigen.
+5. **Windows-Netzwerktest:** nur als Stichprobe (siehe oben). In CI-Lauf 123 hielt WebView2 Verbindungen zu zwei Microsoft-Adressen und fragte per DNS nach `wpad`; die App selbst verband nur über Loopback. Seitdem startet WebView2 mit Schaltern ohne Hintergrund-Netzverkehr, Komponenten-Updates und Proxy-Suche (`additionalBrowserArgs`, `docs/sicherheit.md` §5), und der Windows-Schritt scheitert bei jedem Befund.
 6. **Barrierefreiheit:** keine neue Abhängigkeit (axe-core). Die Regeln prüft ein eigenes Modul, weil axe-core als eingespritzter Quelltext an der CSP und den eingefrorenen Prototypen scheitern würde.
 7. **Ein Zweig je Phase** (Abschnitt 24): Die Agenten arbeiteten auf lokalen Zweigen; gepusht wurde nur der erlaubte Zweig.
 
@@ -147,9 +149,10 @@ Keine bekannten.
 
 ## CI
 
-| Lauf | Ergebnis | Inhalt   |
-| ---- | -------- | -------- |
-| 123  | LAUF123  | Phase 14 |
+| Lauf | Ergebnis    | Inhalt                                                                                                                                                                                                                 |
+| ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 123  | rot (Linux) | E2E auf beiden Systemen grün, Installer und Installationstests grün; Netzwerk-Aufzeichnung startete auf dem Runner nicht (Prüfung des Trace-Dateisystems ohne root); Windows-Stichprobe fand Verbindungen von WebView2 |
+| 124  | LAUF124     | Abschluss Phase 14                                                                                                                                                                                                     |
 
 ## Nächster Schritt
 

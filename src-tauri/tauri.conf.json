@@ -21,7 +21,8 @@
         "minHeight": 500,
         "center": true,
         "dragDropEnabled": false,
-        "visible": false
+        "visible": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --no-pings --no-proxy-server --no-first-run"
       }
     ],
     "security": {

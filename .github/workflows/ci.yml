@@ -136,12 +136,12 @@ jobs:
           sh scripts/network-record-linux.sh stop tests/e2e/.network/linux.txt
           node scripts/network-check.mjs linux tests/e2e/.network/linux.txt
 
-      - name: Network test (Windows, sampled, report only)
+      - name: Network test (Windows, sampled)
         if: runner.os == 'Windows'
         # Samples TCP/UDP of the app's process tree and its DNS queries during
-        # a second run of the suite. Sampling misses short connections, so
-        # this step only reports (docs/sicherheit.md).
-        continue-on-error: true
+        # a second run of the suite. Sampling misses short connections; what
+        # it sees fails the step (CI run 123 saw WebView2 reach Microsoft
+        # hosts and ask for wpad, now switched off in tauri.conf.json).
         shell: pwsh
         run: |
           $out = 'tests/e2e/.network/windows.jsonl'
@@ -151,8 +151,10 @@ jobs:
           $e2e = $LASTEXITCODE
           New-Item -ItemType File -Path $stop | Out-Null
           $watch.WaitForExit(120000) | Out-Null
-          node scripts/network-check.mjs windows $out
+          node scripts/network-check.mjs windows $out --strict
+          $check = $LASTEXITCODE
           if ($e2e -ne 0) { Write-Output "::warning::the E2E suite failed during the network sampling (exit $e2e)" }
+          exit $check
 
   release-check:
     name: Release build contains no test plugins
