@@ -12,11 +12,13 @@ Diese Datei ist das Arbeitsgedächtnis. Zu Beginn jeder Sitzung lesen, am Ende a
 
 **Phase 13 – Erweiterungen** (Abschnitt 22): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Register in Rust, Register im Frontend, Einstellungen übertragen), abgeschlossen, CI-Lauf 122 grün; Bericht in `docs/bericht-phase-13.md`.
 
+**Phase 14 – Qualitätssicherung und Auslieferung** (Abschnitt 25): freigegeben („Starte“). Umgesetzt mit drei parallelen Agenten (Installer, Netzwerktest und Sicherheit, Barrierefreiheit und Leistung), abgeschlossen, CI-Lauf 127 grün; Bericht in `docs/bericht-phase-14.md`. Unsignierte Installer für Windows (NSIS, MSI) und Linux (`.deb`, AppImage), Netzwerktest ohne Befund, Lizenz MIT OR Apache-2.0.
+
 Zweig: weiterhin `claude/project-write-phase-1-6sh7n2` (die Sitzung erlaubt nur diesen Zweig).
 
-Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh), ADR 0023 (Prüfwerk `spellbook`), ADR 0024 (Wörterbücher), ADR 0025 (Sprachprüfung), ADR 0026 (LanguageTool über eine vorhandene Installation), ADR 0027 (Erweiterungen: Register, kein fremder Code, Einstellungen übertragen).
+Entscheidungen: ADR 0021 (Export, Drucken, Backup, Wiederherstellung Stufe 5), ADR 0022 (Mesh), ADR 0023 (Prüfwerk `spellbook`), ADR 0024 (Wörterbücher), ADR 0025 (Sprachprüfung), ADR 0026 (LanguageTool über eine vorhandene Installation), ADR 0027 (Erweiterungen: Register, kein fremder Code, Einstellungen übertragen), ADR 0028 (Lizenz, unsigniert, keine Updates, Windows und Linux).
 
-CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Phase 12: Lauf 118 grün (Zwischenstand), 119 rot (F-58), **120 grün** (Abschluss Phase 12). Phase 13: Lauf 121 rot (Windows, E2E-Test zu `eval`, siehe Bericht), **122 grün** (Abschluss Phase 13). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
+CI: Lauf 112 grün (Abschluss Phase 10). Phase 11: Lauf 113 rot (F-54), 114 rot (Windows, unsicherer erster Klick im Mesh-Test), 115 rot (F-55, Clippy mit Rust 1.100), 116 rot (F-56, F-57), **117 grün** (Abschluss Phase 11). Phase 12: Lauf 118 grün (Zwischenstand), 119 rot (F-58), **120 grün** (Abschluss Phase 12). Phase 13: Lauf 121 rot (Windows, E2E-Test zu `eval`, siehe Bericht), **122 grün** (Abschluss Phase 13). Phase 14: Lauf 123 rot (Netzwerk-Aufzeichnung startete nicht; WebView2-Verbindungen), 124 rot (F-59), 125 rot (erste Fassung von F-59), 126 rot (Paketquellen des Linux-Runners), **127 grün** (Abschluss Phase 14). Zwischenstände und reine Doku-Commits tragen `[skip ci]` in der Betreffzeile; ein Commit ohne `[skip ci]` besteht vorher alle lokalen Prüfungen (F-26) und startet CI selbst – kein zusätzlicher Lauf von Hand (die Gruppe `concurrency` bricht sonst den älteren ab).
 
 ## Stand Phase 13
 
@@ -286,4 +288,8 @@ Entschieden am 18. November 2026 (ADR 0028): D4 Lizenz MIT OR Apache-2.0; D11 vo
 
 ## Nächster Schritt
 
-Phase 14 (Qualitätssicherung und Auslieferung) läuft.
+Phase 14 ist abgeschlossen (CI-Lauf 127 grün); Abschnitt 25 endet damit. Offen beim Auftraggeber:
+
+1. AppImage über 50 MB (88,8 MB): Zielwert für das AppImage nicht anwenden oder AppImage weglassen.
+2. Rechteinhaber in `LICENSE-MIT` und `LICENSE-APACHE` (bisher „The Project Write authors“).
+3. Freigabe der Handtests: Installation unter Windows mit SmartScreen, Tastatur und Screenreader (NVDA, Orca), Messung auf dem Referenzgerät mit Release-Build.

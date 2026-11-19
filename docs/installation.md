@@ -21,16 +21,16 @@ Testplugins sind in keinem Paket enthalten (Abschnitt 20): Der Installer-Test su
 
 Zielwert aus Abschnitt 6: Installationspaket ohne Zusatzpakete **≤ 50 MB** (gerechnet mit 1 MB = 1.000.000 Byte, die strengere Lesart). CI misst jedes Paket im Job „Installers“ und bricht ab, wenn NSIS, MSI oder `.deb` größer sind; die Werte stehen in der Zusammenfassung des Laufs.
 
-| Paket         | Größe                     | Gemessen                              |
-| ------------- | ------------------------- | ------------------------------------- |
-| NSIS (`.exe`) | _CI-Wert eintragen_       | CI, `windows-latest`                  |
-| MSI           | _CI-Wert eintragen_       | CI, `windows-latest`                  |
-| `.deb`        | 10,3 MB (10.329.226 Byte) | lokal, Linux-Container (Ubuntu 24.04) |
-| AppImage      | 88,7 MB (88.656.376 Byte) | lokal, Linux-Container (Ubuntu 24.04) |
+| Paket         | Größe                     | Gemessen                                    |
+| ------------- | ------------------------- | ------------------------------------------- |
+| NSIS (`.exe`) | 7,7 MB (7.742.263 Byte)   | CI-Lauf 127, `windows-latest`               |
+| MSI           | 10,1 MB (10.055.680 Byte) | CI-Lauf 127, `windows-latest`               |
+| `.deb`        | 10,4 MB (10.423.032 Byte) | CI-Lauf 127, `ubuntu-24.04` (lokal 10,3 MB) |
+| AppImage      | 88,8 MB (88.754.680 Byte) | CI-Lauf 127, `ubuntu-24.04` (lokal 88,7 MB) |
 
 Das Programm selbst ist rund 14 MB groß, die Wörterbücher mit dem Quelltext von igerman98 6 MB.
 
-**Das AppImage überschreitet den Zielwert** und wird in CI nur gemessen, nicht bewertet (`--report-only AppImage`). Ein AppImage muss alles mitbringen, was es nicht vom System erwarten darf: allein WebKitGTK (`libwebkit2gtk-4.1.so`, 91 MB), JavaScriptCore (32 MB) und die ICU-Daten (30 MB) machen ausgepackt rund 150 MB aus, komprimiert den größten Teil der 88,7 MB. Das `.deb` und die Windows-Installer nehmen diese Laufzeit vom System (WebKitGTK aus den Paketquellen, WebView2 von Windows) und bleiben deshalb weit unter 50 MB. Die GStreamer-Medienbibliotheken sind bereits weggelassen (`bundleMediaFramework: false`); kleiner wird ein AppImage mit WebKitGTK nicht. Ob der Zielwert für das AppImage nicht gilt oder das AppImage entfällt, entscheidet der Auftraggeber.
+**Das AppImage überschreitet den Zielwert** und wird in CI nur gemessen, nicht bewertet (`--report-only AppImage`). Ein AppImage muss alles mitbringen, was es nicht vom System erwarten darf: allein WebKitGTK (`libwebkit2gtk-4.1.so`, 91 MB), JavaScriptCore (32 MB) und die ICU-Daten (30 MB) machen ausgepackt rund 150 MB aus, komprimiert den größten Teil der 88,8 MB. Das `.deb` und die Windows-Installer nehmen diese Laufzeit vom System (WebKitGTK aus den Paketquellen, WebView2 von Windows) und bleiben deshalb weit unter 50 MB. Die GStreamer-Medienbibliotheken sind bereits weggelassen (`bundleMediaFramework: false`); kleiner wird ein AppImage mit WebKitGTK nicht. Ob der Zielwert für das AppImage nicht gilt oder das AppImage entfällt, entscheidet der Auftraggeber.
 
 ## Windows
 

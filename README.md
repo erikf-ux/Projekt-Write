@@ -2,7 +2,11 @@
 
 Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Windows, macOS und Linux. Keine Cloud, keine Konten, keine Telemetrie.
 
-> Stand: **Phase 11 – Mesh** (in Arbeit). Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+> Stand: **Phase 14 – Qualitätssicherung und Auslieferung** (abgeschlossen). macOS ist vorerst zurückgestellt; Installer gibt es für Windows und Linux. Der vollständige Auftrag steht in [`docs/master-prompt.md`](docs/master-prompt.md), der aktuelle Stand in [`docs/status.md`](docs/status.md).
+
+## Installation
+
+Installer für Windows (NSIS, MSI) und Linux (`.deb`, AppImage) entstehen in CI im Job „Installers“. Sie sind vorerst nicht signiert; Hinweise zu SmartScreen, Smart App Control und zur Deinstallation in [`docs/installation.md`](docs/installation.md). Die App baut im Normalbetrieb keine Netzverbindung auf und hat keine Update-Funktion.
 
 ## Voraussetzungen
 
@@ -24,6 +28,7 @@ Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Wi
 | Echten Ordnerdialog prüfen (manuell)           | `npx wdio run tests/e2e/manual/wdio.manual.conf.ts` (unter Linux mit `xvfb-run`; speichert ein Bildschirmfoto)                                                            |
 | Referenzbibliothek erzeugen                    | `node scripts/reference-library.mjs` (Standard: 10.000 Dokumente und 5.000 Medien in `src-tauri/target/reference-library`; `--seed`, `--documents`, `--force`, `--check`) |
 | Lizenzliste aktualisieren                      | `node scripts/third-party-licenses.mjs`                                                                                                                                   |
+| Installer bauen                                | `npx tauri build --bundles nsis,msi` (Windows) bzw. `--bundles deb,appimage` (Linux)                                                                                      |
 | Release-Binary                                 | `npx tauri build --no-bundle`                                                                                                                                             |
 | App-Icons neu erzeugen                         | `node scripts/app-icons.mjs` (Quelle `src-tauri/icons/app-icon.png`, 256 × 256 px)                                                                                        |
 
@@ -34,7 +39,10 @@ Lokale, plattformübergreifende Schreib- und Wissensmanagement-Anwendung für Wi
 - [Abhängigkeiten](docs/dependencies.md)
 - [Architekturentscheidungen](docs/adr/README.md)
 - [Changelog](CHANGELOG.md)
-- [Lizenzen Dritter](THIRD-PARTY-LICENSES)
+- [Installation](docs/installation.md)
+- [Sicherheit](docs/sicherheit.md)
+- [Leistung und Barrierefreiheit](docs/leistung-und-barrierefreiheit.md)
+- [Lizenzen Dritter](THIRD-PARTY-LICENSES) und ihre [Lizenztexte](THIRD-PARTY-NOTICES)
 
 ## Die Bibliothek
 
@@ -93,3 +101,7 @@ Alle Kürzel außer denen der Texteingabe (Rückgängig, Wiederholen, Einfügen)
 ## Datenschutz
 
 Project Write arbeitet vollständig lokal. Die Bibliothek ist in Version 1.0 nicht verschlüsselt; empfohlen wird die Datenträgerverschlüsselung des Betriebssystems (BitLocker, FileVault, LUKS).
+
+## Lizenz
+
+Project Write steht nach Wahl unter der [MIT-Lizenz](LICENSE-MIT) oder der [Apache-Lizenz 2.0](LICENSE-APACHE) (ADR 0028). Die mitgelieferten Wörterbücher tragen eigene Lizenzen (`dictionaries/<Sprache>/LICENSE`).

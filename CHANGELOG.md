@@ -4,6 +4,24 @@ Alle wesentlichen Änderungen an Project Write. Format nach [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 14 – Qualitätssicherung und Auslieferung
+
+#### Hinzugefügt
+
+- Installer für Windows (NSIS für den Nutzer, MSI) und Linux (`.deb`, AppImage), vorerst unsigniert; Installation und Deinstallation in CI auf frischen Runnern geprüft, die Bibliothek bleibt dabei unangetastet. Hinweise zu SmartScreen und Smart App Control in `docs/installation.md`.
+- Lizenz MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`); `THIRD-PARTY-NOTICES` mit den vollständigen Lizenztexten und Copyright-Hinweisen aller ausgelieferten Fremdkomponenten, in jedem Installer enthalten.
+- Netzwerktest: Unter Linux zeichnet `bpftrace` während der ganzen E2E-Suite jede Verbindung der App auf, unter Windows prüft eine Stichprobe jede Sekunde; erlaubt sind nur lokale Verbindungen.
+- Sicherheitsprüfung (`docs/sicherheit.md`), Prüfung der Barrierefreiheit (Tastatur, Fokus, ARIA, gezeichneter Kontrast) und Bericht über alle Zielwerte aus Abschnitt 6 (`docs/leistung-und-barrierefreiheit.md`) mit neuen Messungen für Kaltstart und Arbeitsspeicher.
+
+#### Geändert
+
+- WebView2 startet ohne Hintergrund-Netzverkehr, Komponenten-Updates und Proxy-Suche.
+
+#### Behoben
+
+- Kontrast von Checkboxen und Optionsfeldern im hellen Design; Fokusrückgabe von Befehlspalette und Dialogen; Schließen-Schaltfläche und Kontextmenü in der Tab-Liste; `aria-controls` auf fehlende Bereiche.
+- F-59: Die Befehlspalette konnte den Fokus an den Editor verlieren; `Enter` fügte dann eine Zeile ein, statt den Befehl auszuführen.
+
 ### Phase 13 – Erweiterungen
 
 #### Hinzugefügt
