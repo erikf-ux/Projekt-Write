@@ -223,7 +223,22 @@ async function runByKeyboard(command: string): Promise<void> {
           return;
         }
       }
-      throw new Error(`the palette stayed open after Enter on ${command}`);
+      const state = await browser.execute(() => {
+        const input = document.querySelector<HTMLInputElement>(
+          '[data-testid="command-palette"] [role="combobox"]',
+        );
+        const active = document.activeElement;
+        return {
+          query: input?.value ?? null,
+          chosen:
+            document.getElementById(input?.getAttribute('aria-activedescendant') ?? '')?.textContent ?? null,
+          focus: `${active?.tagName ?? ''} ${active?.getAttribute('data-testid') ?? ''} ${active?.getAttribute('role') ?? ''}`,
+          dialogs: [...document.querySelectorAll('[role="dialog"]')].map((d) =>
+            d.getAttribute('data-testid'),
+          ),
+        };
+      });
+      throw new Error(`the palette stayed open after Enter on ${command}: ${JSON.stringify(state)}`);
     }
     await browser.keys('ArrowDown');
   }

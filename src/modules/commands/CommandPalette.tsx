@@ -62,7 +62,18 @@ export function CommandPalette({ entries, onRun, onClose }: CommandPaletteProps)
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     input.current?.focus();
+    // The palette is modal: focus that leaves it comes back to the input.
+    // A focus call that lands late (Tiptap focuses the editor in the next
+    // animation frame) would otherwise send Enter into the text (F-59).
+    const onFocusIn = (event: FocusEvent) => {
+      const root = input.current?.closest('[role="dialog"]');
+      if (root && event.target instanceof Node && !root.contains(event.target)) {
+        input.current?.focus();
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
     return () => {
+      document.removeEventListener('focusin', onFocusIn);
       const current = document.activeElement;
       if (previous?.isConnected && (current === null || current === document.body)) {
         previous.focus();

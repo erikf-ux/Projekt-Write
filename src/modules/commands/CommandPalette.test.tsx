@@ -69,4 +69,17 @@ describe('CommandPalette', () => {
     expect(document.activeElement).toBe(origin);
     origin.remove();
   });
+
+  it('keeps the focus in the input when something outside takes it (F-59)', () => {
+    const outside = document.createElement('div');
+    outside.tabIndex = 0;
+    document.body.append(outside);
+    render(<CommandPalette entries={entries} onRun={vi.fn()} onClose={vi.fn()} />);
+    const input = screen.getByRole('combobox');
+    expect(document.activeElement).toBe(input);
+    // As the editor focusing itself a frame late, after the palette opened.
+    outside.focus();
+    expect(document.activeElement).toBe(input);
+    outside.remove();
+  });
 });
