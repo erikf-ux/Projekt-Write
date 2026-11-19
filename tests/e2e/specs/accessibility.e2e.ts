@@ -156,7 +156,34 @@ async function runByKeyboard(command: string): Promise<void> {
         ?.textContent ?? '',
     command,
   );
-  await browser.keys(title.split(''));
+  // The embedded WebDriver now and then loses a synthetic key (F-27): the
+  // query must read exactly the title before the arrow keys look for it.
+  const query = () =>
+    browser.execute(
+      () =>
+        document.querySelector<HTMLInputElement>('[data-testid="command-palette"] [role="combobox"]')
+          ?.value ?? '',
+    );
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const typed = await query();
+    if (typed === title) {
+      break;
+    }
+    if (typed !== '') {
+      await browser.keys(['Control', 'a']);
+      await browser.keys('Backspace');
+    }
+    await browser.keys(title.split(''));
+    await browser
+      .waitUntil(async () => (await query()).length >= title.length, {
+        timeout: 2_000,
+        timeoutMsg: 'the typed title did not arrive',
+      })
+      .catch(() => undefined);
+  }
+  if ((await query()) !== title) {
+    throw new Error(`could not type the title of ${command}: ${await query()}`);
+  }
   for (let step = 0; step < 30; step += 1) {
     const active = await browser.execute(() => {
       const input = document.querySelector('[data-testid="command-palette"] [role="combobox"]');
