@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import { $, $$, browser, expect } from '@wdio/globals';
 import { activeDocumentId } from '../editing';
+import { measureStartAndIdleMemory } from '../processes';
 import { handover } from '../sandbox';
 import { pinMainWindow } from '../session';
 
@@ -15,6 +16,8 @@ describe('Session after a restart (stage 1)', () => {
   before(async () => {
     await pinMainWindow();
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+    // Section 6: the cold start with the tabs of the last session (processes.ts).
+    await measureStartAndIdleMemory('tabs of the last session restored', { memory: false });
   });
 
   it('opens the tabs of the last session again, with the active tab and the selection', async () => {

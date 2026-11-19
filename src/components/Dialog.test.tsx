@@ -60,4 +60,19 @@ describe('Dialog', () => {
     expect(document.activeElement).toBe(second);
     outside.remove();
   });
+
+  it('returns the focus to the opener even when a control inside takes it with autoFocus', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const { unmount } = render(
+      <Dialog title="Version" onClose={vi.fn()}>
+        <input aria-label="Name" autoFocus />
+      </Dialog>,
+    );
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

@@ -169,107 +169,116 @@ export function TabBar({
   }
 
   return (
-    <div
-      ref={list}
-      role="tablist"
-      aria-label={t('tabs.label')}
-      data-testid="tabs"
-      className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-muted/40 bg-sidebar"
-      onDragOver={(event) => {
-        if (event.dataTransfer.types.includes(DRAG_TYPE)) {
+    <>
+      <div
+        ref={list}
+        role="tablist"
+        aria-label={t('tabs.label')}
+        data-testid="tabs"
+        className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-muted/40 bg-sidebar"
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes(DRAG_TYPE)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            setDropIndex(indexAt(event));
+          }
+        }}
+        onDragLeave={() => {
+          setDropIndex(null);
+        }}
+        onDrop={(event) => {
+          const id = event.dataTransfer.getData(DRAG_TYPE);
+          setDropIndex(null);
+          if (!id) {
+            return;
+          }
           event.preventDefault();
-          event.dataTransfer.dropEffect = 'move';
-          setDropIndex(indexAt(event));
-        }
-      }}
-      onDragLeave={() => {
-        setDropIndex(null);
-      }}
-      onDrop={(event) => {
-        const id = event.dataTransfer.getData(DRAG_TYPE);
-        setDropIndex(null);
-        if (!id) {
-          return;
-        }
-        event.preventDefault();
-        const from = tabs.findIndex((tab) => tab.id === id);
-        let to = indexAt(event);
-        if (from !== -1 && from < to) {
-          to -= 1;
-        }
-        onMove(id, to);
-      }}
-    >
-      {tabs.map((tab, index) => {
-        const selected = tab.id === active;
-        return (
-          <div
-            key={tab.id}
-            id={tabElementId(tab.id)}
-            role="tab"
-            aria-selected={selected}
-            aria-controls={panelId(tab.id)}
-            tabIndex={tab.id === stop ? 0 : -1}
-            draggable
-            data-tab={tab.id}
-            data-unsaved={tab.marker === 'unsaved' ? true : undefined}
-            title={tab.tooltip ?? tab.title}
-            className={`text-ui group relative flex max-w-56 min-w-24 cursor-default items-center gap-2 border-r border-muted/40 pr-1 pl-3 focus-visible:outline-offset-[-2px] ${
-              selected ? 'bg-surface text-fg' : 'text-muted'
-            } ${dropIndex === index ? 'border-l-2 border-l-accent' : ''}`}
-            onClick={() => {
-              onActivate(tab.id);
-            }}
-            onAuxClick={(event) => {
-              if (event.button === 1) {
+          const from = tabs.findIndex((tab) => tab.id === id);
+          let to = indexAt(event);
+          if (from !== -1 && from < to) {
+            to -= 1;
+          }
+          onMove(id, to);
+        }}
+      >
+        {tabs.map((tab, index) => {
+          const selected = tab.id === active;
+          return (
+            <div
+              key={tab.id}
+              id={tabElementId(tab.id)}
+              role="tab"
+              aria-selected={selected}
+              aria-controls={panelId(tab.id)}
+              tabIndex={tab.id === stop ? 0 : -1}
+              draggable
+              data-tab={tab.id}
+              data-unsaved={tab.marker === 'unsaved' ? true : undefined}
+              title={tab.tooltip ?? tab.title}
+              className={`text-ui group relative flex max-w-56 min-w-24 cursor-default items-center gap-2 border-r border-muted/40 pr-1 pl-3 focus-visible:outline-offset-[-2px] ${
+                selected ? 'bg-surface text-fg' : 'text-muted'
+              } ${dropIndex === index ? 'border-l-2 border-l-accent' : ''}`}
+              onClick={() => {
+                onActivate(tab.id);
+              }}
+              onAuxClick={(event) => {
+                if (event.button === 1) {
+                  event.preventDefault();
+                  onClose(tab.id);
+                }
+              }}
+              onFocus={() => {
+                setFocused(tab.id);
+              }}
+              onKeyDown={(event) => {
+                onKeyDown(event, tab, index);
+              }}
+              onContextMenu={(event) => {
                 event.preventDefault();
-                onClose(tab.id);
-              }
-            }}
-            onFocus={() => {
-              setFocused(tab.id);
-            }}
-            onKeyDown={(event) => {
-              onKeyDown(event, tab, index);
-            }}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              openMenu(tab, { x: event.clientX, y: event.clientY });
-            }}
-            onDragStart={(event) => {
-              event.dataTransfer.setData(DRAG_TYPE, tab.id);
-              event.dataTransfer.effectAllowed = 'move';
-            }}
-          >
-            {selected ? (
-              <span aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-accent" />
-            ) : null}
-            <span className="truncate">{tab.title}</span>
-            {tab.marker === 'error' ? (
-              <span className="text-danger" title={t('status.saveError')}>
-                !<span className="sr-only">{t('status.saveError')}</span>
-              </span>
-            ) : tab.marker === 'unsaved' ? (
-              <span className="text-accent" title={t('tab.unsaved')} data-testid="tab-unsaved">
-                ●<span className="sr-only">{t('tab.unsaved')}</span>
-              </span>
-            ) : null}
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-label={t('tabs.close', { title: tab.title })}
-              title={closeShortcut ? `${t('command.tab.close')} (${closeShortcut})` : t('command.tab.close')}
-              className="ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-pw text-muted hover:bg-sidebar hover:text-fg"
-              onClick={(event) => {
-                event.stopPropagation();
-                onClose(tab.id);
+                openMenu(tab, { x: event.clientX, y: event.clientY });
+              }}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(DRAG_TYPE, tab.id);
+                event.dataTransfer.effectAllowed = 'move';
               }}
             >
-              <X aria-hidden="true" className="size-3.5" />
-            </button>
-          </div>
-        );
-      })}
+              {selected ? (
+                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-accent" />
+              ) : null}
+              <span className="truncate">{tab.title}</span>
+              {tab.marker === 'error' ? (
+                <span className="text-danger" title={t('status.saveError')}>
+                  !<span className="sr-only">{t('status.saveError')}</span>
+                </span>
+              ) : tab.marker === 'unsaved' ? (
+                <span className="text-accent" title={t('tab.unsaved')} data-testid="tab-unsaved">
+                  ●<span className="sr-only">{t('tab.unsaved')}</span>
+                </span>
+              ) : null}
+              <button
+                type="button"
+                tabIndex={-1}
+                // A shortcut for the mouse: for assistive technology a tab
+                // holds no other control (WAI-ARIA). From the keyboard,
+                // Delete, Ctrl+W and the context menu close the tab.
+                aria-hidden="true"
+                aria-label={t('tabs.close', { title: tab.title })}
+                title={
+                  closeShortcut ? `${t('command.tab.close')} (${closeShortcut})` : t('command.tab.close')
+                }
+                className="ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-pw text-muted hover:bg-sidebar hover:text-fg"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClose(tab.id);
+                }}
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {/* Outside the tablist: a tablist holds tabs only (WAI-ARIA). */}
       {menu ? (
         <ContextMenu
           {...menu}
@@ -278,6 +287,6 @@ export function TabBar({
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }

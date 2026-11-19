@@ -39,6 +39,60 @@
     font-size: var(--text-ui);
   }
 
+  /*
+   * Checkboxes and radio buttons drawn from the tokens (section 6: 3:1 for
+   * graphical elements). WebKitGTK draws the unchecked box with a #C3C3C3
+   * border, 1.76:1 on white (Phase 14 accessibility check).
+   */
+  input[type='checkbox'],
+  input[type='radio'] {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    border: 1px solid var(--pw-color-text-muted);
+    border-radius: 3px;
+    background-color: var(--pw-color-surface);
+    vertical-align: middle;
+  }
+
+  input[type='radio'] {
+    border-radius: 50%;
+  }
+
+  input[type='checkbox']:checked {
+    border-color: var(--pw-color-accent);
+    background-color: var(--pw-color-accent);
+  }
+
+  input[type='checkbox']:checked::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background-color: var(--pw-color-surface);
+    clip-path: polygon(14% 44%, 0 59%, 40% 100%, 100% 22%, 86% 8%, 40% 70%);
+  }
+
+  input[type='radio']:checked {
+    border-color: var(--pw-color-accent);
+  }
+
+  input[type='radio']:checked::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--pw-color-accent);
+  }
+
+  input[type='checkbox']:disabled,
+  input[type='radio']:disabled {
+    opacity: 0.5;
+  }
+
   /* Visible keyboard focus everywhere (section 11). */
   :focus-visible {
     outline: 2px solid var(--pw-color-accent);

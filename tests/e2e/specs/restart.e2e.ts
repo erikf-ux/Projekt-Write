@@ -5,12 +5,15 @@
  * a moved library opens only after a confirmation.
  *
  * Runs after library.e2e.ts, in a new app process (library.e2e.ts closes the
- * window; the test service starts the app again).
+ * window; the test service starts the app again). The first start with a
+ * library: it also measures the cold start and the idle memory (section 6,
+ * processes.ts).
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { $, $$, expect } from '@wdio/globals';
+import { measureStartAndIdleMemory } from '../processes';
 import { appDirs, application, pickedFolders } from '../sandbox';
 import { closeSettings, openSettings, pinMainWindow } from '../session';
 
@@ -46,6 +49,8 @@ describe('Project Write – Phase 2 restart and second instance', () => {
     await pinMainWindow();
     // The remembered library opens at start: the workbench, not the first start.
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 60_000 });
+    // Section 6: cold start and idle memory, before anything is touched.
+    await measureStartAndIdleMemory('small library of the tests');
     await openSettings('library');
     await waitForOpenLibrary();
   });

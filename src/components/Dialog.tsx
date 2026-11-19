@@ -30,6 +30,21 @@ function topDialog(): HTMLElement | undefined {
   return innermost[innermost.length - 1];
 }
 
+/** The element outside every dialog that had the focus last. */
+let lastFocusOutside: HTMLElement | null = null;
+document.addEventListener(
+  'focusin',
+  (event) => {
+    if (
+      event.target instanceof HTMLElement &&
+      !event.target.closest('[role="dialog"], [role="alertdialog"]')
+    ) {
+      lastFocusOutside = event.target;
+    }
+  },
+  true,
+);
+
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -46,8 +61,15 @@ export function Dialog({
   const titleId = useId();
 
   useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const element = panel.current;
+    // Where the focus was before the dialog opened. A control inside with
+    // `autoFocus` may already have taken it: then the last focus outside
+    // every dialog counts.
+    const active = document.activeElement;
+    const previous =
+      active instanceof HTMLElement && active !== document.body && !element?.contains(active)
+        ? active
+        : lastFocusOutside;
     const focusFirst = () => {
       const first =
         element?.querySelector<HTMLElement>('[data-autofocus]') ??
@@ -86,7 +108,9 @@ export function Dialog({
       if (index !== -1) {
         openDialogs.splice(index, 1);
       }
-      previous?.focus();
+      if (previous?.isConnected) {
+        previous.focus();
+      }
     };
   }, []);
 

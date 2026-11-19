@@ -24,11 +24,15 @@
  * Phase 9 measures the global search: from typing a query to its hits on
  * screen, against the target of section 6 (300 ms).
  *
+ * Phase 14 measures the cold start and the idle memory there first
+ * (section 6, processes.ts).
+ *
  * Runs in a new app process after reference-prepare.e2e.ts.
  */
 import { $, browser, expect } from '@wdio/globals';
 import { runFromPalette } from '../editing';
 import { measured } from '../measurements';
+import { measureMemory, measureStartAndIdleMemory } from '../processes';
 import { pinMainWindow } from '../session';
 
 /** Targets (ADR 0017, decision 17). */
@@ -60,6 +64,8 @@ describe('Explorer with the reference library (Phase 7)', () => {
     await pinMainWindow();
     await $('[data-testid="workbench"]').waitForDisplayed({ timeout: 120_000 });
     await $('[data-testid="explorer"] [data-subnet]').waitForExist({ timeout: 120_000 });
+    // Section 6: cold start and idle memory with the reference library (processes.ts).
+    await measureStartAndIdleMemory('reference library, 10,000 documents');
   });
 
   it('shows the tree after the library begins to open (target 1 s)', async () => {
@@ -515,5 +521,11 @@ describe('Mesh with the reference library (Phase 11, load test)', () => {
     measured(
       `Mesh target 30 frames per second (${MESH_FRAME_TARGET_MS.toFixed(1)} ms): zoom ${percentile(result.zoom, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}, pan ${percentile(result.pan, 0.95) <= MESH_FRAME_TARGET_MS ? 'met' : 'missed'}`,
     );
+  });
+});
+
+describe('Memory after the load tests (Phase 14)', () => {
+  it('logs the memory of the app with the Mesh of 1,000 nodes open', async () => {
+    await measureMemory('reference library, after Explorer, gallery, search and Mesh');
   });
 });

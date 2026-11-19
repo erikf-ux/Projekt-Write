@@ -70,7 +70,8 @@ export function SettingsDialog() {
             role="tab"
             id={`settings-tab-${entry.id}`}
             aria-selected={section === entry.id}
-            aria-controls={`settings-panel-${entry.id}`}
+            // Only the panel of the selected section exists.
+            aria-controls={section === entry.id ? `settings-panel-${entry.id}` : undefined}
             tabIndex={section === entry.id ? 0 : -1}
             data-testid={`settings-tab-${entry.id}`}
             className={`text-ui -mb-px border-b-2 px-3 py-1.5 ${

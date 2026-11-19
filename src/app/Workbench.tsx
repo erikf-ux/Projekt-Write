@@ -71,6 +71,7 @@ import { TagManager } from '@/modules/structure/TagManager';
 import { TagsDialog } from '@/modules/structure/TagsDialog';
 import { useExplorer } from '@/modules/documents/explorerStore';
 import { useBindings, useShortcutLabel } from './bindings';
+import { markReadyForInput } from './readyMark';
 
 /** How often external files are compared with their state on disk. */
 export const EXTERNAL_CHECK_MS = 2000;
@@ -150,6 +151,8 @@ export function Workbench({ openEmptyDocument }: WorkbenchProps) {
         created.current = true;
         await runCommand('document.new');
       }
+      // Section 6, "Kaltstart bis zur Eingabemöglichkeit" (E2E measurement).
+      markReadyForInput();
     })();
   }, [libraryKey, openEmptyDocument]);
 
